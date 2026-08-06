@@ -185,6 +185,23 @@ export class MarkupEngineService {
     </svg>`;
   }
 
+  // ── Minimum-size check before committing a drawn shape ────────
+  hasMinimumSize(s: ShapeData): boolean {
+    const MIN = 3;
+    switch (s.tool) {
+      case 'line': case 'arrow': case 'dimension':
+        return Math.hypot((s.x2||0)-(s.x1||0), (s.y2||0)-(s.y1||0)) > MIN;
+      case 'rect': case 'highlight':
+        return (s.width||0) > MIN && (s.height||0) > MIN;
+      case 'circle':
+        return (s.r||0) > MIN;
+      case 'freehand': case 'cloud':
+        return (s.points?.length || 0) > 2;
+      default:
+        return true;
+    }
+  }
+
   // ── Hit test: find shape at pointer position ─────────────────
   hitTest(shapes: ShapeData[], pt: PointerPoint, tolerance = 8): ShapeData | null {
     for (let i = shapes.length - 1; i >= 0; i--) {
