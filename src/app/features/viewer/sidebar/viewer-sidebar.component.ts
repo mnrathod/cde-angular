@@ -4,12 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
 import { AnnotationService } from '../../../core/services/viewer/annotation.service';
 import { AnnotationThreadComponent } from '../markup/annotation-thread.component';
+import { DocumentSignatureComponent } from '../markup/document-signature.component';
 import { Annotation } from '../../../core/models';
 
 @Component({
   selector: 'app-viewer-sidebar',
   standalone: true,
-  imports: [CommonModule, FormsModule, AnnotationThreadComponent],
+  imports: [CommonModule, FormsModule, AnnotationThreadComponent, DocumentSignatureComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="w-60 bg-white border-l border-gray-200 flex flex-col flex-shrink-0">
@@ -120,6 +121,13 @@ import { Annotation } from '../../../core/models';
         </div>
       }
 
+      <!-- Signatures tab -->
+      @if (state.sidebarTab() === 'signatures') {
+        <div class="flex-1 overflow-y-auto">
+          <app-document-signature [documentId]="state.documentId()"></app-document-signature>
+        </div>
+      }
+
       <!-- Search tab -->
       @if (state.sidebarTab() === 'search') {
         <div class="flex flex-col h-full">
@@ -166,6 +174,7 @@ export class ViewerSidebarComponent {
   readonly tabs = [
     { id: 'annotations' as const, icon: '✍', label: 'Notes' },
     { id: 'threads'     as const, icon: '💬', label: 'Threads' },
+    { id: 'signatures'  as const, icon: '🔏', label: 'Sign' },
     { id: 'thumbnails'  as const, icon: '⊞', label: 'Pages' },
     { id: 'search'      as const, icon: '🔍', label: 'Search' },
   ];
