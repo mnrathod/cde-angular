@@ -43,12 +43,14 @@ import { AuthService } from '../../core/services/auth.service';
             <div>
               <label class="block text-xs font-medium text-gray-600 mb-1">Username</label>
               <input [(ngModel)]="username" name="username" type="text" required
+                autocomplete="username"
                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 placeholder="admin" />
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-600 mb-1">Password</label>
               <input [(ngModel)]="password" name="password" type="password" required
+                autocomplete="current-password"
                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 placeholder="••••••••" />
             </div>
@@ -66,16 +68,19 @@ import { AuthService } from '../../core/services/auth.service';
             <div>
               <label class="block text-xs font-medium text-gray-600 mb-1">Username</label>
               <input [(ngModel)]="username" name="username" type="text" required
+                autocomplete="username"
                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
               <input [(ngModel)]="email" name="email" type="email"
+                autocomplete="email"
                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-600 mb-1">Password</label>
               <input [(ngModel)]="password" name="password" type="password" required
+                autocomplete="new-password"
                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
             </div>
             <button type="submit" [disabled]="loading()"
@@ -100,7 +105,12 @@ export class LoginComponent {
   email    = '';
 
   doLogin() {
-    if (!this.username || !this.password) return;
+    if (!this.username || !this.password) {
+      // Never fail silently — e.g. browser autofill can populate the visible
+      // inputs without ngModel picking up the change, leaving these blank.
+      this.error.set('Please enter both username and password.');
+      return;
+    }
     this.loading.set(true);
     this.error.set('');
     this.auth.login({ username: this.username, password: this.password }).subscribe({
