@@ -5,6 +5,8 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { MarkupEngineService, PointerPoint } from '../../../core/services/viewer/markup-engine.service';
+import { ViewerStateService, ShapeData } from '../../../core/services/viewer/viewer-state.service';
 
 export interface CadLayer {
   name:    string;
@@ -28,8 +30,33 @@ export interface CadLayer {
         (wheel)="onWheel($event)">
 
         <div #svgWrap [style.transform]="transform()"
-             style="transform-origin: top left; transition: transform .1s">
+             style="transform-origin: top left; transition: transform .1s; position: relative; display: inline-block;">
           <div [innerHTML]="processedSvg()" class="cad-svg-host"></div>
+
+          <!-- Markup overlay — same coordinate space as the drawing, so
+               annotations stay pinned to the drawing itself while panning/zooming -->
+          <svg #markupSvg
+            class="absolute top-0 left-0 w-full h-full"
+            [attr.viewBox]="contentViewBox()"
+            [style.cursor]="cursorStyle()"
+            [style.pointer-events]="drawingEnabled() ? 'auto' : 'none'"
+            (mousedown)="onPointerDown($event)"
+            (mousemove)="onPointerMove($event)"
+            (mouseup)="onPointerUp($event)"
+            (touchstart)="onPointerDown($event); $event.preventDefault()"
+            (touchmove)="onPointerMove($event); $event.preventDefault()"
+            (touchend)="onPointerUp($event)">
+
+            <!-- Saved / in-progress shapes (CAD/SVG drawings have a single "page") -->
+            @for (shape of state.shapes(); track shape.id) {
+              @if (shape.pageNumber === 1) {
+                <g [innerHTML]="renderShape(shape)"></g>
+              }
+            }
+            @if (activeShape()) {
+              <g [innerHTML]="renderShape(activeShape()!)"></g>
+            }
+          </svg>
         </div>
       </div>
 
@@ -116,14 +143,36 @@ export class CadViewerComponent implements OnChanges {
   private _dxfV = signal('');
   private _entC = signal(0);
   @ViewChild('svgWrap') svgWrap!: ElementRef<HTMLDivElement>;
+  @ViewChild('markupSvg') markupSvg!: ElementRef<SVGSVGElement>;
 
   private sanitizer = inject(DomSanitizer);
+  state  = inject(ViewerStateService);
+  markup = inject(MarkupEngineService);
 
   layers        = signal<CadLayer[]>([]);
   zoom          = signal(1.0);
   panX          = signal(0);
   panY          = signal(0);
   visibleCount  = computed(() => this.layers().filter(l => l.visible).length);
+
+  // ── Markup ───────────────────────────────────────────────────
+  contentViewBox = signal('0 0 800 600');
+  activeShape    = signal<ShapeData | null>(null);
+  private drawing = false;
+
+  drawingEnabled = computed(() => {
+    const tool = this.state.activeTool();
+    return tool !== 'pan' && tool !== 'select';
+  });
+
+  cursorStyle = computed(() => {
+    switch (this.state.activeTool()) {
+      case 'pan':    return 'grab';
+      case 'select': return 'default';
+      case 'text':   return 'text';
+      default:       return this.drawingEnabled() ? 'crosshair' : 'default';
+    }
+  });
 
   transform = computed(() =>
     `translate(${this.panX()}px, ${this.panY()}px) scale(${this.zoom()})`
@@ -154,7 +203,26 @@ export class CadViewerComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges) {
     if (changes['svgContent'] && this.svgContent) {
       this.parseLayers();
+      this.parseViewBox();
     }
+  }
+
+  // ── Read the embedded drawing's own coordinate space so the markup
+  //    overlay lines up with it exactly, at any zoom/pan level ──────
+  private parseViewBox() {
+    const parser = new DOMParser();
+    const doc    = parser.parseFromString(this.svgContent, 'image/svg+xml');
+    const svgEl  = doc.querySelector('svg');
+    if (!svgEl) return;
+
+    const viewBox = svgEl.getAttribute('viewBox');
+    if (viewBox) {
+      this.contentViewBox.set(viewBox);
+      return;
+    }
+    const width  = parseFloat(svgEl.getAttribute('width')  || '') || 800;
+    const height = parseFloat(svgEl.getAttribute('height') || '') || 600;
+    this.contentViewBox.set(`0 0 ${width} ${height}`);
   }
 
   private parseLayers() {
@@ -249,4 +317,59 @@ export class CadViewerComponent implements OnChanges {
   zoomIn()    { this.zoom.update(z => Math.min(z * 1.25, 10)); }
   zoomOut()   { this.zoom.update(z => Math.max(z / 1.25, 0.1)); }
   resetZoom() { this.zoom.set(1); this.panX.set(0); this.panY.set(0); }
+
+  // ── Markup drawing — mirrors PdfPageComponent's pointer handling,
+  //    against this drawing's own viewBox instead of a rendered PDF page ──
+  renderShape(s: ShapeData): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(this.markup.shapeToSvg(s));
+  }
+
+  onPointerDown(e: MouseEvent | TouchEvent) {
+    if (!this.drawingEnabled()) return;
+    const tool = this.state.activeTool();
+    const pt   = this.markup.getSvgPoint(e, this.markupSvg.nativeElement);
+    this.drawing = true;
+
+    if (tool === 'text' || tool === 'stamp') {
+      this.handleTextTool(pt, tool);
+      return;
+    }
+
+    const shape = this.markup.startShape(
+      tool, pt, 1,
+      this.state.strokeColor(),
+      this.state.strokeWidth(),
+      this.state.fillOpacity(),
+      'current-user'
+    );
+    this.activeShape.set(shape);
+  }
+
+  onPointerMove(e: MouseEvent | TouchEvent) {
+    if (!this.drawing || !this.activeShape()) return;
+    const pt      = this.markup.getSvgPoint(e, this.markupSvg.nativeElement);
+    const updated = this.markup.updateShape(this.activeShape()!, pt);
+    this.activeShape.set(updated);
+  }
+
+  onPointerUp(e: MouseEvent | TouchEvent) {
+    if (!this.drawing || !this.activeShape()) return;
+    this.drawing = false;
+    const shape = this.activeShape()!;
+    if (this.markup.hasMinimumSize(shape)) {
+      this.state.addShape(shape);
+    }
+    this.activeShape.set(null);
+  }
+
+  private handleTextTool(pt: PointerPoint, tool: 'text' | 'stamp') {
+    const text = prompt(tool === 'stamp' ? 'Stamp text:' : 'Enter annotation text:');
+    if (text?.trim()) {
+      const shape = this.markup.startShape(
+        tool, pt, 1, this.state.strokeColor(), this.state.strokeWidth(), 0
+      );
+      this.state.addShape({ ...shape, text });
+    }
+    this.drawing = false;
+  }
 }

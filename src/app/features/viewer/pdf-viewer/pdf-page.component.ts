@@ -174,7 +174,7 @@ export class PdfPageComponent implements OnInit, OnChanges, OnDestroy {
     this.drawing = false;
     const shape  = this.activeShape()!;
     // Only commit if the shape has meaningful size
-    if (this.hasMinimumSize(shape)) {
+    if (this.markup.hasMinimumSize(shape)) {
       this.state.addShape(shape);
     }
     this.activeShape.set(null);
@@ -218,22 +218,6 @@ export class PdfPageComponent implements OnInit, OnChanges, OnDestroy {
       }
       el.appendChild(span);
     });
-  }
-
-  private hasMinimumSize(s: ShapeData): boolean {
-    const MIN = 3;
-    switch (s.tool) {
-      case 'line': case 'arrow': case 'dimension':
-        return Math.hypot((s.x2||0)-(s.x1||0), (s.y2||0)-(s.y1||0)) > MIN;
-      case 'rect': case 'highlight':
-        return (s.width||0) > MIN && (s.height||0) > MIN;
-      case 'circle':
-        return (s.r||0) > MIN;
-      case 'freehand': case 'cloud':
-        return (s.points?.length || 0) > 2;
-      default:
-        return true;
-    }
   }
 
   // ── Export this page's markup as SVG string (for print) ─────
