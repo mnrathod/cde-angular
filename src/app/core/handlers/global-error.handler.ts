@@ -20,7 +20,7 @@ export interface AppError {
  * 2. Stores them in a signal for the ErrorToastComponent
  * 3. Never crashes the app — always swallows and recovers
  */
-@Injectable()
+@Injectable({ providedIn: 'root' })
 export class GlobalErrorHandler implements ErrorHandler {
 
   // Signal-based error queue — components subscribe to this
