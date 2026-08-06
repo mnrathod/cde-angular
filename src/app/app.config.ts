@@ -26,8 +26,12 @@ export const appConfig: ApplicationConfig = {
       withInterceptors([authInterceptor])
     ),
 
-    // Global error handler — catches all uncaught Angular errors
-    { provide: ErrorHandler, useClass: GlobalErrorHandler },
+    // Global error handler — catches all uncaught Angular errors.
+    // useExisting (not useClass) so this resolves to the SAME root
+    // singleton that ErrorToastComponent injects via `inject(GlobalErrorHandler)` —
+    // otherwise Angular's actual ErrorHandler and the toast UI's error
+    // store would be two separate instances and the toast would never fire.
+    { provide: ErrorHandler, useExisting: GlobalErrorHandler },
 
     // Service worker (PWA) — only in production builds
     ...(isDevMode() ? [] : [
