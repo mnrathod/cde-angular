@@ -124,7 +124,7 @@ export interface CadLayer {
         <!-- Zoom controls -->
         <div class="p-2 border-t border-gray-200 flex items-center justify-center gap-2">
           <button (click)="zoomOut()" class="h-7 w-7 text-sm rounded border border-gray-300 bg-white hover:bg-gray-50">−</button>
-          <span class="text-xs text-gray-500 w-12 text-center">{{ (zoom() * 100).toFixed(0) }}%</span>
+          <span class="text-xs text-gray-500 w-12 text-center">{{ (state.zoom() * 100).toFixed(0) }}%</span>
           <button (click)="zoomIn()"  class="h-7 w-7 text-sm rounded border border-gray-300 bg-white hover:bg-gray-50">+</button>
           <button (click)="resetZoom()" class="h-7 px-2 text-xs rounded border border-gray-300 bg-white hover:bg-gray-50">Fit</button>
         </div>
@@ -150,7 +150,9 @@ export class CadViewerComponent implements OnChanges {
   markup = inject(MarkupEngineService);
 
   layers        = signal<CadLayer[]>([]);
-  zoom          = signal(1.0);
+  // Zoom lives on ViewerStateService (shared with the top toolbar's − / + / Fit
+  // controls) — NOT a local signal, otherwise the toolbar's zoom buttons
+  // silently have no effect on this viewer (the bug this fixes).
   panX          = signal(0);
   panY          = signal(0);
   visibleCount  = computed(() => this.layers().filter(l => l.visible).length);
@@ -175,7 +177,7 @@ export class CadViewerComponent implements OnChanges {
   });
 
   transform = computed(() =>
-    `translate(${this.panX()}px, ${this.panY()}px) scale(${this.zoom()})`
+    `translate(${this.panX()}px, ${this.panY()}px) scale(${this.state.zoom()})`
   );
 
   processedSvg = computed((): SafeHtml => {
@@ -310,13 +312,13 @@ export class CadViewerComponent implements OnChanges {
     if (e.ctrlKey) {
       // Zoom
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      this.zoom.update(z => Math.max(0.1, Math.min(10, z + delta)));
+      this.state.zoom.update(z => Math.max(0.1, Math.min(10, z + delta)));
     }
   }
 
-  zoomIn()    { this.zoom.update(z => Math.min(z * 1.25, 10)); }
-  zoomOut()   { this.zoom.update(z => Math.max(z / 1.25, 0.1)); }
-  resetZoom() { this.zoom.set(1); this.panX.set(0); this.panY.set(0); }
+  zoomIn()    { this.state.zoomIn(); }
+  zoomOut()   { this.state.zoomOut(); }
+  resetZoom() { this.state.zoomFit(); this.panX.set(0); this.panY.set(0); }
 
   // ── Markup drawing — mirrors PdfPageComponent's pointer handling,
   //    against this drawing's own viewBox instead of a rendered PDF page ──
