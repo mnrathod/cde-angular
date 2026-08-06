@@ -1,0 +1,116 @@
+import { Component, signal, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { AuthService } from '../../core/services/auth.service';
+
+@Component({
+  selector: 'app-login',
+  standalone: true,
+  imports: [FormsModule, CommonModule],
+  template: `
+    <div class="min-h-screen bg-gradient-to-br from-nav to-accent flex items-center justify-center p-4">
+      <div class="bg-white rounded-lg shadow-2xl p-8 w-full max-w-sm">
+
+        <!-- Logo -->
+        <div class="flex items-center gap-3 mb-8">
+          <div class="w-9 h-9 bg-accent rounded flex items-center justify-center text-white font-black text-sm">CDE</div>
+          <span class="font-bold text-lg text-gray-800">Platform</span>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-1 mb-6 bg-gray-100 p-1 rounded">
+          <button (click)="tab.set('login')"
+            class="flex-1 py-1.5 text-sm rounded transition-all"
+            [class]="tab() === 'login' ? 'bg-white text-accent shadow-sm font-semibold' : 'text-gray-500'"
+          >Sign In</button>
+          <button (click)="tab.set('register')"
+            class="flex-1 py-1.5 text-sm rounded transition-all"
+            [class]="tab() === 'register' ? 'bg-white text-accent shadow-sm font-semibold' : 'text-gray-500'"
+          >Register</button>
+        </div>
+
+        <!-- Error -->
+        @if (error()) {
+          <div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded">
+            {{ error() }}
+          </div>
+        }
+
+        <!-- Login Form -->
+        @if (tab() === 'login') {
+          <form (ngSubmit)="doLogin()" class="space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Username</label>
+              <input [(ngModel)]="username" name="username" type="text" required
+                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                placeholder="admin" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Password</label>
+              <input [(ngModel)]="password" name="password" type="password" required
+                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                placeholder="••••••••" />
+            </div>
+            <button type="submit" [disabled]="loading()"
+              class="w-full bg-accent hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded text-sm transition-colors mt-2">
+              {{ loading() ? 'Signing in...' : 'Sign In' }}
+            </button>
+          </form>
+          <p class="text-xs text-gray-400 text-center mt-4">Demo: admin / admin123</p>
+        }
+
+        <!-- Register Form -->
+        @if (tab() === 'register') {
+          <form (ngSubmit)="doRegister()" class="space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Username</label>
+              <input [(ngModel)]="username" name="username" type="text" required
+                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
+              <input [(ngModel)]="email" name="email" type="email"
+                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Password</label>
+              <input [(ngModel)]="password" name="password" type="password" required
+                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+            </div>
+            <button type="submit" [disabled]="loading()"
+              class="w-full bg-accent hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded text-sm transition-colors">
+              {{ loading() ? 'Creating...' : 'Create Account' }}
+            </button>
+          </form>
+        }
+      </div>
+    </div>
+  `
+})
+export class LoginComponent {
+  private auth   = inject(AuthService);
+  private router = inject(Router);
+
+  tab      = signal<'login' | 'register'>('login');
+  loading  = signal(false);
+  error    = signal('');
+  username = '';
+  password = '';
+  email    = '';
+
+  doLogin() {
+    if (!this.username || !this.password) return;
+    this.loading.set(true);
+    this.error.set('');
+    this.auth.login({ username: this.username, password: this.password }).subscribe({
+      next: () => this.router.navigate(['/']),
+      error: () => { this.error.set('Invalid username or password'); this.loading.set(false); }
+    });
+  }
+
+  doRegister() {
+    // TODO: implement register endpoint call
+    this.error.set('Registration coming soon. Use demo: admin / admin123');
+  }
+}
