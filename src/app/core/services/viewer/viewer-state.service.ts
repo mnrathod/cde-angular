@@ -73,7 +73,7 @@ export class ViewerStateService {
   readonly showAnnotations = signal(true);
 
   // ── Sidebar ──────────────────────────────────────────────────
-  readonly sidebarTab   = signal<'annotations' | 'threads' | 'thumbnails' | 'search'>('annotations');
+  readonly sidebarTab   = signal<'annotations' | 'threads' | 'thumbnails' | 'search' | 'signatures'>('annotations');
   readonly sidebarOpen  = signal(true);
 
   // ── Computed ─────────────────────────────────────────────────
