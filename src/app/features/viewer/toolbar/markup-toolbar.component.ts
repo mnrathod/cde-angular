@@ -5,6 +5,7 @@ import { ViewerStateService, MarkupTool } from '../../../core/services/viewer/vi
 import { FlattenService } from '../../../core/services/viewer/flatten.service';
 import { AnnotationService } from '../../../core/services/viewer/annotation.service';
 import { PdfEngineService } from '../../../core/services/viewer/pdf-engine.service';
+import { RedactionService } from '../../../core/services/redaction.service';
 
 interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
 
@@ -22,8 +23,9 @@ interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
       @for (t of tools; track t.id) {
         <button
           (click)="setTool(t.id)"
-          [title]="t.label + ' (' + t.key + ')'"
-          class="h-7 px-2.5 text-xs rounded border transition-all flex items-center gap-1 font-medium"
+          [disabled]="t.id === 'redact' && !isPdf()"
+          [title]="t.id === 'redact' && !isPdf() ? 'Redaction is only available for PDF documents' : t.label + ' (' + t.key + ')'"
+          class="h-7 px-2.5 text-xs rounded border transition-all flex items-center gap-1 font-medium disabled:opacity-30 disabled:cursor-not-allowed"
           [class]="state.activeTool() === t.id
             ? 'bg-accent text-white border-accent shadow-sm'
             : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50 hover:text-accent hover:border-blue-300'">
@@ -107,6 +109,15 @@ interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
         🖨 Print
       </button>
 
+      <!-- Apply redaction (PDF only) -->
+      @if (state.redactionRegions().length > 0) {
+        <button (click)="applyRedaction()" [disabled]="redacting"
+          title="Permanently burn these regions into a new PDF and download it"
+          class="h-7 px-2.5 text-xs rounded border bg-red-50 border-red-300 text-red-700 hover:bg-red-100 disabled:opacity-40">
+          ⬛ {{ redacting ? 'Redacting...' : 'Apply Redaction (' + state.redactionRegions().length + ')' }}
+        </button>
+      }
+
       <!-- Zoom controls -->
       <div class="ml-auto flex items-center gap-1">
         <button (click)="state.zoomOut()" class="h-7 w-7 text-xs rounded border bg-white border-gray-300 hover:bg-gray-50">−</button>
@@ -122,8 +133,10 @@ export class MarkupToolbarComponent {
   annService    = inject(AnnotationService);
   pdfEngine     = inject(PdfEngineService);
   flattenService = inject(FlattenService);
+  redactionService = inject(RedactionService);
 
   saving = false;
+  redacting = false;
 
   @Output() saveRequested  = new EventEmitter<void>();
   @Output() printRequested = new EventEmitter<void>();
@@ -142,9 +155,40 @@ export class MarkupToolbarComponent {
     { id: 'stamp',     icon: '🔴', label: 'Stamp',     key: 'P' },
     { id: 'dimension', icon: '↔',  label: 'Measure',   key: 'M' },
     { id: 'callout',   icon: '💬', label: 'Callout',   key: 'O' },
+    { id: 'redact',    icon: '⬛', label: 'Redact',    key: 'X' },
   ];
 
-  setTool(t: MarkupTool) { this.state.activeTool.set(t); }
+  setTool(t: MarkupTool) {
+    if (t === 'redact' && !this.isPdf()) return;   // matches the button's disabled state
+    this.state.activeTool.set(t);
+  }
+
+  isPdf(): boolean {
+    return this.state.viewerData()?.type === 'pdf';
+  }
+
+  applyRedaction() {
+    const docId   = this.state.documentId();
+    const regions = this.state.redactionRegions();
+    if (!regions.length) return;
+
+    this.redacting = true;
+    this.redactionService.redact(docId, regions).subscribe({
+      next: blob => {
+        this.redacting = false;
+        const docName = this.state.viewerData()?.name || 'document';
+        const url = URL.createObjectURL(blob);
+        const a   = document.createElement('a');
+        a.href = url; a.download = `${docName}_redacted.pdf`; a.click();
+        URL.revokeObjectURL(url);
+        this.state.clearRedactionRegions();
+      },
+      error: () => {
+        this.redacting = false;
+        alert('Redaction failed — check that the document converter service is running.');
+      }
+    });
+  }
 
   onKey(e: KeyboardEvent) {
     if (e.ctrlKey && e.key === 'z')  { e.preventDefault(); this.state.undo(); return; }

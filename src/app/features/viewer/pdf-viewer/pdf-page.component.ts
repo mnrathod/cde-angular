@@ -1,6 +1,6 @@
 import {
-  Component, Input, Output, EventEmitter, signal, inject,
-  OnInit, OnDestroy, OnChanges, SimpleChanges,
+  Component, Input, Output, EventEmitter, signal, computed, inject,
+  OnInit, AfterViewInit, OnDestroy, OnChanges, SimpleChanges,
   ElementRef, ViewChild, ChangeDetectionStrategy
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -54,6 +54,15 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
           }
         }
 
+        <!-- Committed redaction regions (stored in PDF-point space, converted
+             back to this page's current screen pixels — stays correctly
+             positioned across zoom changes, unlike ShapeData) -->
+        @for (region of redactionRegionsOnPage(); track region.id) {
+          <rect [attr.x]="region.screenX" [attr.y]="region.screenY"
+                [attr.width]="region.screenWidth" [attr.height]="region.screenHeight"
+                fill="#000000" stroke="#000000"/>
+        }
+
         <!-- In-progress shape being drawn -->
         @if (activeShape()) {
           <g [innerHTML]="renderShape(activeShape()!)"></g>
@@ -79,7 +88,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
     .text-layer .highlight { background: rgba(255,255,0,0.4); }
   `]
 })
-export class PdfPageComponent implements OnInit, OnChanges, OnDestroy {
+export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDestroy {
   @Input({ required: true }) pdfDoc!:    any;
   @Input({ required: true }) pageNumber!: number;
   @Input()                   zoom        = 1.0;
@@ -109,12 +118,21 @@ export class PdfPageComponent implements OnInit, OnChanges, OnDestroy {
     }
   };
 
-  ngOnInit() {
+  ngOnInit() { /* first render happens in ngAfterViewInit — see below */ }
+
+  // @ViewChild('pageCanvas') isn't populated until after the view is
+  // initialized, so the *first* render has to happen here, not in
+  // ngOnInit/ngOnChanges — calling render() before this silently no-ops
+  // on its `!this.canvas` guard, which is why pages never painted.
+  ngAfterViewInit() {
     this.render();
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['zoom'] || changes['pdfDoc'] || changes['pageNumber']) {
+    // Skip the very first call — the view (and @ViewChild canvas) isn't
+    // ready yet; ngAfterViewInit handles the initial render instead.
+    const isFirstChange = Object.values(changes).some(c => c.isFirstChange());
+    if (!isFirstChange && (changes['zoom'] || changes['pdfDoc'] || changes['pageNumber'])) {
       this.render();
     }
     if (changes['searchQuery']) {
@@ -138,6 +156,25 @@ export class PdfPageComponent implements OnInit, OnChanges, OnDestroy {
   renderShape(s: ShapeData): SafeHtml {
     return this.sanitizer.bypassSecurityTrustHtml(this.markup.shapeToSvg(s));
   }
+
+  // ── Committed redaction regions for this page, converted from the
+  //    canonical PDF-point storage back into this page's current screen
+  //    pixels. Recomputes whenever pageWidth/pageHeight change (i.e. on
+  //    zoom), so — unlike ShapeData — redaction boxes stay correctly
+  //    positioned across zoom changes instead of drifting. ─────────────
+  redactionRegionsOnPage = computed(() => {
+    const zoom         = this.zoom;
+    const nativeHeight = this.pageHeight() / zoom;
+    return this.state.redactionRegions()
+      .filter(r => r.page === this.pageNumber)
+      .map(r => ({
+        id:           r.id,
+        screenX:      r.x * zoom,
+        screenY:      (nativeHeight - r.y - r.height) * zoom,
+        screenWidth:  r.width  * zoom,
+        screenHeight: r.height * zoom
+      }));
+  });
 
   // ── Unified pointer handling (mouse + touch) ─────────────────
   onPointerDown(e: MouseEvent | TouchEvent) {
@@ -175,9 +212,31 @@ export class PdfPageComponent implements OnInit, OnChanges, OnDestroy {
     const shape  = this.activeShape()!;
     // Only commit if the shape has meaningful size
     if (this.markup.hasMinimumSize(shape)) {
-      this.state.addShape(shape);
+      if (shape.tool === 'redact') {
+        this.commitRedactionRegion(shape);
+      } else {
+        this.state.addShape(shape);
+      }
     }
     this.activeShape.set(null);
+  }
+
+  // Convert a drawn rect (screen pixels, top-left origin, current zoom)
+  // into the backend's coordinate system (PDF points, origin bottom-left).
+  private commitRedactionRegion(shape: ShapeData) {
+    const zoom         = this.zoom;
+    const nativeHeight = this.pageHeight() / zoom;
+    const pdfWidth      = (shape.width  || 0) / zoom;
+    const pdfHeight     = (shape.height || 0) / zoom;
+    const pdfX          = (shape.x || 0) / zoom;
+    const topNative      = (shape.y || 0) / zoom;
+    const pdfY           = nativeHeight - topNative - pdfHeight;
+
+    this.state.addRedactionRegion({
+      id: this.markup.newId(),
+      page: this.pageNumber,
+      x: pdfX, y: pdfY, width: pdfWidth, height: pdfHeight
+    });
   }
 
   // ── Text tool — show input prompt ───────────────────────────
