@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { ViewerStateService, ShapeData } from '../../core/services/viewer/viewer-state.service';
+import { ViewerStateService, ShapeData } from './viewer-state.service';
 
 const makeShape = (overrides: Partial<ShapeData> = {}): ShapeData => ({
   id: `s-${Math.random()}`, tool: 'rect', pageNumber: 1,
@@ -22,8 +22,8 @@ describe('ViewerStateService', () => {
     expect(service.zoom()).toBe(1.0);
     expect(service.shapes()).toEqual([]);
     expect(service.activeTool()).toBe('pan');
-    expect(service.dirty()).toBeFalse();
-    expect(service.canUndo()).toBeFalse();
+    expect(service.dirty()).toBe(false);
+    expect(service.canUndo()).toBe(false);
   });
 
   // ── Shape management ──────────────────────────────────────────
@@ -31,12 +31,12 @@ describe('ViewerStateService', () => {
     const s = makeShape();
     service.addShape(s);
     expect(service.shapes().length).toBe(1);
-    expect(service.dirty()).toBeTrue();
+    expect(service.dirty()).toBe(true);
   });
 
   it('addShape() should push undo snapshot', () => {
     service.addShape(makeShape());
-    expect(service.canUndo()).toBeTrue();
+    expect(service.canUndo()).toBe(true);
   });
 
   it('removeShape() should remove by id', () => {
@@ -118,9 +118,9 @@ describe('ViewerStateService', () => {
   // ── Annotations saved ─────────────────────────────────────────
   it('setAnnotationsSaved() should clear dirty flag', () => {
     service.addShape(makeShape());
-    expect(service.dirty()).toBeTrue();
+    expect(service.dirty()).toBe(true);
     service.setAnnotationsSaved([]);
-    expect(service.dirty()).toBeFalse();
+    expect(service.dirty()).toBe(false);
   });
 
   // ── Undo stack cap ────────────────────────────────────────────

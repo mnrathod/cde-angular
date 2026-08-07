@@ -3,8 +3,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
-import { RemoteLoggingService } from '../../core/services/remote-logging.service';
-import { AuthService } from '../../core/services/auth.service';
+import { RemoteLoggingService } from './remote-logging.service';
+import { AuthService } from './auth.service';
 
 describe('RemoteLoggingService', () => {
   let service: RemoteLoggingService;

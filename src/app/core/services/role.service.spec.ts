@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { RoleService } from '../../core/services/role.service';
-import { AuthService } from '../../core/services/auth.service';
+import { RoleService } from './role.service';
+import { AuthService } from './auth.service';
 
 describe('RoleService', () => {
   let service: RoleService;
@@ -27,46 +27,46 @@ describe('RoleService', () => {
 
   it('ADMIN should have all permissions', () => {
     mockRole.set('ADMIN');
-    expect(service.can('canUpload')).toBeTrue();
-    expect(service.can('canDelete')).toBeTrue();
-    expect(service.can('canManageUsers')).toBeTrue();
-    expect(service.can('canApprove')).toBeTrue();
+    expect(service.can('canUpload')).toBe(true);
+    expect(service.can('canDelete')).toBe(true);
+    expect(service.can('canManageUsers')).toBe(true);
+    expect(service.can('canApprove')).toBe(true);
   });
 
   it('VIEWER should have limited permissions', () => {
     mockRole.set('VIEWER');
-    expect(service.can('canUpload')).toBeFalse();
-    expect(service.can('canDelete')).toBeFalse();
-    expect(service.can('canAnnotate')).toBeFalse();
-    expect(service.can('canCompare')).toBeTrue();
-    expect(service.can('canExportXfdf')).toBeTrue();
+    expect(service.can('canUpload')).toBe(false);
+    expect(service.can('canDelete')).toBe(false);
+    expect(service.can('canAnnotate')).toBe(false);
+    expect(service.can('canCompare')).toBe(true);
+    expect(service.can('canExportXfdf')).toBe(true);
   });
 
   it('isAtLeast() should respect role hierarchy', () => {
     mockRole.set('EDITOR');
-    expect(service.isAtLeast('VIEWER')).toBeTrue();
-    expect(service.isAtLeast('EDITOR')).toBeTrue();
-    expect(service.isAtLeast('PROJECT_MANAGER')).toBeFalse();
-    expect(service.isAtLeast('ADMIN')).toBeFalse();
+    expect(service.isAtLeast('VIEWER')).toBe(true);
+    expect(service.isAtLeast('EDITOR')).toBe(true);
+    expect(service.isAtLeast('PROJECT_MANAGER')).toBe(false);
+    expect(service.isAtLeast('ADMIN')).toBe(false);
   });
 
   it('is() should match single role', () => {
     mockRole.set('ADMIN');
-    expect(service.is('ADMIN')).toBeTrue();
-    expect(service.is('VIEWER')).toBeFalse();
+    expect(service.is('ADMIN')).toBe(true);
+    expect(service.is('VIEWER')).toBe(false);
   });
 
   it('is() should match array of roles', () => {
     mockRole.set('PROJECT_MANAGER');
-    expect(service.is(['ADMIN', 'PROJECT_MANAGER'])).toBeTrue();
-    expect(service.is(['VIEWER', 'GUEST'])).toBeFalse();
+    expect(service.is(['ADMIN', 'PROJECT_MANAGER'])).toBe(true);
+    expect(service.is(['VIEWER', 'GUEST'])).toBe(false);
   });
 
   it('EDITOR should be able to upload but not delete', () => {
     mockRole.set('EDITOR');
-    expect(service.can('canUpload')).toBeTrue();
-    expect(service.can('canDelete')).toBeFalse();
-    expect(service.can('canAnnotate')).toBeTrue();
-    expect(service.can('canApprove')).toBeFalse();
+    expect(service.can('canUpload')).toBe(true);
+    expect(service.can('canDelete')).toBe(false);
+    expect(service.can('canAnnotate')).toBe(true);
+    expect(service.can('canApprove')).toBe(false);
   });
 });

@@ -2,7 +2,7 @@ import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { AuthService } from '../../core/services/auth.service';
+import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -31,7 +31,7 @@ describe('AuthService', () => {
   });
 
   it('isLoggedIn() should be false initially', () => {
-    expect(service.isLoggedIn()).toBeFalse();
+    expect(service.isLoggedIn()).toBe(false);
   });
 
   it('login() should store token and set signals', fakeAsync(() => {
@@ -41,7 +41,7 @@ describe('AuthService', () => {
     req.flush(MOCK_RESPONSE);
     tick();
 
-    expect(service.isLoggedIn()).toBeTrue();
+    expect(service.isLoggedIn()).toBe(true);
     expect(service.username()).toBe('admin');
     expect(localStorage.getItem('cde_token')).toBe(MOCK_TOKEN);
   }));
@@ -53,7 +53,7 @@ describe('AuthService', () => {
     tick();
 
     service.logout();
-    expect(service.isLoggedIn()).toBeFalse();
+    expect(service.isLoggedIn()).toBe(false);
     expect(service.token()).toBeNull();
     expect(service.username()).toBeNull();
     expect(localStorage.getItem('cde_token')).toBeNull();
@@ -82,6 +82,6 @@ describe('AuthService', () => {
     );
     tick();
     expect(error).toBeTruthy();
-    expect(service.isLoggedIn()).toBeFalse();
+    expect(service.isLoggedIn()).toBe(false);
   }));
 });

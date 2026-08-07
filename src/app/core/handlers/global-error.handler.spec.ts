@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
-import { GlobalErrorHandler } from '../../core/handlers/global-error.handler';
+import { GlobalErrorHandler } from './global-error.handler';
 
 describe('GlobalErrorHandler', () => {
   let handler: GlobalErrorHandler;
@@ -24,7 +24,7 @@ describe('GlobalErrorHandler', () => {
     expect(errors.length).toBe(1);
     expect(errors[0].type).toBe('runtime');
     expect(errors[0].message).toBe('Something broke');
-    expect(errors[0].dismissed).toBeFalse();
+    expect(errors[0].dismissed).toBe(false);
   });
 
   it('should classify 401 HttpErrorResponse', () => {
@@ -55,14 +55,14 @@ describe('GlobalErrorHandler', () => {
     handler.handleError(new Error('test'));
     const id = handler.errors()[0].id;
     handler.dismiss(id);
-    expect(handler.errors()[0].dismissed).toBeTrue();
+    expect(handler.errors()[0].dismissed).toBe(true);
   });
 
   it('dismissAll() should dismiss all errors', () => {
     handler.handleError(new Error('e1'));
     handler.handleError(new Error('e2'));
     handler.dismissAll();
-    expect(handler.errors().every(e => e.dismissed)).toBeTrue();
+    expect(handler.errors().every(e => e.dismissed)).toBe(true);
   });
 
   it('should cap errors at 5', () => {
