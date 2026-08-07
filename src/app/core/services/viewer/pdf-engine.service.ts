@@ -1,29 +1,27 @@
 import { Injectable } from '@angular/core';
+import * as pdfjsLib from 'pdfjs-dist';
 
-declare const pdfjsLib: any;
-
-const PDF_JS_CDN    = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-const PDF_WORKER    = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const THUMBNAIL_DPI = 0.3;   // zoom factor for thumbnail generation
 
 @Injectable({ providedIn: 'root' })
 export class PdfEngineService {
 
-  private loaded = false;
+  private workerConfigured = false;
 
-  // ── Load PDF.js from CDN ─────────────────────────────────────
+  // ── Configure the pdf.js worker from the bundled package (no external
+  //    CDN dependency — pdfjs-dist ships in node_modules/dist already) ───
   async ensureLoaded(): Promise<void> {
-    if (this.loaded) return;
-    await this.loadScript(PDF_JS_CDN);
-    pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER;
-    this.loaded = true;
+    if (this.workerConfigured) return;
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).toString();
+    this.workerConfigured = true;
   }
 
   // ── Open PDF from ArrayBuffer or URL ────────────────────────
   async openDocument(src: ArrayBuffer | string): Promise<any> {
     await this.ensureLoaded();
     const loadingTask = typeof src === 'string'
-      ? pdfjsLib.getDocument(src)
+      ? pdfjsLib.getDocument({ url: src })
       : pdfjsLib.getDocument({ data: src });
     return loadingTask.promise;
   }
@@ -123,16 +121,5 @@ export class PdfEngineService {
     win.document.close();
     win.focus();
     setTimeout(() => { win.print(); win.close(); }, 800);
-  }
-
-  private loadScript(src: string): Promise<void> {
-    if ((window as any).pdfjsLib) return Promise.resolve();
-    return new Promise((res, rej) => {
-      const s    = document.createElement('script');
-      s.src      = src;
-      s.onload   = () => res();
-      s.onerror  = rej;
-      document.head.appendChild(s);
-    });
   }
 }

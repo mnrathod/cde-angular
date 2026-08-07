@@ -4,7 +4,8 @@ import { Annotation, AnnotationType, ViewerData } from '../../models';
 export type MarkupTool =
   | 'pan' | 'select'
   | 'line' | 'arrow' | 'rect' | 'circle' | 'freehand' | 'cloud'
-  | 'text' | 'highlight' | 'stamp' | 'dimension' | 'callout';
+  | 'text' | 'highlight' | 'stamp' | 'dimension' | 'callout'
+  | 'redact';
 
 export interface ShapeData {
   id:          string;
@@ -38,6 +39,21 @@ export interface PageThumbnail {
   dataUrl:    string;
 }
 
+// A redaction region, in the backend's own coordinate system: PDF points,
+// origin bottom-left (matches DocumentProcessingController/converter's
+// /redact contract exactly). Deliberately NOT a ShapeData — that type is
+// screen-pixel, top-left-origin, and zoom-dependent; redaction regions need
+// to stay correct regardless of zoom, since they're sent to the server.
+export interface RedactionRegion {
+  id:      string;
+  page:    number;
+  x:       number;
+  y:       number;
+  width:   number;
+  height:  number;
+  reason?: string;
+}
+
 @Injectable()   // ← NOT providedIn root — scoped per viewer instance
 export class ViewerStateService {
 
@@ -68,12 +84,15 @@ export class ViewerStateService {
   readonly selectedId   = signal<number | null>(null);
   readonly dirty        = signal(false);   // unsaved changes
 
+  // ── Redaction (PDF only) ───────────────────────────────────────
+  readonly redactionRegions = signal<RedactionRegion[]>([]);
+
   // ── Annotations (saved) ──────────────────────────────────────
   readonly annotations  = signal<Annotation[]>([]);
   readonly showAnnotations = signal(true);
 
   // ── Sidebar ──────────────────────────────────────────────────
-  readonly sidebarTab   = signal<'annotations' | 'threads' | 'thumbnails' | 'search' | 'signatures'>('annotations');
+  readonly sidebarTab   = signal<'annotations' | 'threads' | 'thumbnails' | 'search' | 'signatures' | 'redact'>('annotations');
   readonly sidebarOpen  = signal(true);
 
   // ── Computed ─────────────────────────────────────────────────
@@ -123,6 +142,18 @@ export class ViewerStateService {
   setAnnotationsSaved(savedAnnotations: Annotation[]) {
     this.annotations.set(savedAnnotations);
     this.dirty.set(false);
+  }
+
+  addRedactionRegion(region: RedactionRegion) {
+    this.redactionRegions.update(rs => [...rs, region]);
+  }
+
+  removeRedactionRegion(id: string) {
+    this.redactionRegions.update(rs => rs.filter(r => r.id !== id));
+  }
+
+  clearRedactionRegions() {
+    this.redactionRegions.set([]);
   }
 
   navigateTo(page: number) {

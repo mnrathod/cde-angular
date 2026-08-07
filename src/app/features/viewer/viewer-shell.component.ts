@@ -5,6 +5,7 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 
 import { ViewerStateService } from '../../core/services/viewer/viewer-state.service';
 import { PdfEngineService } from '../../core/services/viewer/pdf-engine.service';
@@ -182,7 +183,12 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
         } else if (data.type === 'pdf' || data.pdfUrl) {
           this.state.loadingMsg.set('Rendering PDF...');
           const url = data.pdfUrl || `/api/viewer/${id}/pdf`;
-          const pdfDoc = await this.pdfEngine.openDocument(url);
+          // Fetch via HttpClient (authInterceptor attaches the JWT) rather than
+          // handing pdf.js a URL to fetch itself — pdf.js's internal fetch is a
+          // plain browser fetch() that bypasses Angular's interceptors entirely,
+          // which the backend correctly rejects as unauthenticated (403).
+          const bytes  = await firstValueFrom(this.http.get(url, { responseType: 'arraybuffer' }));
+          const pdfDoc = await this.pdfEngine.openDocument(bytes);
           this.state.pdfDoc.set(pdfDoc);
           this.state.totalPages.set(pdfDoc.numPages);
           this.state.viewerData.set({ ...data, type: 'pdf' });

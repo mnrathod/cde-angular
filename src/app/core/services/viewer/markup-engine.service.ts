@@ -53,7 +53,7 @@ export class MarkupEngineService {
     switch (tool) {
       case 'line': case 'arrow': case 'dimension':
         return { ...base, x1: pt.x, y1: pt.y, x2: pt.x, y2: pt.y };
-      case 'rect': case 'highlight':
+      case 'rect': case 'highlight': case 'redact':
         return { ...base, x: pt.x, y: pt.y, width: 0, height: 0 };
       case 'circle':
         return { ...base, cx: pt.x, cy: pt.y, r: 0 };
@@ -74,7 +74,7 @@ export class MarkupEngineService {
     switch (shape.tool) {
       case 'line': case 'arrow': case 'dimension':
         return { ...shape, x2: pt.x, y2: pt.y };
-      case 'rect': case 'highlight':
+      case 'rect': case 'highlight': case 'redact':
         return {
           ...shape,
           x:      Math.min(shape.x!, pt.x),
@@ -121,6 +121,11 @@ export class MarkupEngineService {
 
       case 'highlight':
         return `<rect data-id="${s.id}" x="${s.x}" y="${s.y}" width="${s.width||0}" height="${s.height||2}" fill="#FFFF0066" stroke="none"/>`;
+
+      case 'redact':
+        // Live drag preview only — committed regions render separately in
+        // PDF-point space (see ViewerStateService.redactionRegions).
+        return `<rect data-id="${s.id}" x="${s.x}" y="${s.y}" width="${s.width||0}" height="${s.height||0}" fill="#000000" stroke="#000000"/>`;
 
       case 'circle':
         return `<circle data-id="${s.id}" cx="${s.cx}" cy="${s.cy}" r="${s.r||0}" stroke="${stroke}" stroke-width="${sw}" fill="${fill}"/>`;
@@ -191,7 +196,7 @@ export class MarkupEngineService {
     switch (s.tool) {
       case 'line': case 'arrow': case 'dimension':
         return Math.hypot((s.x2||0)-(s.x1||0), (s.y2||0)-(s.y1||0)) > MIN;
-      case 'rect': case 'highlight':
+      case 'rect': case 'highlight': case 'redact':
         return (s.width||0) > MIN && (s.height||0) > MIN;
       case 'circle':
         return (s.r||0) > MIN;
