@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { MarkupEngineService } from '../../core/services/viewer/markup-engine.service';
-import { ShapeData } from '../../core/services/viewer/viewer-state.service';
+import { MarkupEngineService } from './markup-engine.service';
+import { ShapeData } from './viewer-state.service';
 
 describe('MarkupEngineService', () => {
   let service: MarkupEngineService;
@@ -25,7 +25,9 @@ describe('MarkupEngineService', () => {
 
   // ── startShape ────────────────────────────────────────────────
   it('startShape line should set x1,y1,x2,y2', () => {
-    const s = service.startShape('line', pt, ...Object.values(defaults) as any);
+    const s = service.startShape(
+      'line', pt, defaults.pageNumber, defaults.color, defaults.strokeWidth, defaults.opacity
+    );
     expect(s.tool).toBe('line');
     expect(s.x1).toBe(100); expect(s.y1).toBe(150);
     expect(s.x2).toBe(100); expect(s.y2).toBe(150);
