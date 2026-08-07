@@ -1,5 +1,13 @@
 // ── Auth ────────────────────────────────────────────────────────
 export interface LoginRequest  { username: string; password: string; }
+export interface RegisterRequest {
+  username: string;
+  email:    string;
+  /** Backend enforces a 6-character minimum. */
+  password: string;
+  /** Omitted means the backend's default (ENGINEER). */
+  role?:    string;
+}
 export interface AuthResponse  { token: string; username: string; role: string; }
 
 // ── Project ─────────────────────────────────────────────────────

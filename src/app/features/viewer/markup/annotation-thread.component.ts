@@ -6,6 +6,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Annotation, AnnotationReply, AnnotationThread } from '../../../core/models';
+import { AnnotationService } from '../../../core/services/viewer/annotation.service';
+import { RoleService } from '../../../core/services/role.service';
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
@@ -48,7 +50,7 @@ import { AuthService } from '../../../core/services/auth.service';
             @if (thread.replies.length > 0) {
               <div class="divide-y divide-gray-100">
                 @for (reply of thread.replies; track reply.id) {
-                  <div class="flex items-start gap-2 p-2.5 hover:bg-gray-50 transition-colors">
+                  <div class="group flex items-start gap-2 p-2.5 hover:bg-gray-50 transition-colors">
                     <div class="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                       {{ reply.authorName?.charAt(0)?.toUpperCase() }}
                     </div>
@@ -56,6 +58,14 @@ import { AuthService } from '../../../core/services/auth.service';
                       <div class="flex items-center gap-2">
                         <span class="text-xs font-semibold text-gray-700">{{ reply.authorName }}</span>
                         <span class="text-xs text-gray-400">{{ reply.createdAt | date:'shortTime' }}</span>
+                        <span class="flex-1"></span>
+                        @if (canDelete(reply)) {
+                          <button (click)="deleteReply(thread.annotation.id, reply)"
+                            [disabled]="deletingReplyId() === reply.id"
+                            title="Delete reply"
+                            class="opacity-0 group-hover:opacity-100 text-xs text-gray-400
+                                   hover:text-red-600 disabled:opacity-40">✕</button>
+                        }
                       </div>
                       <div class="text-xs text-gray-600 mt-0.5 leading-relaxed">{{ reply.content }}</div>
                     </div>
@@ -126,10 +136,13 @@ export class AnnotationThreadComponent implements OnInit, OnChanges {
 
   private http = inject(HttpClient);
   private auth = inject(AuthService);
+  private annotationService = inject(AnnotationService);
+  protected roleService     = inject(RoleService);
 
   threads      = signal<AnnotationThread[]>([]);
   replyInputs: Record<number, string> = {};
   newComment   = '';
+  deletingReplyId = signal<number | null>(null);
 
   ngOnInit() {
     this.buildThreads();
@@ -150,15 +163,38 @@ export class AnnotationThreadComponent implements OnInit, OnChanges {
 
     // Load replies for each annotation
     this.annotations.forEach(ann => {
-      this.http.get<AnnotationReply[]>(`/api/annotations/${ann.id}/replies`)
-        .subscribe({
-          next: replies => {
-            this.threads.update(ts =>
-              ts.map(t => t.annotation.id === ann.id ? { ...t, replies } : t)
-            );
-          },
-          error: () => { /* replies endpoint may not exist yet */ }
-        });
+      this.annotationService.loadReplies(ann.id).subscribe({
+        next: replies => {
+          this.threads.update(ts =>
+            ts.map(t => t.annotation.id === ann.id ? { ...t, replies } : t)
+          );
+        },
+        error: () => { /* thread simply stays empty */ }
+      });
+    });
+  }
+
+  /**
+   * Replies are deletable by their author, and by anyone the role model
+   * grants delete rights. The server is the authority; this only decides
+   * whether to offer the control.
+   */
+  canDelete(reply: AnnotationReply): boolean {
+    return this.roleService.can('canDelete') || reply.authorName === this.auth.username();
+  }
+
+  deleteReply(annotationId: number, reply: AnnotationReply) {
+    this.deletingReplyId.set(reply.id);
+    this.annotationService.deleteReply(reply.id).subscribe({
+      next: () => {
+        this.deletingReplyId.set(null);
+        this.threads.update(ts => ts.map(t =>
+          t.annotation.id === annotationId
+            ? { ...t, replies: t.replies.filter(r => r.id !== reply.id) }
+            : t
+        ));
+      },
+      error: () => this.deletingReplyId.set(null)
     });
   }
 
@@ -166,10 +202,7 @@ export class AnnotationThreadComponent implements OnInit, OnChanges {
     const content = this.replyInputs[annotation.id]?.trim();
     if (!content) return;
 
-    this.http.post<AnnotationReply>(`/api/annotations/${annotation.id}/replies`, {
-      content,
-      authorName: this.auth.username()
-    }).subscribe({
+    this.annotationService.addReply(annotation.id, content).subscribe({
       next: reply => {
         this.threads.update(ts =>
           ts.map(t => t.annotation.id === annotation.id

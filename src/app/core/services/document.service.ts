@@ -1,7 +1,7 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs/operators';
-import { Document } from '../models';
+import { Document, DocumentStatus } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class DocumentService {
@@ -40,8 +40,19 @@ export class DocumentService {
   }
 
   delete(id: number) {
-    return this.http.delete(`/api/documents/${id}`).pipe(
+    // Typed void to match the endpoint's 204 No Content.
+    return this.http.delete<void>(`/api/documents/${id}`).pipe(
       tap(() => this.documents.update(list => list.filter(d => d.id !== id)))
+    );
+  }
+
+  updateStatus(id: number, status: DocumentStatus) {
+    return this.http.patch<Document>(`/api/documents/${id}/status`, null, {
+      params: { status }
+    }).pipe(
+      tap(updated => this.documents.update(
+        list => list.map(d => d.id === id ? updated : d)
+      ))
     );
   }
 

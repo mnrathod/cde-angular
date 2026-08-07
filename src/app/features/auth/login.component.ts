@@ -4,6 +4,9 @@ import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 
+/** Matches the backend's @Size(min = 6) on RegisterRequest.password. */
+const MIN_PASSWORD_LENGTH = 6;
+
 @Component({
   selector: 'app-login',
   standalone: true,
@@ -120,7 +123,43 @@ export class LoginComponent {
   }
 
   doRegister() {
-    // TODO: implement register endpoint call
-    this.error.set('Registration coming soon. Use demo: admin / admin123');
+    // Mirrors doLogin's guard: autofill can populate the inputs without
+    // ngModel seeing it, so never fail silently on an apparently-filled form.
+    if (!this.username || !this.email || !this.password) {
+      this.error.set('Please enter a username, email and password.');
+      return;
+    }
+    if (this.password.length < MIN_PASSWORD_LENGTH) {
+      // Stated up front rather than surfacing the server's rejection, which
+      // would cost a round trip to tell the user something knowable here.
+      this.error.set(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+      return;
+    }
+
+    this.loading.set(true);
+    this.error.set('');
+    this.auth.register({
+      username: this.username,
+      email:    this.email,
+      password: this.password
+    }).subscribe({
+      // Registration returns a token, so the user lands signed in.
+      next:  () => this.router.navigate(['/']),
+      error: err => {
+        this.loading.set(false);
+        this.error.set(this.registrationError(err));
+      }
+    });
+  }
+
+  /**
+   * The backend answers a duplicate username or email with 400 and a plain
+   * string body; anything else is reported generically.
+   */
+  private registrationError(err: { status?: number; error?: unknown }): string {
+    if (err.status === 400 && typeof err.error === 'string' && err.error.trim()) {
+      return err.error;
+    }
+    return 'Could not create the account. Please try again.';
   }
 }
