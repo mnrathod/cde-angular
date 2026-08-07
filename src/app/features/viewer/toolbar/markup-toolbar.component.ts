@@ -24,7 +24,9 @@ interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
         <button
           (click)="setTool(t.id)"
           [disabled]="t.id === 'redact' && !isPdf()"
-          [title]="t.id === 'redact' && !isPdf() ? 'Redaction is only available for PDF documents' : t.label + ' (' + t.key + ')'"
+          [title]="t.id === 'redact' && !isPdf() ? 'Redaction is only available for PDF documents'
+            : (t.id === 'polygon' || t.id === 'polyline') ? t.label + ' (' + t.key + ') — click to add points, double-click to finish'
+            : t.label + ' (' + t.key + ')'"
           class="h-7 px-2.5 text-xs rounded border transition-all flex items-center gap-1 font-medium disabled:opacity-30 disabled:cursor-not-allowed"
           [class]="state.activeTool() === t.id
             ? 'bg-accent text-white border-accent shadow-sm'
@@ -148,11 +150,18 @@ export class MarkupToolbarComponent {
     { id: 'arrow',     icon: '→',  label: 'Arrow',     key: 'A' },
     { id: 'rect',      icon: '□',  label: 'Rect',      key: 'R' },
     { id: 'circle',    icon: '○',  label: 'Circle',    key: 'C' },
+    { id: 'ellipse',   icon: '⬭',  label: 'Ellipse',   key: 'E' },
+    { id: 'polygon',   icon: '⬠',  label: 'Polygon',   key: 'G' },
+    { id: 'polyline',  icon: '⌁',  label: 'Polyline',  key: 'Y' },
     { id: 'freehand',  icon: '✏',  label: 'Freehand',  key: 'F' },
     { id: 'cloud',     icon: '☁',  label: 'Cloud',     key: 'K' },
     { id: 'text',      icon: 'T',  label: 'Text',      key: 'T' },
     { id: 'highlight', icon: '▌',  label: 'Highlight', key: 'H' },
+    { id: 'underline', icon: 'U',  label: 'Underline', key: 'U' },
+    { id: 'strikeout', icon: 'S̶',  label: 'Strikeout', key: 'D' },
+    { id: 'squiggly',  icon: '〜', label: 'Squiggly',  key: 'Q' },
     { id: 'stamp',     icon: '🔴', label: 'Stamp',     key: 'P' },
+    { id: 'note',      icon: '🗒',  label: 'Note',      key: 'N' },
     { id: 'dimension', icon: '↔',  label: 'Measure',   key: 'M' },
     { id: 'callout',   icon: '💬', label: 'Callout',   key: 'O' },
     { id: 'redact',    icon: '⬛', label: 'Redact',    key: 'X' },

@@ -1,7 +1,7 @@
 import {
   Component, Input, Output, EventEmitter, signal, computed, inject,
   OnInit, AfterViewInit, OnDestroy, OnChanges, SimpleChanges,
-  ElementRef, ViewChild, ChangeDetectionStrategy
+  ElementRef, ViewChild, ChangeDetectionStrategy, HostListener
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PdfEngineService } from '../../../core/services/viewer/pdf-engine.service';
@@ -43,6 +43,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
         (mousedown)="onPointerDown($event)"
         (mousemove)="onPointerMove($event)"
         (mouseup)="onPointerUp($event)"
+        (dblclick)="onDoubleClick($event)"
         (touchstart)="onPointerDown($event); $event.preventDefault()"
         (touchmove)="onPointerMove($event); $event.preventDefault()"
         (touchend)="onPointerUp($event)">
@@ -63,9 +64,10 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
                 fill="#000000" stroke="#000000"/>
         }
 
-        <!-- In-progress shape being drawn -->
+        <!-- In-progress shape being drawn (polygon/polyline rubber-band
+             to the cursor between clicks via previewShape()) -->
         @if (activeShape()) {
-          <g [innerHTML]="renderShape(activeShape()!)"></g>
+          <g [innerHTML]="renderShape(previewShape())"></g>
         }
       </svg>
 
@@ -108,6 +110,9 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   activeShape = signal<ShapeData | null>(null);
   private drawing = false;
   private viewport: any = null;
+  // Live cursor position while a polygon/polyline is mid-click-sequence,
+  // so the in-progress shape rubber-bands to the pointer between vertices.
+  private polyHover: PointerPoint | null = null;
 
   cursorStyle = () => {
     switch (this.state.activeTool()) {
@@ -182,13 +187,19 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     if (tool === 'pan' || tool === 'select') return;
 
     const pt = this.markup.getSvgPoint(e, this.svg.nativeElement);
-    this.drawing = true;
 
-    if (tool === 'text' || tool === 'stamp') {
+    if (tool === 'text' || tool === 'stamp' || tool === 'note') {
+      this.drawing = true;
       this.handleTextTool(pt, tool);
       return;
     }
 
+    if (tool === 'polygon' || tool === 'polyline') {
+      this.handlePolyClick(pt, tool);
+      return;   // click-driven — never sets `drawing`, mouseup is a no-op
+    }
+
+    this.drawing = true;
     const shape = this.markup.startShape(
       tool, pt, this.pageNumber,
       this.state.strokeColor(),
@@ -200,10 +211,15 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   }
 
   onPointerMove(e: MouseEvent | TouchEvent) {
-    if (!this.drawing || !this.activeShape()) return;
-    const pt      = this.markup.getSvgPoint(e, this.svg.nativeElement);
-    const updated = this.markup.updateShape(this.activeShape()!, pt);
-    this.activeShape.set(updated);
+    const active = this.activeShape();
+    if (!active) return;
+    const pt = this.markup.getSvgPoint(e, this.svg.nativeElement);
+    if (active.tool === 'polygon' || active.tool === 'polyline') {
+      this.polyHover = pt;   // rubber-band only; vertices are click-committed
+      return;
+    }
+    if (!this.drawing) return;
+    this.activeShape.set(this.markup.updateShape(active, pt));
   }
 
   onPointerUp(e: MouseEvent | TouchEvent) {
@@ -219,6 +235,50 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       }
     }
     this.activeShape.set(null);
+  }
+
+  // ── Polygon / polyline: click to add a vertex, double-click to finish ──
+  private handlePolyClick(pt: PointerPoint, tool: MarkupTool) {
+    const current = this.activeShape();
+    if (current && current.tool === tool) {
+      this.activeShape.set(this.markup.addVertex(current, pt));
+    } else {
+      this.activeShape.set(this.markup.startShape(
+        tool, pt, this.pageNumber,
+        this.state.strokeColor(), this.state.strokeWidth(), this.state.fillOpacity(),
+        'current-user'
+      ));
+    }
+  }
+
+  onDoubleClick(e: MouseEvent) {
+    const shape = this.activeShape();
+    if (!shape || (shape.tool !== 'polygon' && shape.tool !== 'polyline')) return;
+    e.preventDefault();
+    // The dblclick's second click already added a spurious vertex — drop it.
+    const finished = this.markup.removeLastVertex(shape);
+    this.polyHover = null;
+    if (this.markup.hasMinimumSize(finished)) {
+      this.state.addShape(finished);
+    }
+    this.activeShape.set(null);
+  }
+
+  @HostListener('document:keydown.escape')
+  cancelPolyInProgress() {
+    const shape = this.activeShape();
+    if (shape && (shape.tool === 'polygon' || shape.tool === 'polyline')) {
+      this.activeShape.set(null);
+      this.polyHover = null;
+    }
+  }
+
+  // ── Live shape used for rendering only — appends the un-committed
+  //    cursor position to polygon/polyline so they rubber-band to the
+  //    pointer between clicks; every other tool renders unchanged. ──────
+  previewShape(): ShapeData {
+    const shape = this.activeShape()!;
+    return this.markup.withPreviewPoint(shape, this.polyHover);
   }
 
   // Convert a drawn rect (screen pixels, top-left origin, current zoom)
@@ -241,7 +301,9 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
   // ── Text tool — show input prompt ───────────────────────────
   private handleTextTool(pt: PointerPoint, tool: MarkupTool) {
-    const text = prompt(tool === 'stamp' ? 'Stamp text:' : 'Enter annotation text:');
+    const promptText = tool === 'stamp' ? 'Stamp text:'
+      : tool === 'note' ? 'Sticky note:' : 'Enter annotation text:';
+    const text = prompt(promptText);
     if (text?.trim()) {
       const shape = this.markup.startShape(
         tool, pt, this.pageNumber,

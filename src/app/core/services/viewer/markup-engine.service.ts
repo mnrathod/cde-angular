@@ -53,28 +53,33 @@ export class MarkupEngineService {
     switch (tool) {
       case 'line': case 'arrow': case 'dimension':
         return { ...base, x1: pt.x, y1: pt.y, x2: pt.x, y2: pt.y };
-      case 'rect': case 'highlight': case 'redact':
+      case 'rect': case 'highlight': case 'redact': case 'ellipse':
+      case 'underline': case 'strikeout': case 'squiggly':
         return { ...base, x: pt.x, y: pt.y, width: 0, height: 0 };
       case 'circle':
         return { ...base, cx: pt.x, cy: pt.y, r: 0 };
-      case 'freehand': case 'cloud':
+      case 'freehand': case 'cloud': case 'polygon': case 'polyline':
         return { ...base, points: [pt] };
       case 'text':
       case 'callout':
         return { ...base, x: pt.x, y: pt.y, text: '', x1: pt.x, y1: pt.y, x2: pt.x + 80, y2: pt.y - 40 };
       case 'stamp':
         return { ...base, x: pt.x, y: pt.y, text: 'REVIEWED' };
+      case 'note':
+        return { ...base, x: pt.x, y: pt.y, text: '' };
       default:
         return { ...base, x: pt.x, y: pt.y };
     }
   }
 
-  // ── Update shape as pointer moves ────────────────────────────
+  // ── Update shape as pointer moves (drag-driven tools only —
+  //    'polygon'/'polyline' are click-driven, see addVertex()) ─────
   updateShape(shape: ShapeData, pt: PointerPoint): ShapeData {
     switch (shape.tool) {
       case 'line': case 'arrow': case 'dimension':
         return { ...shape, x2: pt.x, y2: pt.y };
-      case 'rect': case 'highlight': case 'redact':
+      case 'rect': case 'highlight': case 'redact': case 'ellipse':
+      case 'underline': case 'strikeout': case 'squiggly':
         return {
           ...shape,
           x:      Math.min(shape.x!, pt.x),
@@ -91,6 +96,26 @@ export class MarkupEngineService {
       default:
         return shape;
     }
+  }
+
+  // ── Click-driven vertex tools (polygon/polyline) ─────────────
+  // Each click appends exactly one vertex (unlike freehand/cloud, which
+  // append a point per mousemove while dragging). A double-click finishes
+  // the shape — see removeLastVertex() for stripping the duplicate vertex
+  // a dblclick's second mousedown produces.
+  addVertex(shape: ShapeData, pt: PointerPoint): ShapeData {
+    return { ...shape, points: [...(shape.points || []), pt] };
+  }
+
+  removeLastVertex(shape: ShapeData): ShapeData {
+    return { ...shape, points: (shape.points || []).slice(0, -1) };
+  }
+
+  // Preview-only: appends a non-committed cursor point so the in-progress
+  // polygon/polyline rubber-bands to the pointer between clicks.
+  withPreviewPoint(shape: ShapeData, pt: PointerPoint | null): ShapeData {
+    if (!pt || shape.tool !== 'polygon' && shape.tool !== 'polyline') return shape;
+    return { ...shape, points: [...(shape.points || []), pt] };
   }
 
   // ── Render a ShapeData to SVG element string ─────────────────
@@ -129,6 +154,49 @@ export class MarkupEngineService {
 
       case 'circle':
         return `<circle data-id="${s.id}" cx="${s.cx}" cy="${s.cy}" r="${s.r||0}" stroke="${stroke}" stroke-width="${sw}" fill="${fill}"/>`;
+
+      case 'ellipse': {
+        const rx = (s.width||0)/2, ry = (s.height||0)/2;
+        return `<ellipse data-id="${s.id}" cx="${(s.x||0)+rx}" cy="${(s.y||0)+ry}" rx="${rx}" ry="${ry}" stroke="${stroke}" stroke-width="${sw}" fill="${fill}"/>`;
+      }
+
+      // Text-markup tools: drag a box over the target text region.
+      case 'underline':
+        return `<line data-id="${s.id}" x1="${s.x}" y1="${(s.y||0)+(s.height||0)}" x2="${(s.x||0)+(s.width||0)}" y2="${(s.y||0)+(s.height||0)}" stroke="${stroke}" stroke-width="${Math.max(sw,2)}"/>`;
+
+      case 'strikeout':
+        return `<line data-id="${s.id}" x1="${s.x}" y1="${(s.y||0)+(s.height||0)/2}" x2="${(s.x||0)+(s.width||0)}" y2="${(s.y||0)+(s.height||0)/2}" stroke="${stroke}" stroke-width="${Math.max(sw,2)}"/>`;
+
+      case 'squiggly': {
+        const x0 = s.x||0, yBase = (s.y||0)+(s.height||0), w = s.width||0;
+        const period = 6, amp = 2;
+        let d = `M${x0},${yBase}`;
+        for (let px = 0; px <= w; px += period) {
+          d += ` Q${x0+px+period/2},${yBase + (Math.floor(px/period)%2===0 ? -amp : amp)} ${x0+px+period},${yBase}`;
+        }
+        return `<path data-id="${s.id}" d="${d}" stroke="${stroke}" stroke-width="${Math.max(sw,1.5)}" fill="none"/>`;
+      }
+
+      case 'note':
+        return `<g data-id="${s.id}">
+          <rect x="${(s.x||0)-9}" y="${(s.y||0)-9}" width="18" height="18" rx="3" fill="#FFD54A" stroke="${stroke}" stroke-width="1.5"/>
+          <text x="${s.x}" y="${(s.y||0)+4}" text-anchor="middle" font-size="12">📝</text>
+          <title>${this.escapeXml(s.text||'')}</title>
+        </g>`;
+
+      case 'polygon': {
+        const pts = s.points || [];
+        if (pts.length < 2) return '';
+        const d = pts.map((p,i) => `${i===0?'M':'L'}${p.x},${p.y}`).join(' ') + ' Z';
+        return `<path data-id="${s.id}" d="${d}" stroke="${stroke}" stroke-width="${sw}" fill="${fill}" stroke-linejoin="round"/>`;
+      }
+
+      case 'polyline': {
+        const pts = s.points || [];
+        if (pts.length < 2) return '';
+        const d = pts.map((p,i) => `${i===0?'M':'L'}${p.x},${p.y}`).join(' ');
+        return `<path data-id="${s.id}" d="${d}" stroke="${stroke}" stroke-width="${sw}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+      }
 
       case 'freehand': {
         const pts = s.points || [];
@@ -196,12 +264,15 @@ export class MarkupEngineService {
     switch (s.tool) {
       case 'line': case 'arrow': case 'dimension':
         return Math.hypot((s.x2||0)-(s.x1||0), (s.y2||0)-(s.y1||0)) > MIN;
-      case 'rect': case 'highlight': case 'redact':
+      case 'rect': case 'highlight': case 'redact': case 'ellipse':
+      case 'underline': case 'strikeout': case 'squiggly':
         return (s.width||0) > MIN && (s.height||0) > MIN;
       case 'circle':
         return (s.r||0) > MIN;
-      case 'freehand': case 'cloud':
+      case 'freehand': case 'cloud': case 'polygon':
         return (s.points?.length || 0) > 2;
+      case 'polyline':
+        return (s.points?.length || 0) > 1;
       default:
         return true;
     }
@@ -217,7 +288,8 @@ export class MarkupEngineService {
 
   private shapeContains(s: ShapeData, pt: PointerPoint, tol: number): boolean {
     switch (s.tool) {
-      case 'rect': case 'highlight':
+      case 'rect': case 'highlight': case 'ellipse':
+      case 'underline': case 'strikeout': case 'squiggly':
         return pt.x >= (s.x||0)-tol && pt.x <= (s.x||0)+(s.width||0)+tol &&
                pt.y >= (s.y||0)-tol && pt.y <= (s.y||0)+(s.height||0)+tol;
       case 'circle':
