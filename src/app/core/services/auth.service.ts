@@ -2,7 +2,7 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { tap } from 'rxjs/operators';
-import { AuthResponse, LoginRequest } from '../models';
+import { AuthResponse, LoginRequest, RegisterRequest } from '../models';
 
 const TOKEN_KEY = 'cde_token';
 
@@ -29,12 +29,18 @@ export class AuthService {
 
   login(req: LoginRequest) {
     return this.http.post<AuthResponse>('/api/auth/login', req).pipe(
-      tap(res => {
-        localStorage.setItem(TOKEN_KEY, res.token);
-        this._token.set(res.token);
-        this._username.set(res.username);
-        this._role.set(res.role);
-      })
+      tap(res => this.startSession(res))
+    );
+  }
+
+  /**
+   * Registration returns the same AuthResponse as login, so a successful
+   * sign-up establishes the session directly rather than bouncing the user
+   * back to the login form to retype what they just entered.
+   */
+  register(req: RegisterRequest) {
+    return this.http.post<AuthResponse>('/api/auth/register', req).pipe(
+      tap(res => this.startSession(res))
     );
   }
 
@@ -49,6 +55,13 @@ export class AuthService {
   getAuthHeaders(): Record<string, string> {
     const t = this._token();
     return t ? { Authorization: `Bearer ${t}` } : {};
+  }
+
+  private startSession(res: AuthResponse) {
+    localStorage.setItem(TOKEN_KEY, res.token);
+    this._token.set(res.token);
+    this._username.set(res.username);
+    this._role.set(res.role);
   }
 
   private parseToken(token: string) {

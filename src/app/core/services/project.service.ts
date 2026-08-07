@@ -30,4 +30,24 @@ export class ProjectService {
       tap(p => this.projects.update(list => [...list, p]))
     );
   }
+
+  update(id: number, data: Partial<Project>) {
+    return this.http.put<Project>(`/api/projects/${id}`, data).pipe(
+      tap(updated => {
+        this.projects.update(list => list.map(p => p.id === id ? updated : p));
+        // Keep the selection pointing at the refreshed object, otherwise the
+        // detail pane keeps rendering the pre-edit copy.
+        if (this.selected()?.id === id) this.selected.set(updated);
+      })
+    );
+  }
+
+  remove(id: number) {
+    return this.http.delete<void>(`/api/projects/${id}`).pipe(
+      tap(() => {
+        this.projects.update(list => list.filter(p => p.id !== id));
+        if (this.selected()?.id === id) this.selected.set(null);
+      })
+    );
+  }
 }

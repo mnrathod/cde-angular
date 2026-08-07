@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, forkJoin, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-import { Annotation, AnnotationRequest, AnnotationType } from '../../models';
+import { Annotation, AnnotationReply, AnnotationRequest, AnnotationType } from '../../models';
 import { ShapeData } from './viewer-state.service';
 import { MarkupEngineService } from './markup-engine.service';
 
@@ -44,6 +44,21 @@ export class AnnotationService {
   // ── Resolve an annotation ────────────────────────────────────
   resolveAnnotation(id: number): Observable<Annotation> {
     return this.http.patch<Annotation>(`/api/annotations/${id}/resolve`, {});
+  }
+
+  // ── Replies ──────────────────────────────────────────────────
+  loadReplies(annotationId: number): Observable<AnnotationReply[]> {
+    return this.http.get<AnnotationReply[]>(`/api/annotations/${annotationId}/replies`);
+  }
+
+  addReply(annotationId: number, content: string): Observable<AnnotationReply> {
+    return this.http.post<AnnotationReply>(
+      `/api/annotations/${annotationId}/replies`, { content }
+    );
+  }
+
+  deleteReply(replyId: number): Observable<void> {
+    return this.http.delete<void>(`/api/annotations/replies/${replyId}`);
   }
 
   // ── XFDF Export ──────────────────────────────────────────────
