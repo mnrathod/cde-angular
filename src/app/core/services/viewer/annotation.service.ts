@@ -101,13 +101,16 @@ export class AnnotationService {
 
   private shapeToAnnotationType(tool: string): AnnotationType {
     const map: Record<string, AnnotationType> = {
-      'text': 'COMMENT', 'note': 'COMMENT', 'highlight': 'HIGHLIGHT',
+      // 'note' is the sticky note and maps to COMMENT; 'text' is a text box
+      // and stays MARKUP. Mapping both to COMMENT made them the same
+      // annotation on export, so a note came back as text and vice versa.
+      'note': 'COMMENT', 'highlight': 'HIGHLIGHT',
       'stamp': 'STAMP', 'dimension': 'DIMENSION',
       'cloud': 'CLOUD', 'arrow': 'ARROW',
       'underline': 'UNDERLINE', 'strikeout': 'STRIKEOUT', 'squiggly': 'SQUIGGLY',
-      // rect, circle, ellipse, polygon, polyline, line, freehand, callout, redact
-      // all fall through to 'MARKUP' — the backend dispatches the concrete
-      // shape via the `tool` field embedded in shapeData (see XfdfService).
+      // text, rect, circle, ellipse, polygon, polyline, line, freehand,
+      // callout and redact fall through to 'MARKUP' — the backend dispatches
+      // the concrete shape via the `tool` field in shapeData (see XfdfService).
     };
     return map[tool] || 'MARKUP';
   }
