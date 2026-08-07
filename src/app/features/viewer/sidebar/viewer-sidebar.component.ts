@@ -5,12 +5,13 @@ import { ViewerStateService } from '../../../core/services/viewer/viewer-state.s
 import { AnnotationService } from '../../../core/services/viewer/annotation.service';
 import { AnnotationThreadComponent } from '../markup/annotation-thread.component';
 import { DocumentSignatureComponent } from '../markup/document-signature.component';
+import { PdfFormComponent } from '../markup/pdf-form.component';
 import { Annotation } from '../../../core/models';
 
 @Component({
   selector: 'app-viewer-sidebar',
   standalone: true,
-  imports: [CommonModule, FormsModule, AnnotationThreadComponent, DocumentSignatureComponent],
+  imports: [CommonModule, FormsModule, AnnotationThreadComponent, DocumentSignatureComponent, PdfFormComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="w-60 bg-white border-l border-gray-200 flex flex-col flex-shrink-0">
@@ -129,6 +130,16 @@ import { Annotation } from '../../../core/models';
       }
 
       <!-- Redact tab -->
+      <!-- Form fields tab -->
+      @if (state.sidebarTab() === 'form') {
+        <div class="flex-1 overflow-y-auto">
+          <app-pdf-form
+            [documentId]="state.documentId()"
+            [documentName]="state.viewerData()?.name || 'document'">
+          </app-pdf-form>
+        </div>
+      }
+
       @if (state.sidebarTab() === 'redact') {
         <div class="flex-1 overflow-y-auto p-3">
           <div class="text-sm font-semibold text-gray-800 mb-1">Redaction</div>
@@ -210,6 +221,7 @@ export class ViewerSidebarComponent {
     { id: 'threads'     as const, icon: '💬', label: 'Threads' },
     { id: 'signatures'  as const, icon: '🔏', label: 'Sign' },
     { id: 'redact'      as const, icon: '⬛', label: 'Redact' },
+    { id: 'form'        as const, icon: '📝', label: 'Form' },
     { id: 'thumbnails'  as const, icon: '⊞', label: 'Pages' },
     { id: 'search'      as const, icon: '🔍', label: 'Search' },
   ];
