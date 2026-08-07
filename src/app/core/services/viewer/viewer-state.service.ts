@@ -3,8 +3,10 @@ import { Annotation, AnnotationType, ViewerData } from '../../models';
 
 export type MarkupTool =
   | 'pan' | 'select'
-  | 'line' | 'arrow' | 'rect' | 'circle' | 'freehand' | 'cloud'
-  | 'text' | 'highlight' | 'stamp' | 'dimension' | 'callout'
+  | 'line' | 'arrow' | 'rect' | 'circle' | 'ellipse' | 'freehand' | 'cloud'
+  | 'polygon' | 'polyline'
+  | 'text' | 'highlight' | 'underline' | 'strikeout' | 'squiggly'
+  | 'stamp' | 'note' | 'dimension' | 'callout'
   | 'redact';
 
 export interface ShapeData {

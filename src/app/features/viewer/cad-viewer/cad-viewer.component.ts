@@ -1,12 +1,12 @@
 import {
   Component, inject, signal, computed, Input, OnChanges,
-  SimpleChanges, ChangeDetectionStrategy, ElementRef, ViewChild
+  SimpleChanges, ChangeDetectionStrategy, ElementRef, ViewChild, HostListener
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MarkupEngineService, PointerPoint } from '../../../core/services/viewer/markup-engine.service';
-import { ViewerStateService, ShapeData } from '../../../core/services/viewer/viewer-state.service';
+import { ViewerStateService, ShapeData, MarkupTool } from '../../../core/services/viewer/viewer-state.service';
 
 export interface CadLayer {
   name:    string;
@@ -43,6 +43,7 @@ export interface CadLayer {
             (mousedown)="onPointerDown($event)"
             (mousemove)="onPointerMove($event)"
             (mouseup)="onPointerUp($event)"
+            (dblclick)="onDoubleClick($event)"
             (touchstart)="onPointerDown($event); $event.preventDefault()"
             (touchmove)="onPointerMove($event); $event.preventDefault()"
             (touchend)="onPointerUp($event)">
@@ -54,7 +55,7 @@ export interface CadLayer {
               }
             }
             @if (activeShape()) {
-              <g [innerHTML]="renderShape(activeShape()!)"></g>
+              <g [innerHTML]="renderShape(previewShape())"></g>
             }
           </svg>
         </div>
@@ -161,6 +162,9 @@ export class CadViewerComponent implements OnChanges {
   contentViewBox = signal('0 0 800 600');
   activeShape    = signal<ShapeData | null>(null);
   private drawing = false;
+  // Live cursor position while a polygon/polyline is mid-click-sequence —
+  // mirrors PdfPageComponent's identical rubber-band handling.
+  private polyHover: PointerPoint | null = null;
 
   drawingEnabled = computed(() => {
     const tool = this.state.activeTool();
@@ -330,13 +334,19 @@ export class CadViewerComponent implements OnChanges {
     if (!this.drawingEnabled()) return;
     const tool = this.state.activeTool();
     const pt   = this.markup.getSvgPoint(e, this.markupSvg.nativeElement);
-    this.drawing = true;
 
-    if (tool === 'text' || tool === 'stamp') {
+    if (tool === 'text' || tool === 'stamp' || tool === 'note') {
+      this.drawing = true;
       this.handleTextTool(pt, tool);
       return;
     }
 
+    if (tool === 'polygon' || tool === 'polyline') {
+      this.handlePolyClick(pt, tool);
+      return;   // click-driven — never sets `drawing`, mouseup is a no-op
+    }
+
+    this.drawing = true;
     const shape = this.markup.startShape(
       tool, pt, 1,
       this.state.strokeColor(),
@@ -348,10 +358,15 @@ export class CadViewerComponent implements OnChanges {
   }
 
   onPointerMove(e: MouseEvent | TouchEvent) {
-    if (!this.drawing || !this.activeShape()) return;
-    const pt      = this.markup.getSvgPoint(e, this.markupSvg.nativeElement);
-    const updated = this.markup.updateShape(this.activeShape()!, pt);
-    this.activeShape.set(updated);
+    const active = this.activeShape();
+    if (!active) return;
+    const pt = this.markup.getSvgPoint(e, this.markupSvg.nativeElement);
+    if (active.tool === 'polygon' || active.tool === 'polyline') {
+      this.polyHover = pt;
+      return;
+    }
+    if (!this.drawing) return;
+    this.activeShape.set(this.markup.updateShape(active, pt));
   }
 
   onPointerUp(e: MouseEvent | TouchEvent) {
@@ -364,8 +379,50 @@ export class CadViewerComponent implements OnChanges {
     this.activeShape.set(null);
   }
 
-  private handleTextTool(pt: PointerPoint, tool: 'text' | 'stamp') {
-    const text = prompt(tool === 'stamp' ? 'Stamp text:' : 'Enter annotation text:');
+  // ── Polygon / polyline: click to add a vertex, double-click to finish ──
+  private handlePolyClick(pt: PointerPoint, tool: MarkupTool) {
+    const current = this.activeShape();
+    if (current && current.tool === tool) {
+      this.activeShape.set(this.markup.addVertex(current, pt));
+    } else {
+      this.activeShape.set(this.markup.startShape(
+        tool, pt, 1,
+        this.state.strokeColor(), this.state.strokeWidth(), this.state.fillOpacity(),
+        'current-user'
+      ));
+    }
+  }
+
+  onDoubleClick(e: MouseEvent) {
+    const shape = this.activeShape();
+    if (!shape || (shape.tool !== 'polygon' && shape.tool !== 'polyline')) return;
+    e.preventDefault();
+    const finished = this.markup.removeLastVertex(shape);
+    this.polyHover = null;
+    if (this.markup.hasMinimumSize(finished)) {
+      this.state.addShape(finished);
+    }
+    this.activeShape.set(null);
+  }
+
+  @HostListener('document:keydown.escape')
+  cancelPolyInProgress() {
+    const shape = this.activeShape();
+    if (shape && (shape.tool === 'polygon' || shape.tool === 'polyline')) {
+      this.activeShape.set(null);
+      this.polyHover = null;
+    }
+  }
+
+  previewShape(): ShapeData {
+    const shape = this.activeShape()!;
+    return this.markup.withPreviewPoint(shape, this.polyHover);
+  }
+
+  private handleTextTool(pt: PointerPoint, tool: MarkupTool) {
+    const promptText = tool === 'stamp' ? 'Stamp text:'
+      : tool === 'note' ? 'Sticky note:' : 'Enter annotation text:';
+    const text = prompt(promptText);
     if (text?.trim()) {
       const shape = this.markup.startShape(
         tool, pt, 1, this.state.strokeColor(), this.state.strokeWidth(), 0

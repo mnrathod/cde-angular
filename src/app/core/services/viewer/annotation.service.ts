@@ -86,9 +86,13 @@ export class AnnotationService {
 
   private shapeToAnnotationType(tool: string): AnnotationType {
     const map: Record<string, AnnotationType> = {
-      'text': 'COMMENT', 'highlight': 'HIGHLIGHT',
+      'text': 'COMMENT', 'note': 'COMMENT', 'highlight': 'HIGHLIGHT',
       'stamp': 'STAMP', 'dimension': 'DIMENSION',
       'cloud': 'CLOUD', 'arrow': 'ARROW',
+      'underline': 'UNDERLINE', 'strikeout': 'STRIKEOUT', 'squiggly': 'SQUIGGLY',
+      // rect, circle, ellipse, polygon, polyline, line, freehand, callout, redact
+      // all fall through to 'MARKUP' — the backend dispatches the concrete
+      // shape via the `tool` field embedded in shapeData (see XfdfService).
     };
     return map[tool] || 'MARKUP';
   }

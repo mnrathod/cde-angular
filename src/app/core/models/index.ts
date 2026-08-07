@@ -34,7 +34,8 @@ export interface Document {
 }
 
 // ── Annotation ──────────────────────────────────────────────────
-export type AnnotationType   = 'COMMENT' | 'MARKUP' | 'DIMENSION' | 'CLOUD' | 'ARROW' | 'STAMP' | 'HIGHLIGHT';
+export type AnnotationType   = 'COMMENT' | 'MARKUP' | 'DIMENSION' | 'CLOUD' | 'ARROW' | 'STAMP' | 'HIGHLIGHT'
+                              | 'UNDERLINE' | 'STRIKEOUT' | 'SQUIGGLY';
 export type AnnotationStatus = 'OPEN' | 'RESOLVED' | 'CLOSED';
 
 export interface Annotation {
