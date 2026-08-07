@@ -1,4 +1,4 @@
-import { Component, inject, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, Output, EventEmitter, ChangeDetectionStrategy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ViewerStateService, MarkupTool } from '../../../core/services/viewer/viewer-state.service';
@@ -6,6 +6,7 @@ import { FlattenService } from '../../../core/services/viewer/flatten.service';
 import { AnnotationService } from '../../../core/services/viewer/annotation.service';
 import { PdfEngineService } from '../../../core/services/viewer/pdf-engine.service';
 import { RedactionService } from '../../../core/services/redaction.service';
+import { OcrService } from '../../../core/services/ocr.service';
 
 interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
 
@@ -83,7 +84,7 @@ interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
         [class.ring-2]="state.dirty()"
         title="Save annotations"
         class="h-7 px-2.5 text-xs rounded border bg-white border-gray-300 hover:bg-gray-50 ring-accent">
-        💾 {{ saving ? 'Saving...' : state.dirty() ? 'Save *' : 'Saved' }}
+        💾 {{ saving() ? 'Saving...' : state.dirty() ? 'Save *' : 'Saved' }}
       </button>
 
       <!-- XFDF Export -->
@@ -105,6 +106,15 @@ interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
         ⬇ Flatten PDF
       </button>
 
+      <!-- OCR: scanned PDF → searchable PDF -->
+      <button (click)="runOcr()" [disabled]="!isPdf() || ocrRunning()"
+        [title]="!isPdf()
+          ? 'OCR is only available for PDF documents'
+          : 'Make a scanned PDF searchable by adding an invisible text layer'"
+        class="h-7 px-2.5 text-xs rounded border bg-white border-gray-300 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
+        🔎 {{ ocrRunning() ? 'Running OCR...' : 'OCR' }}
+      </button>
+
       <!-- Print -->
       <button (click)="print()" title="Print with annotations"
         class="h-7 px-2.5 text-xs rounded border bg-white border-gray-300 hover:bg-gray-50">
@@ -113,10 +123,10 @@ interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
 
       <!-- Apply redaction (PDF only) -->
       @if (state.redactionRegions().length > 0) {
-        <button (click)="applyRedaction()" [disabled]="redacting"
+        <button (click)="applyRedaction()" [disabled]="redacting()"
           title="Permanently burn these regions into a new PDF and download it"
           class="h-7 px-2.5 text-xs rounded border bg-red-50 border-red-300 text-red-700 hover:bg-red-100 disabled:opacity-40">
-          ⬛ {{ redacting ? 'Redacting...' : 'Apply Redaction (' + state.redactionRegions().length + ')' }}
+          ⬛ {{ redacting() ? 'Redacting...' : 'Apply Redaction (' + state.redactionRegions().length + ')' }}
         </button>
       }
 
@@ -136,9 +146,14 @@ export class MarkupToolbarComponent {
   pdfEngine     = inject(PdfEngineService);
   flattenService = inject(FlattenService);
   redactionService = inject(RedactionService);
+  ocrService       = inject(OcrService);
 
-  saving = false;
-  redacting = false;
+  // Signals, not plain fields: this component is OnPush, so a bare field
+  // mutated from an async HTTP callback never re-renders — the button would
+  // stay stuck on "Redacting..."/"Running OCR..." after the call finished.
+  readonly saving     = signal(false);
+  readonly redacting  = signal(false);
+  readonly ocrRunning = signal(false);
 
   @Output() saveRequested  = new EventEmitter<void>();
   @Output() printRequested = new EventEmitter<void>();
@@ -181,22 +196,58 @@ export class MarkupToolbarComponent {
     const regions = this.state.redactionRegions();
     if (!regions.length) return;
 
-    this.redacting = true;
+    this.redacting.set(true);
     this.redactionService.redact(docId, regions).subscribe({
       next: blob => {
-        this.redacting = false;
-        const docName = this.state.viewerData()?.name || 'document';
-        const url = URL.createObjectURL(blob);
-        const a   = document.createElement('a');
-        a.href = url; a.download = `${docName}_redacted.pdf`; a.click();
-        URL.revokeObjectURL(url);
+        this.redacting.set(false);
+        this.downloadBlob(blob, `${this.documentName()}_redacted.pdf`);
         this.state.clearRedactionRegions();
       },
       error: () => {
-        this.redacting = false;
+        this.redacting.set(false);
         alert('Redaction failed — check that the document converter service is running.');
       }
     });
+  }
+
+  /**
+   * Turn a scanned PDF into a searchable one. The server adds an invisible
+   * text layer and returns a separate copy — the stored document is not
+   * modified — so the result is delivered as a download.
+   */
+  runOcr() {
+    if (!this.isPdf()) return;
+
+    this.ocrRunning.set(true);
+    this.ocrService.makeSearchable(this.state.documentId()).subscribe({
+      next: response => {
+        this.ocrRunning.set(false);
+        if (!response.body) return;
+        const { ocrPages, skippedPages } = this.ocrService.readCounts(response);
+        this.downloadBlob(response.body, `${this.documentName()}_searchable.pdf`);
+        alert(
+          `OCR complete — ${ocrPages} page(s) recognised` +
+          (skippedPages ? `, ${skippedPages} already searchable and left unchanged.` : '.')
+        );
+      },
+      error: err => {
+        this.ocrRunning.set(false);
+        alert(err.status === 503
+          ? 'OCR failed — the document converter service is not running.'
+          : 'OCR failed — check that Tesseract is installed on the converter host.');
+      }
+    });
+  }
+
+  private documentName(): string {
+    return this.state.viewerData()?.name || 'document';
+  }
+
+  private downloadBlob(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
   }
 
   onKey(e: KeyboardEvent) {
@@ -229,12 +280,9 @@ export class MarkupToolbarComponent {
 
   exportXfdf() {
     const docId = this.state.documentId();
-    this.annService.exportXfdf(docId).subscribe(blob => {
-      const url = URL.createObjectURL(blob);
-      const a   = document.createElement('a');
-      a.href = url; a.download = `annotations-doc-${docId}.xfdf`; a.click();
-      URL.revokeObjectURL(url);
-    });
+    this.annService.exportXfdf(docId).subscribe(blob =>
+      this.downloadBlob(blob, `annotations-doc-${docId}.xfdf`)
+    );
   }
 
   importXfdf(event: Event) {
