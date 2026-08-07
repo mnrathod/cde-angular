@@ -19,6 +19,13 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
          [style.width.px]="pageWidth()"
          [style.height.px]="pageHeight()">
 
+      <!-- Placeholder shown while this page is outside the render window -->
+      @if (!rendered()) {
+        <div class="absolute inset-0 bg-white shadow-lg flex items-center justify-center">
+          <span class="text-xs text-gray-400 select-none">Page {{ pageNumber }}</span>
+        </div>
+      }
+
       <!-- PDF canvas -->
       <canvas #pageCanvas
         class="block shadow-lg"
@@ -26,9 +33,11 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
         [style.height.px]="pageHeight()">
       </canvas>
 
-      <!-- Text layer (for text selection + search highlight) -->
+      <!-- Text layer (for text selection + search highlight).
+           Populated by pdf.js's TextLayer — see PdfEngineService. -->
       <div #textLayer
-        class="absolute top-0 left-0 text-layer overflow-hidden"
+        class="textLayer"
+        [style.--total-scale-factor]="zoom"
         [style.width.px]="pageWidth()"
         [style.height.px]="pageHeight()">
       </div>
@@ -36,10 +45,12 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
       <!-- Annotation SVG overlay — BOUND to this page's coordinate system -->
       <svg #markupSvg
         class="absolute top-0 left-0"
+        style="z-index:2"
         [attr.width]="pageWidth()"
         [attr.height]="pageHeight()"
         [attr.viewBox]="'0 0 ' + pageWidth() + ' ' + pageHeight()"
         [style.cursor]="cursorStyle()"
+        [style.pointer-events]="drawingEnabled() ? 'auto' : 'none'"
         (mousedown)="onPointerDown($event)"
         (mousemove)="onPointerMove($event)"
         (mouseup)="onPointerUp($event)"
@@ -77,17 +88,55 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
       </div>
     </div>
   `,
+  // ::ng-deep is required throughout: pdf.js builds the text-layer spans
+  // itself via the DOM API, so they never receive Angular's _ngcontent
+  // attribute and ordinary emulated-encapsulation rules cannot match them.
+  // (That was the bug — the spans rendered as visible, statically
+  // positioned black text on top of the page.) Rules below are the minimum
+  // subset of pdfjs-dist/web/pdf_viewer.css that TextLayer output needs.
   styles: [`
-    .text-layer { pointer-events: none; }
-    .text-layer span {
+    :host ::ng-deep .textLayer {
+      position: absolute; inset: 0;
+      text-align: initial;
+      overflow: clip;
+      line-height: 1;
+      transform-origin: 0 0;
+      forced-color-adjust: none;
+      /* Must sit below the markup overlay (z-index 2) so drawing still
+         receives pointer events once a text layer exists. */
+      z-index: 1;
+      /* The page wrapper sets Tailwind's select-none to stop drag-select
+         while drawing; re-enable it here or the text layer is unselectable. */
+      -webkit-user-select: text;
+      user-select: text;
+      --total-scale-factor: 1;
+      --min-font-size: 1;
+      --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+      --min-font-size-inv: calc(1 / var(--min-font-size));
+    }
+    :host ::ng-deep .textLayer :is(span, br) {
+      color: transparent;
       position: absolute;
       white-space: pre;
-      transform-origin: 0% 0%;
-      color: transparent;
-      pointer-events: auto;
       cursor: text;
+      transform-origin: 0% 0%;
+      -webkit-user-select: text;
+      user-select: text;
     }
-    .text-layer .highlight { background: rgba(255,255,0,0.4); }
+    :host ::ng-deep .textLayer > :not(.markedContent),
+    :host ::ng-deep .textLayer .markedContent span:not(.markedContent) {
+      z-index: 1;
+      --font-height: 0;
+      font-size: calc(var(--text-scale-factor) * var(--font-height));
+      --scale-x: 1;
+      --rotate: 0deg;
+      transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+    }
+    :host ::ng-deep .textLayer .markedContent { display: contents; }
+    :host ::ng-deep .textLayer .cde-search-match {
+      background: rgba(255, 214, 0, 0.45);
+      border-radius: 2px;
+    }
   `]
 })
 export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDestroy {
@@ -95,6 +144,13 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   @Input({ required: true }) pageNumber!: number;
   @Input()                   zoom        = 1.0;
   @Input()                   searchQuery = '';
+  /**
+   * Whether this page is close enough to the viewport to be worth painting.
+   * When false the page keeps its correct size (so scroll height and page
+   * anchors stay right) but releases its canvas backing store — at ~1.9 MB
+   * per page a long document otherwise pins hundreds of MB of GPU memory.
+   */
+  @Input()                   active      = true;
 
   @ViewChild('pageCanvas')  canvas!:    ElementRef<HTMLCanvasElement>;
   @ViewChild('markupSvg')   svg!:       ElementRef<SVGSVGElement>;
@@ -107,12 +163,20 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
   pageWidth  = signal(0);
   pageHeight = signal(0);
+  rendered   = signal(false);
   activeShape = signal<ShapeData | null>(null);
   private drawing = false;
   private viewport: any = null;
   // Live cursor position while a polygon/polyline is mid-click-sequence,
   // so the in-progress shape rubber-bands to the pointer between vertices.
   private polyHover: PointerPoint | null = null;
+
+  /**
+   * With the pan tool the markup overlay stops capturing pointer events, so
+   * they reach the text layer underneath and the user can select text —
+   * mirrors CadViewerComponent's existing drawingEnabled() behaviour.
+   */
+  drawingEnabled = computed(() => this.state.activeTool() !== 'pan');
 
   cursorStyle = () => {
     switch (this.state.activeTool()) {
@@ -137,25 +201,48 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     // Skip the very first call — the view (and @ViewChild canvas) isn't
     // ready yet; ngAfterViewInit handles the initial render instead.
     const isFirstChange = Object.values(changes).some(c => c.isFirstChange());
-    if (!isFirstChange && (changes['zoom'] || changes['pdfDoc'] || changes['pageNumber'])) {
+    if (isFirstChange) return;
+
+    if (changes['zoom'] || changes['pdfDoc'] || changes['pageNumber'] || changes['active']) {
       this.render();
+      return;   // render() re-applies the search highlight itself
     }
     if (changes['searchQuery']) {
       this.highlightSearch();
     }
   }
 
-  ngOnDestroy() { /* cleanup */ }
+  ngOnDestroy() { this.releaseCanvas(); }
 
   async render() {
     if (!this.pdfDoc || !this.canvas) return;
-    const result = await this.engine.renderPage(
+
+    // Size the page even when it isn't being painted, so its placeholder
+    // occupies the right scroll height and annotation geometry stays valid.
+    const size = await this.engine.getPageSize(this.pdfDoc, this.pageNumber, this.zoom);
+    this.pageWidth.set(size.width);
+    this.pageHeight.set(size.height);
+    this.viewport = size.viewport;
+
+    if (!this.active) { this.releaseCanvas(); return; }
+
+    await this.engine.renderPage(
       this.pdfDoc, this.pageNumber, this.canvas.nativeElement, this.zoom
     );
-    this.pageWidth.set(result.width);
-    this.pageHeight.set(result.height);
-    this.viewport = result.viewport;
-    if (this.searchQuery) this.highlightSearch();
+    this.rendered.set(true);
+    await this.highlightSearch();
+  }
+
+  /**
+   * Drop the canvas backing store for an off-screen page. Setting the
+   * dimensions to zero is what actually frees the memory — merely clearing
+   * the 2D context keeps the full buffer allocated.
+   */
+  private releaseCanvas() {
+    const el = this.canvas?.nativeElement;
+    if (el) { el.width = 0; el.height = 0; }
+    this.textLayer?.nativeElement.replaceChildren();
+    this.rendered.set(false);
   }
 
   renderShape(s: ShapeData): SafeHtml {
@@ -314,31 +401,22 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     this.drawing = false;
   }
 
-  // ── Highlight search matches on the text layer ───────────────
+  // ── Build the text layer and mark search matches ─────────────
   private async highlightSearch() {
-    if (!this.textLayer || !this.pdfDoc || !this.searchQuery) return;
-    const items = await this.engine.getTextLayerItems(
-      this.pdfDoc, this.pageNumber, this.viewport
-    );
+    if (!this.textLayer || !this.pdfDoc || !this.viewport || !this.active) return;
+
     const el    = this.textLayer.nativeElement;
-    el.innerHTML = '';
-    const q = this.searchQuery.toLowerCase();
-    items.forEach((item: any) => {
-      const span = document.createElement('span');
-      span.textContent = item.str;
-      if (item.str.toLowerCase().includes(q)) {
-        span.classList.add('highlight');
+    const divs  = await this.engine.renderTextLayer(
+      this.pdfDoc, this.pageNumber, el, this.viewport
+    );
+
+    const query = this.searchQuery.trim().toLowerCase();
+    if (!query) return;
+    for (const div of divs) {
+      if ((div.textContent ?? '').toLowerCase().includes(query)) {
+        div.classList.add('cde-search-match');
       }
-      // Position using PDF.js transform matrix
-      if (item.transform) {
-        const [a,b,c,d,e,f] = item.transform;
-        span.style.transform = `matrix(${a},${b},${c},${d},${e},${f})`;
-        span.style.fontSize  = `${Math.sqrt(a*a+b*b)}px`;
-        span.style.left      = `${e}px`;
-        span.style.top       = `${this.pageHeight() - f}px`;
-      }
-      el.appendChild(span);
-    });
+    }
   }
 
   // ── Export this page's markup as SVG string (for print) ─────

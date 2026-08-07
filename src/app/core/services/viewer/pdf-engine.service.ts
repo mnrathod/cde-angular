@@ -87,11 +87,39 @@ export class PdfEngineService {
     return results;
   }
 
-  // ── Get text layer items for a page (for text selection) ────
-  async getTextLayerItems(pdfDoc: any, pageNum: number, viewport: any): Promise<any[]> {
-    const page    = await pdfDoc.getPage(pageNum);
-    const content = await page.getTextContent();
-    return content.items;
+  // ── Page dimensions without painting ─────────────────────────
+  // Lets the viewer size a page placeholder before (or without) rendering
+  // it, which is what makes windowed rendering possible: off-screen pages
+  // still occupy correct scroll height without costing a canvas.
+  async getPageSize(pdfDoc: any, pageNum: number, zoom = 1.0):
+    Promise<{ width: number; height: number; viewport: any }> {
+    const page     = await pdfDoc.getPage(pageNum);
+    const viewport = page.getViewport({ scale: zoom });
+    return { width: viewport.width, height: viewport.height, viewport };
+  }
+
+  // ── Render the selectable text layer for a page ──────────────
+  // Delegates to pdf.js's own TextLayer rather than positioning spans by
+  // hand: item.transform is in PDF user space (origin bottom-left,
+  // unscaled), so it has to be composed with the viewport transform and
+  // corrected for font ascent before it means anything in CSS pixels.
+  // TextLayer already does all of that, including rotation and per-glyph
+  // horizontal scaling.
+  async renderTextLayer(
+    pdfDoc:    any,
+    pageNum:   number,
+    container: HTMLElement,
+    viewport:  any
+  ): Promise<HTMLElement[]> {
+    const page = await pdfDoc.getPage(pageNum);
+    container.replaceChildren();
+    const textLayer = new (pdfjsLib as any).TextLayer({
+      textContentSource: page.streamTextContent(),
+      container,
+      viewport
+    });
+    await textLayer.render();
+    return textLayer.textDivs ?? [];
   }
 
   // ── Convert PDF page to image for print ─────────────────────
