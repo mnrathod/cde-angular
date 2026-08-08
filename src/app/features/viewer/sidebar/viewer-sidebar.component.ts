@@ -9,6 +9,7 @@ import { PdfFormComponent } from '../markup/pdf-form.component';
 import { VersionHistoryComponent } from '../markup/version-history.component';
 import { PageOrganiserComponent } from '../markup/page-organiser.component';
 import { RedactionPanelComponent } from '../markup/redaction-panel.component';
+import { OutlinePanelComponent } from '../markup/outline-panel.component';
 import { Annotation } from '../../../core/models';
 
 @Component({
@@ -17,7 +18,7 @@ import { Annotation } from '../../../core/models';
   imports: [
     CommonModule, FormsModule, AnnotationThreadComponent,
     DocumentSignatureComponent, PdfFormComponent, VersionHistoryComponent,
-    PageOrganiserComponent, RedactionPanelComponent
+    PageOrganiserComponent, RedactionPanelComponent, OutlinePanelComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -187,6 +188,11 @@ import { Annotation } from '../../../core/models';
         </div>
       }
 
+      <!-- Outline tab -->
+      @if (state.sidebarTab() === 'outline') {
+        <app-outline-panel class="flex-1 overflow-hidden flex flex-col"></app-outline-panel>
+      }
+
       <!-- Version history tab -->
       @if (state.sidebarTab() === 'versions') {
         <div class="flex-1 overflow-y-auto">
@@ -250,6 +256,7 @@ export class ViewerSidebarComponent {
     { id: 'measure'     as const, icon: '📐', label: 'Measure' },
     { id: 'thumbnails'  as const, icon: '⊞', label: 'Pages' },
     { id: 'search'      as const, icon: '🔍', label: 'Search' },
+    { id: 'outline'     as const, icon: '☰', label: 'Outline' },
     { id: 'versions'    as const, icon: '🕐', label: 'History' },
   ];
 
