@@ -16,9 +16,16 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
+    <!-- Outer box takes the rotated footprint so the scroll container
+         reserves the right space; the inner box is what actually turns. -->
+    <div class="relative select-none"
+         [style.width.px]="outerWidth()"
+         [style.height.px]="outerHeight()">
     <div class="relative select-none pdf-page-wrap"
          [style.width.px]="pageWidth()"
-         [style.height.px]="pageHeight()">
+         [style.height.px]="pageHeight()"
+         [style.transform]="rotationTransform()"
+         style="transform-origin: center center">
 
       <!-- Placeholder shown while this page is outside the render window -->
       @if (!rendered()) {
@@ -87,6 +94,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
       <div class="absolute bottom-1 right-2 text-xs text-white/50 select-none pointer-events-none">
         {{ pageNumber }}
       </div>
+    </div>
     </div>
   `,
   // ::ng-deep is required throughout: pdf.js builds the text-layer spans
@@ -256,6 +264,20 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   //    pixels. Recomputes whenever pageWidth/pageHeight change (i.e. on
   //    zoom), so — unlike ShapeData — redaction boxes stay correctly
   //    positioned across zoom changes instead of drifting. ─────────────
+  // ── View rotation ────────────────────────────────────────────
+  rotationTransform = computed(() => {
+    const degrees = this.state.rotation();
+    return degrees ? `rotate(${degrees}deg)` : '';
+  });
+
+  /**
+   * A quarter turn swaps the page's footprint. The rotation itself is a
+   * transform, which does not affect layout, so the outer box has to carry
+   * the swapped size or neighbouring pages overlap.
+   */
+  outerWidth  = computed(() => this.state.isQuarterTurned() ? this.pageHeight() : this.pageWidth());
+  outerHeight = computed(() => this.state.isQuarterTurned() ? this.pageWidth()  : this.pageHeight());
+
   redactionRegionsOnPage = computed(() => {
     const zoom         = this.zoom;
     const nativeHeight = this.pageHeight() / zoom;

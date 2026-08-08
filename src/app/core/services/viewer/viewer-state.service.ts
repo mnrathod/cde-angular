@@ -101,6 +101,7 @@ export class ViewerStateService {
   readonly fillOpacity  = signal(0.15);
   readonly shapes       = signal<ShapeData[]>([]);
   readonly undoStack    = signal<ShapeData[][]>([]);  // snapshots for undo
+  readonly redoStack    = signal<ShapeData[][]>([]);  // snapshots undone, available to redo
   readonly selectedId   = signal<number | null>(null);
   readonly dirty        = signal(false);   // unsaved changes
 
@@ -154,6 +155,7 @@ export class ViewerStateService {
   );
 
   readonly canUndo = computed(() => this.undoStack().length > 0);
+  readonly canRedo = computed(() => this.redoStack().length > 0);
 
   // ── Mutations ────────────────────────────────────────────────
   addShape(shape: ShapeData) {
@@ -176,9 +178,21 @@ export class ViewerStateService {
   undo() {
     const stack = this.undoStack();
     if (!stack.length) return;
-    const prev = stack[stack.length - 1];
+    const previous = stack[stack.length - 1];
     this.undoStack.update(s => s.slice(0, -1));
-    this.shapes.set(prev);
+    // Bank the state being left so redo can return to it.
+    this.redoStack.update(s => [...s, this.shapes()]);
+    this.shapes.set(previous);
+    this.dirty.set(true);
+  }
+
+  redo() {
+    const stack = this.redoStack();
+    if (!stack.length) return;
+    const next = stack[stack.length - 1];
+    this.redoStack.update(s => s.slice(0, -1));
+    this.undoStack.update(s => [...s, this.shapes()]);
+    this.shapes.set(next);
     this.dirty.set(true);
   }
 
@@ -210,6 +224,22 @@ export class ViewerStateService {
     this.currentPage.set(Math.max(1, Math.min(total, page)));
   }
 
+  /**
+   * View rotation in degrees. Applied as a transform over the page and its
+   * markup overlay together, so annotations stay pinned to the drawing
+   * rather than needing their coordinates rewritten.
+   */
+  readonly rotation = signal<0 | 90 | 180 | 270>(0);
+
+  /** True when the rotation swaps the page's width and height. */
+  readonly isQuarterTurned = computed(() => this.rotation() % 180 !== 0);
+
+  rotateClockwise() {
+    this.rotation.update(r => ((r + 90) % 360) as 0 | 90 | 180 | 270);
+  }
+
+  resetRotation() { this.rotation.set(0); }
+
   zoomIn()    { this.zoom.update(z => Math.min(z + 0.25, 5)); }
   zoomOut()   { this.zoom.update(z => Math.max(z - 0.25, 0.25)); }
   zoomFit()   { this.zoom.set(1.0); }
@@ -217,5 +247,8 @@ export class ViewerStateService {
   private pushUndoSnapshot() {
     const current = this.shapes();
     this.undoStack.update(s => [...s.slice(-19), current]);  // keep last 20
+    // A fresh edit abandons the redo branch — the standard behaviour, and
+    // without it redo would restore work the user has since diverged from.
+    this.redoStack.set([]);
   }
 }
