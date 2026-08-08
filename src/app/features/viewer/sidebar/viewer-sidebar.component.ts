@@ -7,6 +7,7 @@ import { AnnotationThreadComponent } from '../markup/annotation-thread.component
 import { DocumentSignatureComponent } from '../markup/document-signature.component';
 import { PdfFormComponent } from '../markup/pdf-form.component';
 import { VersionHistoryComponent } from '../markup/version-history.component';
+import { PageOrganiserComponent } from '../markup/page-organiser.component';
 import { Annotation } from '../../../core/models';
 
 @Component({
@@ -14,7 +15,8 @@ import { Annotation } from '../../../core/models';
   standalone: true,
   imports: [
     CommonModule, FormsModule, AnnotationThreadComponent,
-    DocumentSignatureComponent, PdfFormComponent, VersionHistoryComponent
+    DocumentSignatureComponent, PdfFormComponent, VersionHistoryComponent,
+    PageOrganiserComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -110,20 +112,8 @@ import { Annotation } from '../../../core/models';
 
       <!-- Thumbnails tab -->
       @if (state.sidebarTab() === 'thumbnails') {
-        <div class="flex-1 overflow-y-auto p-2 grid gap-2" style="grid-template-columns:1fr">
-          @if (state.thumbnails().length === 0) {
-            <div class="text-center text-gray-400 text-xs py-8">Generating thumbnails...</div>
-          }
-          @for (thumb of state.thumbnails(); track thumb.pageNumber) {
-            <div (click)="goToPage(thumb.pageNumber)"
-              class="cursor-pointer rounded overflow-hidden border-2 transition-all"
-              [class]="state.currentPage() === thumb.pageNumber
-                ? 'border-accent shadow-md'
-                : 'border-gray-200 hover:border-gray-400'">
-              <img [src]="thumb.dataUrl" class="w-full block" [alt]="'Page ' + thumb.pageNumber" />
-              <div class="text-center text-xs text-gray-500 py-1">{{ thumb.pageNumber }}</div>
-            </div>
-          }
+        <div class="flex-1 overflow-hidden">
+          <app-page-organiser></app-page-organiser>
         </div>
       }
 
