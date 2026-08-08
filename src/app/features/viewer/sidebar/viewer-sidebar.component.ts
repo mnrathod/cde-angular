@@ -8,6 +8,7 @@ import { DocumentSignatureComponent } from '../markup/document-signature.compone
 import { PdfFormComponent } from '../markup/pdf-form.component';
 import { VersionHistoryComponent } from '../markup/version-history.component';
 import { PageOrganiserComponent } from '../markup/page-organiser.component';
+import { RedactionPanelComponent } from '../markup/redaction-panel.component';
 import { Annotation } from '../../../core/models';
 
 @Component({
@@ -16,7 +17,7 @@ import { Annotation } from '../../../core/models';
   imports: [
     CommonModule, FormsModule, AnnotationThreadComponent,
     DocumentSignatureComponent, PdfFormComponent, VersionHistoryComponent,
-    PageOrganiserComponent
+    PageOrganiserComponent, RedactionPanelComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -195,39 +196,9 @@ import { Annotation } from '../../../core/models';
 
       <!-- Redact tab -->
       @if (state.sidebarTab() === 'redact') {
-        <div class="flex-1 overflow-y-auto p-3">
-          <div class="text-sm font-semibold text-gray-800 mb-1">Redaction</div>
-          <p class="text-xs text-gray-500 mb-3">
-            Select the <span class="font-medium">Redact</span> tool in the toolbar and draw boxes
-            over sensitive content, then use <span class="font-medium">Apply Redaction</span> in
-            the toolbar. This permanently destroys the covered content in a downloaded copy —
-            the original document is not modified. PDF documents only.
-          </p>
-
-          @if (state.redactionRegions().length === 0) {
-            <div class="text-center text-gray-400 text-xs py-6">
-              No redaction regions yet.
-            </div>
-          } @else {
-            <div class="text-xs font-semibold text-gray-500 mb-1.5">
-              Pending ({{ state.redactionRegions().length }})
-            </div>
-            @for (r of state.redactionRegions(); track r.id) {
-              <div class="flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 group mb-1 border border-gray-100">
-                <div class="w-3 h-3 rounded-sm bg-black flex-shrink-0"></div>
-                <span class="text-xs text-gray-600 flex-1">
-                  Page {{ r.page }} · {{ r.width.toFixed(0) }}×{{ r.height.toFixed(0) }}pt
-                </span>
-                <button (click)="state.removeRedactionRegion(r.id)"
-                  class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs ml-1"
-                  title="Remove this region">✕</button>
-              </div>
-            }
-          }
-        </div>
+        <app-redaction-panel class="flex-1 overflow-hidden flex flex-col"></app-redaction-panel>
       }
 
-      <!-- Search tab -->
       @if (state.sidebarTab() === 'search') {
         <div class="flex flex-col h-full">
           <div class="p-3 border-b border-gray-200">
