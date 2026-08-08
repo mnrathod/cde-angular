@@ -2,6 +2,7 @@ import { Component, Input, signal, inject, OnInit, ChangeDetectionStrategy } fro
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SignatureService, SignatureRecord, SignRequest } from '../../../core/services/signature.service';
+import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
 
 @Component({
   selector: 'app-document-signature',
@@ -113,6 +114,9 @@ import { SignatureService, SignatureRecord, SignRequest } from '../../../core/se
                 }
                 <div class="text-xs text-gray-400 mt-1">
                   {{ sig.signedAt | date:'medium' }}
+                  @if (sig.version) {
+                    · covers v{{ sig.version }}
+                  }
                 </div>
               </div>
 
@@ -143,6 +147,7 @@ export class DocumentSignatureComponent implements OnInit {
   @Input({ required: true }) documentId!: number;
 
   private service = inject(SignatureService);
+  private state   = inject(ViewerStateService);
 
   signatures    = signal<SignatureRecord[]>([]);
   loading       = signal(true);
@@ -173,6 +178,11 @@ export class DocumentSignatureComponent implements OnInit {
         this.signing.set(false);
         this.showSignForm.set(false);
         this.lastStampSvg.set(result.stampSvg || '');
+        // Signing a PDF rewrites it, so the viewer is now a version behind.
+        if (result.embedded) {
+          this.state.applyVersionCommit(result.version ?? 0,
+            `Signed by ${result.signerName} as ${result.role}`);
+        }
         this.loadSignatures();
         this.signReq = { role: 'Reviewer', reason: '' };
       },
