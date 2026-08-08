@@ -1,13 +1,27 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { Annotation, AnnotationType, ViewerData } from '../../models';
+import { MeasurementScale, UNCALIBRATED } from './measurement.service';
 
 export type MarkupTool =
   | 'pan' | 'select'
   | 'line' | 'arrow' | 'rect' | 'circle' | 'ellipse' | 'freehand' | 'cloud'
   | 'polygon' | 'polyline'
   | 'text' | 'highlight' | 'underline' | 'strikeout' | 'squiggly'
-  | 'stamp' | 'note' | 'dimension' | 'callout'
+  | 'stamp' | 'note' | 'callout'
+  // Measurement: 'dimension' is a multi-segment length, 'area' reports area
+  // and perimeter, 'radius' reports radius and diameter, and 'calibrate'
+  // draws the reference line that gives the drawing its scale.
+  | 'dimension' | 'area' | 'radius' | 'calibrate'
   | 'redact';
+
+/** A committed measurement, kept so the reader can review earlier results. */
+export interface MeasurementEntry {
+  id:      string;
+  kind:    'Linear' | 'Area' | 'Radius';
+  value:   string;
+  detail:  string;
+  page:    number;
+}
 
 export interface ShapeData {
   id:          string;
@@ -23,7 +37,11 @@ export interface ShapeData {
   cx?: number; cy?: number; r?: number;                  // circle
   points?: Array<{x: number; y: number}>;               // freehand, cloud, polygon
   text?: string;                                         // text, stamp, freetext
-  measurement?: string;                                  // dimension
+  measurement?: string;                                  // dimension, area, radius
+  /** Second readout on a measurement — perimeter for area, diameter for radius. */
+  measurementDetail?: string;
+  /** Per-segment lengths on a multi-segment linear measurement. */
+  segmentLabels?: string[];
   // Metadata
   author?: string;
   createdAt?: string;
@@ -89,12 +107,41 @@ export class ViewerStateService {
   // ── Redaction (PDF only) ───────────────────────────────────────
   readonly redactionRegions = signal<RedactionRegion[]>([]);
 
+  // ── Measurement ──────────────────────────────────────────────
+  readonly measurementScale = signal<MeasurementScale>(UNCALIBRATED);
+  readonly measurements     = signal<MeasurementEntry[]>([]);
+  /** Length in pixels of the last calibration line drawn, awaiting its real value. */
+  readonly pendingCalibrationPixels = signal(0);
+
+  readonly isCalibrated = computed(() => this.measurementScale().unit !== 'px');
+
+  setScale(scale: MeasurementScale) { this.measurementScale.set(scale); }
+
+  resetScale() {
+    this.measurementScale.set(UNCALIBRATED);
+    this.pendingCalibrationPixels.set(0);
+  }
+
+  addMeasurement(entry: MeasurementEntry) {
+    // Newest first: the reader cares about what they just measured.
+    this.measurements.update(list => [entry, ...list]);
+  }
+
+  removeMeasurement(id: string) {
+    this.measurements.update(list => list.filter(m => m.id !== id));
+  }
+
+  clearMeasurements() { this.measurements.set([]); }
+
   // ── Annotations (saved) ──────────────────────────────────────
   readonly annotations  = signal<Annotation[]>([]);
   readonly showAnnotations = signal(true);
 
   // ── Sidebar ──────────────────────────────────────────────────
-  readonly sidebarTab   = signal<'annotations' | 'threads' | 'thumbnails' | 'search' | 'signatures' | 'redact' | 'form'>('annotations');
+  readonly sidebarTab = signal<
+    'annotations' | 'threads' | 'thumbnails' | 'search'
+    | 'signatures' | 'redact' | 'form' | 'measure'
+  >('annotations');
   readonly sidebarOpen  = signal(true);
 
   // ── Computed ─────────────────────────────────────────────────

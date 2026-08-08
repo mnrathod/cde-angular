@@ -3,6 +3,12 @@ import { ShapeData, MarkupTool } from './viewer-state.service';
 
 export interface PointerPoint { x: number; y: number; }
 
+/** Measurements are drawn in a fixed palette so they stay distinct from markup. */
+const MEASURE_COLOUR      = '#34d399';
+const MEASURE_COLOUR_DIM  = '#6ee7b7';
+const MEASURE_FILL        = 'rgba(52,211,153,0.10)';
+const CALIBRATION_COLOUR  = '#fbbf24';
+
 /**
  * MarkupEngineService
  * Handles all drawing logic: pointer events (mouse + touch),
@@ -51,7 +57,7 @@ export class MarkupEngineService {
       author, createdAt: new Date().toISOString()
     };
     switch (tool) {
-      case 'line': case 'arrow': case 'dimension':
+      case 'line': case 'arrow':
         return { ...base, x1: pt.x, y1: pt.y, x2: pt.x, y2: pt.y };
       case 'rect': case 'highlight': case 'redact': case 'ellipse':
       case 'underline': case 'strikeout': case 'squiggly':
@@ -59,6 +65,10 @@ export class MarkupEngineService {
       case 'circle':
         return { ...base, cx: pt.x, cy: pt.y, r: 0 };
       case 'freehand': case 'cloud': case 'polygon': case 'polyline':
+      case 'dimension': case 'area': case 'calibrate':
+        return { ...base, points: [pt] };
+      case 'radius':
+        // Centre first, edge second — the radius is the gap between them.
         return { ...base, points: [pt] };
       case 'text':
       case 'callout':
@@ -76,7 +86,7 @@ export class MarkupEngineService {
   //    'polygon'/'polyline' are click-driven, see addVertex()) ─────
   updateShape(shape: ShapeData, pt: PointerPoint): ShapeData {
     switch (shape.tool) {
-      case 'line': case 'arrow': case 'dimension':
+      case 'line': case 'arrow':
         return { ...shape, x2: pt.x, y2: pt.y };
       case 'rect': case 'highlight': case 'redact': case 'ellipse':
       case 'underline': case 'strikeout': case 'squiggly':
@@ -113,8 +123,21 @@ export class MarkupEngineService {
 
   // Preview-only: appends a non-committed cursor point so the in-progress
   // polygon/polyline rubber-bands to the pointer between clicks.
+  /** Tools built by clicking vertices rather than dragging. */
+  private static readonly VERTEX_TOOLS: MarkupTool[] =
+    ['polygon', 'polyline', 'dimension', 'area', 'radius', 'calibrate'];
+
+  isVertexTool(tool: MarkupTool): boolean {
+    return MarkupEngineService.VERTEX_TOOLS.includes(tool);
+  }
+
+  /** Vertex tools that end on a fixed click count rather than a double-click. */
+  requiredVertices(tool: MarkupTool): number | null {
+    return tool === 'radius' ? 2 : tool === 'calibrate' ? 2 : null;
+  }
+
   withPreviewPoint(shape: ShapeData, pt: PointerPoint | null): ShapeData {
-    if (!pt || shape.tool !== 'polygon' && shape.tool !== 'polyline') return shape;
+    if (!pt || !this.isVertexTool(shape.tool)) return shape;
     return { ...shape, points: [...(shape.points || []), pt] };
   }
 
@@ -234,14 +257,56 @@ export class MarkupEngineService {
         </g>`;
       }
 
-      case 'dimension': {
-        const dx = (s.x2||0)-(s.x1||0), dy = (s.y2||0)-(s.y1||0);
-        const len = Math.sqrt(dx*dx+dy*dy);
-        const label = s.measurement || `${len.toFixed(0)}px`;
-        const mx = ((s.x1||0)+(s.x2||0))/2, my = ((s.y1||0)+(s.y2||0))/2;
-        return `<g data-id="${s.id}" stroke="${stroke}" fill="${stroke}">
-          <line x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke-width="${sw}" marker-end="url(#arrow-${s.id})" marker-start="url(#arrow-${s.id})"/>
-          <text x="${mx}" y="${my-4}" font-size="11" text-anchor="middle" fill="${stroke}" font-family="Arial">${label}</text>
+      // ── Measurement tools ────────────────────────────────────
+      // Rendered in their own colour rather than the markup stroke colour:
+      // a measurement is a readout, not an annotation, and needs to stay
+      // legible over whatever markup is already on the drawing.
+      case 'dimension': case 'calibrate': {
+        const pts = s.points || [];
+        if (pts.length < 2) return '';
+        const colour = s.tool === 'calibrate' ? CALIBRATION_COLOUR : MEASURE_COLOUR;
+        const path   = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+        const last   = pts[pts.length - 1];
+        const segments = pts.slice(1).map((p, i) => {
+          const prev = pts[i];
+          return this.measureLabel((prev.x + p.x) / 2, (prev.y + p.y) / 2 - 8,
+            s.segmentLabels?.[i] ?? '', colour, 10);
+        }).join('');
+        return `<g data-id="${s.id}">
+          <path d="${path}" stroke="${colour}" stroke-width="2" fill="none"/>
+          ${pts.map(p => this.measureDot(p, colour)).join('')}
+          ${segments}
+          ${s.measurement ? this.measureLabel(last.x + 6, last.y, '∑ ' + s.measurement, colour, 12) : ''}
+        </g>`;
+      }
+
+      case 'area': {
+        const pts = s.points || [];
+        if (pts.length < 2) return '';
+        const centroidX = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
+        const centroidY = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+        return `<g data-id="${s.id}">
+          <polygon points="${pts.map(p => `${p.x},${p.y}`).join(' ')}"
+                   stroke="${MEASURE_COLOUR}" stroke-width="2" fill="${MEASURE_FILL}"/>
+          ${pts.map(p => this.measureDot(p, MEASURE_COLOUR)).join('')}
+          ${s.measurement ? this.measureLabel(centroidX, centroidY - 5, s.measurement, MEASURE_COLOUR, 13) : ''}
+          ${s.measurementDetail ? this.measureLabel(centroidX, centroidY + 12, 'P: ' + s.measurementDetail, MEASURE_COLOUR_DIM, 10) : ''}
+        </g>`;
+      }
+
+      case 'radius': {
+        const pts = s.points || [];
+        if (pts.length < 2) return '';
+        const [centre, edge] = pts;
+        const r = Math.hypot(edge.x - centre.x, edge.y - centre.y);
+        return `<g data-id="${s.id}">
+          <circle cx="${centre.x}" cy="${centre.y}" r="${r}"
+                  stroke="${MEASURE_COLOUR}" stroke-width="2" fill="${MEASURE_FILL}"/>
+          <line x1="${centre.x}" y1="${centre.y}" x2="${edge.x}" y2="${edge.y}"
+                stroke="${MEASURE_COLOUR}" stroke-width="1.5" stroke-dasharray="4,3"/>
+          ${this.measureDot(centre, MEASURE_COLOUR)}
+          ${s.measurement ? this.measureLabel((centre.x + edge.x) / 2, (centre.y + edge.y) / 2 - 8, 'r = ' + s.measurement, MEASURE_COLOUR, 12) : ''}
+          ${s.measurementDetail ? this.measureLabel(centre.x, centre.y + r + 18, 'ø ' + s.measurementDetail, MEASURE_COLOUR_DIM, 11) : ''}
         </g>`;
       }
 
@@ -262,8 +327,12 @@ export class MarkupEngineService {
   hasMinimumSize(s: ShapeData): boolean {
     const MIN = 3;
     switch (s.tool) {
-      case 'line': case 'arrow': case 'dimension':
+      case 'line': case 'arrow':
         return Math.hypot((s.x2||0)-(s.x1||0), (s.y2||0)-(s.y1||0)) > MIN;
+      case 'dimension': case 'area': case 'calibrate':
+        return (s.points?.length || 0) >= (s.tool === 'area' ? 3 : 2);
+      case 'radius':
+        return (s.points?.length || 0) >= 2;
       case 'rect': case 'highlight': case 'redact': case 'ellipse':
       case 'underline': case 'strikeout': case 'squiggly':
         return (s.width||0) > MIN && (s.height||0) > MIN;
@@ -294,7 +363,7 @@ export class MarkupEngineService {
                pt.y >= (s.y||0)-tol && pt.y <= (s.y||0)+(s.height||0)+tol;
       case 'circle':
         return Math.hypot(pt.x-(s.cx||0), pt.y-(s.cy||0)) <= (s.r||0)+tol;
-      case 'line': case 'arrow': case 'dimension':
+      case 'line': case 'arrow':
         return this.distToSegment(pt, {x:s.x1||0,y:s.y1||0}, {x:s.x2||0,y:s.y2||0}) <= tol;
       default: return false;
     }
@@ -320,6 +389,26 @@ export class MarkupEngineService {
       if (Array.isArray(parsed)) return parsed;
     } catch { /* ignore */ }
     return [];
+  }
+
+  /** Vertex marker on a measurement. */
+  private measureDot(pt: PointerPoint, colour: string): string {
+    return `<circle cx="${pt.x}" cy="${pt.y}" r="4" fill="${colour}" stroke="#fff" stroke-width="1"/>`;
+  }
+
+  /**
+   * Readout with an opaque backing plate — a measurement drawn straight onto
+   * a busy drawing is frequently unreadable without one.
+   */
+  private measureLabel(x: number, y: number, text: string, colour: string, size: number): string {
+    if (!text) return '';
+    const safe  = this.escapeXml(text);
+    const width = safe.length * size * 0.58 + 8;
+    return `<g>
+      <rect x="${x - 2}" y="${y - size}" width="${width}" height="${size + 4}" rx="3" fill="rgba(10,12,20,0.85)"/>
+      <text x="${x + 2}" y="${y}" font-size="${size}" fill="${colour}"
+            font-family="monospace" font-weight="bold">${safe}</text>
+    </g>`;
   }
 
   private escapeXml(s: string): string {

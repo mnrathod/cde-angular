@@ -129,7 +129,58 @@ import { Annotation } from '../../../core/models';
         </div>
       }
 
-      <!-- Redact tab -->
+      <!-- Measurements tab -->
+      @if (state.sidebarTab() === 'measure') {
+        <div class="flex-1 overflow-y-auto p-3">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-sm font-semibold text-gray-800">Measurements</span>
+            @if (state.measurements().length > 0) {
+              <button (click)="state.clearMeasurements()"
+                class="text-xs text-red-500 hover:text-red-700">Clear</button>
+            }
+          </div>
+
+          <div class="flex items-center justify-between text-xs mb-3 p-2 rounded border"
+               [class]="state.isCalibrated()
+                 ? 'bg-green-50 border-green-200 text-green-800'
+                 : 'bg-amber-50 border-amber-200 text-amber-800'">
+            <span>Scale</span>
+            <span class="font-mono">
+              {{ state.isCalibrated()
+                   ? '1px = ' + state.measurementScale().unitsPerPixel.toFixed(5) + ' ' + state.measurementScale().unit
+                   : 'uncalibrated' }}
+            </span>
+          </div>
+
+          @if (!state.isCalibrated()) {
+            <p class="text-xs text-gray-500 mb-3">
+              Results are in pixels. Use <span class="font-medium">Calibrate</span> in the
+              toolbar and draw a line over a known distance to read real units.
+            </p>
+          }
+
+          @if (state.measurements().length === 0) {
+            <div class="text-center text-gray-400 text-xs py-6">
+              No measurements yet. Use Measure, Area or Radius.
+            </div>
+          } @else {
+            @for (m of state.measurements(); track m.id) {
+              <div class="p-2 rounded border border-gray-100 mb-1.5 group hover:bg-gray-50">
+                <div class="flex items-start gap-2">
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-mono font-semibold text-gray-800">{{ m.value }}</div>
+                    <div class="text-xs text-gray-500">{{ m.kind }} · {{ m.detail }} · p{{ m.page }}</div>
+                  </div>
+                  <button (click)="state.removeMeasurement(m.id)"
+                    class="opacity-0 group-hover:opacity-100 text-xs text-gray-400 hover:text-red-600"
+                    title="Remove from list">✕</button>
+                </div>
+              </div>
+            }
+          }
+        </div>
+      }
+
       <!-- Form fields tab -->
       @if (state.sidebarTab() === 'form') {
         <div class="flex-1 overflow-y-auto">
@@ -140,6 +191,7 @@ import { Annotation } from '../../../core/models';
         </div>
       }
 
+      <!-- Redact tab -->
       @if (state.sidebarTab() === 'redact') {
         <div class="flex-1 overflow-y-auto p-3">
           <div class="text-sm font-semibold text-gray-800 mb-1">Redaction</div>
@@ -222,6 +274,7 @@ export class ViewerSidebarComponent {
     { id: 'signatures'  as const, icon: '🔏', label: 'Sign' },
     { id: 'redact'      as const, icon: '⬛', label: 'Redact' },
     { id: 'form'        as const, icon: '📝', label: 'Form' },
+    { id: 'measure'     as const, icon: '📐', label: 'Measure' },
     { id: 'thumbnails'  as const, icon: '⊞', label: 'Pages' },
     { id: 'search'      as const, icon: '🔍', label: 'Search' },
   ];
