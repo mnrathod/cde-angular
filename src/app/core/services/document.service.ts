@@ -1,6 +1,6 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { tap } from 'rxjs/operators';
+import { map, tap } from 'rxjs/operators';
 import { Document, DocumentStatus } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -23,6 +23,27 @@ export class DocumentService {
         this.totalDocs.set(Array.isArray(resp) ? docs.length : (resp.totalElements ?? docs.length));
         this.loading.set(false);
       })
+    );
+  }
+
+  /**
+   * Loads one document without touching the cached list.
+   *
+   * <p>Used where only this document's own metadata is wanted — the page
+   * organiser needs its project before it can offer the siblings whose pages
+   * could be inserted.
+   */
+  getById(id: number) {
+    return this.http.get<Document>(`/api/documents/${id}`);
+  }
+
+  /** Documents in a project, returned without replacing the cached list. */
+  listByProject(projectId: number, size = 200) {
+    const params = { page: '0', size: String(size), sort: 'name,asc' };
+    return this.http.get<Document[] | { content: Document[] }>(
+      `/api/documents/project/${projectId}`, { params }
+    ).pipe(
+      map(resp => Array.isArray(resp) ? resp : (resp.content ?? []))
     );
   }
 
