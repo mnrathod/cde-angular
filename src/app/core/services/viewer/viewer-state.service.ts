@@ -12,7 +12,7 @@ export type MarkupTool =
   // and perimeter, 'radius' reports radius and diameter, and 'calibrate'
   // draws the reference line that gives the drawing its scale.
   | 'dimension' | 'area' | 'radius' | 'calibrate'
-  | 'redact';
+  | 'redact' | 'formfield';
 
 /** A committed measurement, kept so the reader can review earlier results. */
 export interface MeasurementEntry {
@@ -74,6 +74,28 @@ export interface RedactionRegion {
   reason?: string;
 }
 
+/** The control a placed form field should become. */
+export type FormFieldKind = 'TEXT' | 'TEXTAREA' | 'CHECKBOX' | 'DROPDOWN';
+
+/**
+ * A form field drawn on a page but not yet added to the document. Geometry is
+ * in PDF points with a bottom-left origin — the space the server places
+ * fields in — so it stays correct across zoom changes.
+ */
+export interface FormFieldDraft {
+  id:       string;
+  page:     number;
+  x:        number;
+  y:        number;
+  width:    number;
+  height:   number;
+  name:     string;
+  kind:     FormFieldKind;
+  required: boolean;
+  /** Comma-separated choices, for a dropdown. */
+  options:  string;
+}
+
 @Injectable()   // ← NOT providedIn root — scoped per viewer instance
 export class ViewerStateService {
 
@@ -107,6 +129,30 @@ export class ViewerStateService {
 
   // ── Redaction (PDF only) ───────────────────────────────────────
   readonly redactionRegions = signal<RedactionRegion[]>([]);
+
+  // ── Form design (PDF only) ─────────────────────────────────────
+  /**
+   * Fields drawn but not yet added to the document. Held here rather than in
+   * the form panel because the rectangle is drawn on the page and named in
+   * the panel — two components that would otherwise need a handle on each
+   * other.
+   */
+  readonly formFieldDrafts = signal<FormFieldDraft[]>([]);
+
+  addFormFieldDraft(draft: FormFieldDraft) {
+    this.formFieldDrafts.update(drafts => [...drafts, draft]);
+  }
+
+  updateFormFieldDraft(id: string, patch: Partial<FormFieldDraft>) {
+    this.formFieldDrafts.update(drafts =>
+      drafts.map(draft => draft.id === id ? { ...draft, ...patch } : draft));
+  }
+
+  removeFormFieldDraft(id: string) {
+    this.formFieldDrafts.update(drafts => drafts.filter(draft => draft.id !== id));
+  }
+
+  clearFormFieldDrafts() { this.formFieldDrafts.set([]); }
 
   // ── Measurement ──────────────────────────────────────────────
   readonly measurementScale = signal<MeasurementScale>(UNCALIBRATED);

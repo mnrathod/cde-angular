@@ -59,7 +59,7 @@ export class MarkupEngineService {
     switch (tool) {
       case 'line': case 'arrow':
         return { ...base, x1: pt.x, y1: pt.y, x2: pt.x, y2: pt.y };
-      case 'rect': case 'highlight': case 'redact': case 'ellipse':
+      case 'rect': case 'highlight': case 'redact': case 'formfield': case 'ellipse':
       case 'underline': case 'strikeout': case 'squiggly':
         return { ...base, x: pt.x, y: pt.y, width: 0, height: 0 };
       case 'circle':
@@ -88,7 +88,7 @@ export class MarkupEngineService {
     switch (shape.tool) {
       case 'line': case 'arrow':
         return { ...shape, x2: pt.x, y2: pt.y };
-      case 'rect': case 'highlight': case 'redact': case 'ellipse':
+      case 'rect': case 'highlight': case 'redact': case 'formfield': case 'ellipse':
       case 'underline': case 'strikeout': case 'squiggly':
         return {
           ...shape,
@@ -174,6 +174,11 @@ export class MarkupEngineService {
         // Live drag preview only — committed regions render separately in
         // PDF-point space (see ViewerStateService.redactionRegions).
         return `<rect data-id="${s.id}" x="${s.x}" y="${s.y}" width="${s.width||0}" height="${s.height||0}" fill="#000000" stroke="#000000"/>`;
+
+      case 'formfield':
+        // Live drag preview only — placed drafts render separately in
+        // PDF-point space (see ViewerStateService.formFieldDrafts).
+        return `<rect data-id="${s.id}" x="${s.x}" y="${s.y}" width="${s.width||0}" height="${s.height||0}" fill="#3b82f622" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4 3" rx="2"/>`;
 
       case 'circle':
         return `<circle data-id="${s.id}" cx="${s.cx}" cy="${s.cy}" r="${s.r||0}" stroke="${stroke}" stroke-width="${sw}" fill="${fill}"/>`;
@@ -333,7 +338,7 @@ export class MarkupEngineService {
         return (s.points?.length || 0) >= (s.tool === 'area' ? 3 : 2);
       case 'radius':
         return (s.points?.length || 0) >= 2;
-      case 'rect': case 'highlight': case 'redact': case 'ellipse':
+      case 'rect': case 'highlight': case 'redact': case 'formfield': case 'ellipse':
       case 'underline': case 'strikeout': case 'squiggly':
         return (s.width||0) > MIN && (s.height||0) > MIN;
       case 'circle':
@@ -357,7 +362,7 @@ export class MarkupEngineService {
 
   private shapeContains(s: ShapeData, pt: PointerPoint, tol: number): boolean {
     switch (s.tool) {
-      case 'rect': case 'highlight': case 'ellipse':
+      case 'rect': case 'highlight': case 'formfield': case 'ellipse':
       case 'underline': case 'strikeout': case 'squiggly':
         return pt.x >= (s.x||0)-tol && pt.x <= (s.x||0)+(s.width||0)+tol &&
                pt.y >= (s.y||0)-tol && pt.y <= (s.y||0)+(s.height||0)+tol;

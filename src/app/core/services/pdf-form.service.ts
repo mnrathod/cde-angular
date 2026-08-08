@@ -2,6 +2,16 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ProcessingResult } from './document-version.service';
+import { FormFieldDraft } from './viewer/viewer-state.service';
+
+/** Reply from placing or removing form fields. */
+export interface FormChangeResult {
+  success:    boolean;
+  documentId: number;
+  version:    number;
+  summary:    string;
+  fields:     string[];
+}
 
 /** Control type resolved server-side from the field's /FT plus its flag bits. */
 export type PdfFormFieldKind =
@@ -57,6 +67,37 @@ export class PdfFormService {
 
   getFields(documentId: number): Observable<PdfFormFieldsResponse> {
     return this.http.get<PdfFormFieldsResponse>(`/api/documents/${documentId}/form-fields`);
+  }
+
+  /**
+   * Places new fields, making a flat PDF fillable.
+   *
+   * Geometry is sent in PDF points with a bottom-left origin, so a field
+   * lands where it was drawn whatever zoom it was drawn at.
+   */
+  addFields(documentId: number, drafts: FormFieldDraft[]): Observable<FormChangeResult> {
+    return this.http.post<FormChangeResult>(
+      `/api/documents/${documentId}/form-fields`,
+      {
+        fields: drafts.map(draft => ({
+          name:     draft.name.trim(),
+          kind:     draft.kind,
+          page:     draft.page,
+          x:        draft.x,
+          y:        draft.y,
+          width:    draft.width,
+          height:   draft.height,
+          required: draft.required,
+          options:  draft.kind === 'DROPDOWN'
+            ? draft.options.split(',').map(option => option.trim()).filter(Boolean)
+            : []
+        }))
+      });
+  }
+
+  removeFields(documentId: number, names: string[]): Observable<FormChangeResult> {
+    return this.http.request<FormChangeResult>(
+      'delete', `/api/documents/${documentId}/form-fields`, { body: { names } });
   }
 
   /**

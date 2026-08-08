@@ -3,7 +3,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
-  FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule
+  FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule, FormsModule
 } from '@angular/forms';
 import { PdfFormService, PdfFormField } from '../../../core/services/pdf-form.service';
 import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
@@ -18,10 +18,83 @@ import { ViewerStateService } from '../../../core/services/viewer/viewer-state.s
 @Component({
   selector: 'app-pdf-form',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="p-3">
+      <!-- ── Design ────────────────────────────────────────────── -->
+      <details class="mb-3 border border-gray-200 rounded" [open]="state.formFieldDrafts().length > 0">
+        <summary class="text-xs font-semibold text-gray-600 px-2 py-1.5 cursor-pointer select-none">
+          Design fields
+          @if (state.formFieldDrafts().length) {
+            <span class="text-blue-600">({{ state.formFieldDrafts().length }} placed)</span>
+          }
+        </summary>
+
+        <div class="p-2 border-t border-gray-100">
+          <p class="text-xs text-gray-500 mb-2">
+            Pick the <span class="font-medium">Field</span> tool in the toolbar and draw a box on
+            the page, then name it here.
+          </p>
+
+          @for (draft of state.formFieldDrafts(); track draft.id) {
+            <div class="border border-gray-200 rounded p-1.5 mb-1.5">
+              <div class="flex items-center gap-1 mb-1">
+                <input type="text" [ngModel]="draft.name"
+                  (ngModelChange)="state.updateFormFieldDraft(draft.id, { name: $event })"
+                  placeholder="field name"
+                  class="flex-1 min-w-0 text-xs border border-gray-300 rounded px-1.5 py-0.5" />
+                <span class="text-xs text-gray-400">p{{ draft.page }}</span>
+                <button (click)="state.removeFormFieldDraft(draft.id)"
+                  class="text-red-400 hover:text-red-600 text-xs" title="Discard">✕</button>
+              </div>
+              <div class="flex items-center gap-1">
+                <select [ngModel]="draft.kind"
+                  (ngModelChange)="state.updateFormFieldDraft(draft.id, { kind: $event })"
+                  class="text-xs border border-gray-300 rounded px-1 py-0.5">
+                  <option value="TEXT">Text</option>
+                  <option value="TEXTAREA">Multi-line</option>
+                  <option value="CHECKBOX">Checkbox</option>
+                  <option value="DROPDOWN">Dropdown</option>
+                </select>
+                <label class="flex items-center gap-1 text-xs text-gray-600">
+                  <input type="checkbox" [ngModel]="draft.required"
+                    (ngModelChange)="state.updateFormFieldDraft(draft.id, { required: $event })" />
+                  Required
+                </label>
+              </div>
+              @if (draft.kind === 'DROPDOWN') {
+                <input type="text" [ngModel]="draft.options"
+                  (ngModelChange)="state.updateFormFieldDraft(draft.id, { options: $event })"
+                  placeholder="options, comma separated"
+                  class="w-full text-xs border border-gray-300 rounded px-1.5 py-0.5 mt-1" />
+              }
+            </div>
+          }
+
+          @if (state.formFieldDrafts().length) {
+            <div class="flex gap-1.5">
+              <button (click)="state.clearFormFieldDrafts()" [disabled]="designing()"
+                class="flex-1 text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-40">
+                Discard all
+              </button>
+              <button (click)="addDrafts()" [disabled]="!draftsReady() || designing()"
+                [title]="draftsReady() ? 'Add these fields to the document' : 'Every field needs a name'"
+                class="flex-1 text-xs px-2 py-1 rounded bg-accent text-white hover:opacity-90 disabled:opacity-40">
+                {{ designing() ? 'Adding...' : 'Add fields' }}
+              </button>
+            </div>
+          }
+
+          @if (designMessage()) {
+            <p class="text-xs mt-1.5"
+               [class]="designFailed() ? 'text-red-600' : 'text-emerald-700'">
+              {{ designMessage() }}
+            </p>
+          }
+        </div>
+      </details>
+
       <div class="text-sm font-semibold text-gray-800 mb-1">Form Fields</div>
 
       @if (loading()) {
@@ -42,8 +115,8 @@ import { ViewerStateService } from '../../../core/services/viewer/viewer-state.s
 
       @if (fields().length > 0) {
         <p class="text-xs text-gray-500 mb-3">
-          {{ fields().length }} field(s). Filling produces a copy for download —
-          the stored document is not changed.
+          {{ fields().length }} field(s). Filling commits a new version; the
+          previous one stays in the history.
         </p>
 
         <form [formGroup]="form" (ngSubmit)="submit()">
@@ -153,7 +226,11 @@ export class PdfFormComponent implements OnInit {
 
   private formService = inject(PdfFormService);
   private fb          = inject(FormBuilder);
-  private state       = inject(ViewerStateService);
+  readonly state      = inject(ViewerStateService);
+
+  readonly designing     = signal(false);
+  readonly designMessage = signal('');
+  readonly designFailed  = signal(false);
 
   readonly fields        = signal<PdfFormField[]>([]);
   readonly loading       = signal(true);
@@ -221,6 +298,40 @@ export class PdfFormComponent implements OnInit {
       ));
     }
     this.form = group;
+  }
+
+  /** Every placed field needs a name, and a dropdown needs choices. */
+  draftsReady(): boolean {
+    const drafts = this.state.formFieldDrafts();
+    return drafts.length > 0 && drafts.every(draft =>
+      draft.name.trim().length > 0 &&
+      (draft.kind !== 'DROPDOWN' || draft.options.split(',').some(o => o.trim())));
+  }
+
+  addDrafts() {
+    if (!this.draftsReady()) return;
+    this.designing.set(true);
+    this.designMessage.set('');
+
+    this.formService.addFields(this.documentId, this.state.formFieldDrafts()).subscribe({
+      next: result => {
+        this.designing.set(false);
+        this.designFailed.set(false);
+        this.designMessage.set(result.summary);
+        this.state.clearFormFieldDrafts();
+        // The document now has fields it did not have; reload so the fill
+        // form below reflects them.
+        this.state.applyVersionCommit(result.version, result.summary);
+        this.loadFields();
+      },
+      error: err => {
+        this.designing.set(false);
+        this.designFailed.set(true);
+        // The server names the offending field, which is more use than a
+        // generic rejection when twenty boxes have been placed.
+        this.designMessage.set(err.error?.message ?? 'The fields could not be added.');
+      }
+    });
   }
 
   isInvalid(name: string): boolean {
