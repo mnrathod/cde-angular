@@ -26,8 +26,9 @@ interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
       @for (t of tools; track t.id) {
         <button
           (click)="setTool(t.id)"
-          [disabled]="t.id === 'redact' && !isPdf()"
-          [title]="t.id === 'redact' && !isPdf() ? 'Redaction is only available for PDF documents'
+          [disabled]="(t.id === 'redact' || t.id === 'formfield') && !isPdf()"
+          [title]="t.id === 'formfield' ? 'Draw a form field, then name it in the Form panel'
+            : t.id === 'redact' && !isPdf() ? 'Redaction is only available for PDF documents'
             : (t.id === 'polygon' || t.id === 'polyline') ? t.label + ' (' + t.key + ') — click to add points, double-click to finish'
             : t.label + ' (' + t.key + ')'"
           class="h-7 px-2.5 text-xs rounded border transition-all flex items-center gap-1 font-medium disabled:opacity-30 disabled:cursor-not-allowed"
@@ -263,6 +264,7 @@ export class MarkupToolbarComponent {
     { id: 'radius',    icon: '◎',  label: 'Radius',    key: 'E' },
     { id: 'callout',   icon: '💬', label: 'Callout',   key: 'O' },
     { id: 'redact',    icon: '⬛', label: 'Redact',    key: 'X' },
+    { id: 'formfield', icon: '▭',  label: 'Field',     key: 'B' },
   ];
 
   /** Tools whose readouts depend on the drawing's scale. */
@@ -273,7 +275,8 @@ export class MarkupToolbarComponent {
   }
 
   setTool(t: MarkupTool) {
-    if (t === 'redact' && !this.isPdf()) return;   // matches the button's disabled state
+    // Both need a PDF to act on, matching the buttons' disabled state.
+    if ((t === 'redact' || t === 'formfield') && !this.isPdf()) return;
     this.state.activeTool.set(t);
   }
 

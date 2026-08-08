@@ -87,6 +87,19 @@ import { PageLinksComponent } from '../markup/page-links.component';
                 fill="#000000" stroke="#000000"/>
         }
 
+        <!-- Placed but not yet added form fields, converted from PDF points
+             so they stay put across zoom changes -->
+        @for (draft of formFieldDraftsOnPage(); track draft.id) {
+          <g>
+            <rect [attr.x]="draft.screenX" [attr.y]="draft.screenY"
+                  [attr.width]="draft.screenWidth" [attr.height]="draft.screenHeight"
+                  fill="#3b82f622" stroke="#3b82f6" stroke-width="1.5"
+                  stroke-dasharray="4 3" rx="2"/>
+            <text [attr.x]="draft.screenX + 3" [attr.y]="draft.screenY - 3"
+                  font-size="10" fill="#2563eb">{{ draft.name || 'unnamed' }}</text>
+          </g>
+        }
+
         <!-- In-progress shape being drawn (polygon/polyline rubber-band
              to the cursor between clicks via previewShape()) -->
         @if (activeShape()) {
@@ -374,6 +387,8 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     if (this.markup.hasMinimumSize(shape)) {
       if (shape.tool === 'redact') {
         this.commitRedactionRegion(shape);
+      } else if (shape.tool === 'formfield') {
+        this.commitFormFieldDraft(shape);
       } else {
         this.state.addShape(shape);
       }
@@ -468,20 +483,64 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   // Convert a drawn rect (screen pixels, top-left origin, current zoom)
   // into the backend's coordinate system (PDF points, origin bottom-left).
   private commitRedactionRegion(shape: ShapeData) {
-    const zoom         = this.zoom;
-    const nativeHeight = this.pageHeight() / zoom;
-    const pdfWidth      = (shape.width  || 0) / zoom;
-    const pdfHeight     = (shape.height || 0) / zoom;
-    const pdfX          = (shape.x || 0) / zoom;
-    const topNative      = (shape.y || 0) / zoom;
-    const pdfY           = nativeHeight - topNative - pdfHeight;
-
     this.state.addRedactionRegion({
       id: this.markup.newId(),
       page: this.pageNumber,
-      x: pdfX, y: pdfY, width: pdfWidth, height: pdfHeight
+      ...this.toPdfRect(shape)
     });
   }
+
+  /**
+   * Screen pixels at the current zoom, top-left origin, converted to PDF
+   * points with a bottom-left origin — the space the server works in, and
+   * the reason these stay correct when the zoom changes.
+   */
+  private toPdfRect(shape: ShapeData): { x: number; y: number; width: number; height: number } {
+    const zoom         = this.zoom;
+    const nativeHeight = this.pageHeight() / zoom;
+    const width        = (shape.width  || 0) / zoom;
+    const height       = (shape.height || 0) / zoom;
+    return {
+      x:      (shape.x || 0) / zoom,
+      y:      nativeHeight - ((shape.y || 0) / zoom) - height,
+      width,
+      height
+    };
+  }
+
+  /**
+   * Turns a drawn rectangle into an unnamed field draft.
+   *
+   * <p>Named in the Form panel rather than here: a prompt for every box would
+   * make laying out a form of twenty fields twenty interruptions.
+   */
+  private commitFormFieldDraft(shape: ShapeData) {
+    const box = this.toPdfRect(shape);
+    this.state.addFormFieldDraft({
+      id: this.markup.newId(),
+      page: this.pageNumber,
+      ...box,
+      name: '',
+      kind: 'TEXT',
+      required: false,
+      options: ''
+    });
+  }
+
+  /** Field drafts on this page, in current screen pixels. */
+  formFieldDraftsOnPage = computed(() => {
+    const zoom         = this.zoom;
+    const nativeHeight = this.pageHeight() / zoom;
+    return this.state.formFieldDrafts()
+      .filter(draft => draft.page === this.pageNumber)
+      .map(draft => ({
+        ...draft,
+        screenX:      draft.x * zoom,
+        screenY:      (nativeHeight - draft.y - draft.height) * zoom,
+        screenWidth:  draft.width * zoom,
+        screenHeight: draft.height * zoom
+      }));
+  });
 
   // ── Text tool — show input prompt ───────────────────────────
   private handleTextTool(pt: PointerPoint, tool: MarkupTool) {
