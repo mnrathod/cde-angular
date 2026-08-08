@@ -9,11 +9,13 @@ import { MarkupEngineService, PointerPoint } from '../../../core/services/viewer
 import { ViewerStateService, ShapeData, MarkupTool } from '../../../core/services/viewer/viewer-state.service';
 import { MeasurementService } from '../../../core/services/viewer/measurement.service';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { CollaborationService } from '../../../core/services/collaboration.service';
+import { RemoteCursorsComponent } from '../markup/remote-cursors.component';
 
 @Component({
   selector: 'app-pdf-page',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RemoteCursorsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Outer box takes the rotated footprint so the scroll container
@@ -22,6 +24,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
          [style.width.px]="outerWidth()"
          [style.height.px]="outerHeight()">
     <div class="relative select-none pdf-page-wrap"
+         (mousemove)="reportCursor($event)"
          [style.width.px]="pageWidth()"
          [style.height.px]="pageHeight()"
          [style.transform]="rotationTransform()"
@@ -89,6 +92,9 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
           <g [innerHTML]="renderShape(previewShape())"></g>
         }
       </svg>
+
+      <!-- Other people's pointers -->
+      <app-remote-cursors [pageNumber]="pageNumber" [zoom]="zoom"></app-remote-cursors>
 
       <!-- Page number label -->
       <div class="absolute bottom-1 right-2 text-xs text-white/50 select-none pointer-events-none">
@@ -170,6 +176,7 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   markup  = inject(MarkupEngineService);
   measure = inject(MeasurementService);
   sanitizer = inject(DomSanitizer);
+  private collaboration = inject(CollaborationService);
 
   pageWidth  = signal(0);
   pageHeight = signal(0);
@@ -319,6 +326,26 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       'current-user'
     );
     this.activeShape.set(shape);
+  }
+
+  /**
+   * Tells other viewers where this pointer is.
+   *
+   * <p>Bound to the page wrapper rather than the markup overlay, which turns
+   * off pointer events unless a drawing tool is active — a pointer that only
+   * broadcast while drawing would be no use for following along.
+   *
+   * <p>Coordinates are divided by the zoom so they describe a place on the
+   * page rather than a place on this screen; the service throttles the rate.
+   */
+  reportCursor(e: MouseEvent) {
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const scale = this.zoom || 1;
+    this.collaboration.reportCursor({
+      page: this.pageNumber,
+      x: (e.clientX - box.left) / scale,
+      y: (e.clientY - box.top) / scale
+    });
   }
 
   onPointerMove(e: MouseEvent | TouchEvent) {

@@ -12,6 +12,7 @@ import { PdfEngineService } from '../../core/services/viewer/pdf-engine.service'
 import { AnnotationService } from '../../core/services/viewer/annotation.service';
 import { ViewerService } from '../../core/services/viewer.service';
 import { DocumentService } from '../../core/services/document.service';
+import { AuthService } from '../../core/services/auth.service';
 
 import { MarkupToolbarComponent } from './toolbar/markup-toolbar.component';
 import { ViewerSidebarComponent } from './sidebar/viewer-sidebar.component';
@@ -19,12 +20,14 @@ import { PdfViewerComponent } from './pdf-viewer/pdf-viewer.component';
 import { CadViewerComponent } from './cad-viewer/cad-viewer.component';
 import { PdfPageComponent } from './pdf-viewer/pdf-page.component';
 import { ViewerData } from '../../core/models';
+import { CollaborationService, CollaborationEvent } from '../../core/services/collaboration.service';
 
 @Component({
   selector: 'app-viewer-shell',
   standalone: true,
-  // Provide ViewerStateService at THIS component level — scoped, not singleton
-  providers: [ViewerStateService],
+  // Scoped to this component, not singletons: leaving the document must tear
+  // the socket down, not leave it announcing a presence that has gone.
+  providers: [ViewerStateService, CollaborationService],
   imports: [
     CommonModule,
     MarkupToolbarComponent,
@@ -53,6 +56,24 @@ import { ViewerData } from '../../core/models';
             <span class="text-xs text-white/70">{{ state.viewerData()?.drawingNumber }}</span>
           }
         </div>
+
+        <!-- Who else is viewing this document -->
+        @if (collaboration.others().length) {
+          <div class="flex items-center -space-x-1.5 mr-1"
+               [title]="presenceTitle()">
+            @for (participant of collaboration.others(); track participant.username) {
+              <span class="w-6 h-6 rounded-full flex items-center justify-center
+                           text-[10px] font-bold text-white border-2 border-white/70"
+                    [style.background]="participant.colour">
+                {{ initialsOf(participant.username) }}
+              </span>
+            }
+          </div>
+        }
+        @if (collaboration.connected()) {
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1"
+                title="Live — changes from others appear as they happen"></span>
+        }
 
         <!-- Page navigation (PDF only) -->
         @if (state.totalPages() > 1) {
@@ -158,9 +179,16 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
   http       = inject(HttpClient);
   private route  = inject(ActivatedRoute);
   private router = inject(Router);
+  private auth   = inject(AuthService);
+
+  collaboration = inject(CollaborationService);
 
   imageUrl = '';
   entityCount = 0;
+
+  /** Stops the cursor-expiry timer and the event subscription on teardown. */
+  private cursorTimer?: ReturnType<typeof setInterval>;
+  private unsubscribeCollaboration?: () => void;
 
   constructor() {
     // Redact/OCR/flatten/form-fill rewrite the document server-side and
@@ -179,9 +207,66 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
     this.state.documentId.set(id);
     this.loadDocument(id);
     this.loadAnnotations(id);
+    this.startCollaboration(id);
   }
 
-  ngOnDestroy() { /* cleanup any subscriptions */ }
+  ngOnDestroy() {
+    this.unsubscribeCollaboration?.();
+    if (this.cursorTimer) clearInterval(this.cursorTimer);
+    this.collaboration.disconnect();
+  }
+
+  // ── Collaboration ────────────────────────────────────────────
+
+  private startCollaboration(documentId: number) {
+    this.collaboration.connect(documentId);
+    this.unsubscribeCollaboration = this.collaboration.onEvent(
+      event => this.applyRemoteChange(event));
+    // Cursors expire rather than being cleared: someone who stops moving has
+    // not left, but a pointer frozen where they last were is misleading.
+    this.cursorTimer = setInterval(() => this.collaboration.pruneStaleCursors(), 2000);
+  }
+
+  /**
+   * Applies a change someone else made.
+   *
+   * <p>Annotation events reload the document's annotations rather than
+   * patching the local list from the payload: the list is small, and
+   * re-reading it cannot drift out of step with the server the way a
+   * sequence of incremental patches can.
+   */
+  private applyRemoteChange(event: CollaborationEvent) {
+    if (event.actor && event.actor === this.auth.username()) return;
+
+    switch (event.type) {
+      case 'ANNOTATION_CREATED':
+      case 'ANNOTATION_UPDATED':
+      case 'ANNOTATION_DELETED':
+      case 'ANNOTATION_RESOLVED':
+      case 'REPLY_ADDED':
+        this.loadAnnotations(this.state.documentId());
+        break;
+
+      case 'VERSION_COMMITTED':
+        // The bytes this viewer is showing have been replaced. Reload, and
+        // say who did it — the page changing underneath you with no
+        // explanation is alarming.
+        this.state.processingMessage.set(
+          `v${event.version} by ${event.actor} — ${event.summary ?? 'document updated'}`);
+        this.state.applyVersionCommit(event.version ?? this.state.currentVersion());
+        break;
+    }
+  }
+
+  presenceTitle(): string {
+    return this.collaboration.others()
+      .map(participant => participant.username)
+      .join(', ') + ' also viewing';
+  }
+
+  initialsOf(username: string): string {
+    return username.slice(0, 2).toUpperCase();
+  }
 
   private async loadDocument(id: number) {
     this.state.loading.set(true);
