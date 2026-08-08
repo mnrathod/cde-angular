@@ -141,7 +141,7 @@ export class ViewerStateService {
   // ── Sidebar ──────────────────────────────────────────────────
   readonly sidebarTab = signal<
     'annotations' | 'threads' | 'thumbnails' | 'search'
-    | 'signatures' | 'redact' | 'form' | 'measure' | 'versions'
+    | 'signatures' | 'redact' | 'form' | 'measure' | 'versions' | 'outline'
   >('annotations');
   readonly sidebarOpen  = signal(true);
 

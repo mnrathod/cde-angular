@@ -11,11 +11,12 @@ import { MeasurementService } from '../../../core/services/viewer/measurement.se
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CollaborationService } from '../../../core/services/collaboration.service';
 import { RemoteCursorsComponent } from '../markup/remote-cursors.component';
+import { PageLinksComponent } from '../markup/page-links.component';
 
 @Component({
   selector: 'app-pdf-page',
   standalone: true,
-  imports: [CommonModule, RemoteCursorsComponent],
+  imports: [CommonModule, RemoteCursorsComponent, PageLinksComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Outer box takes the rotated footprint so the scroll container
@@ -92,6 +93,11 @@ import { RemoteCursorsComponent } from '../markup/remote-cursors.component';
           <g [innerHTML]="renderShape(previewShape())"></g>
         }
       </svg>
+
+      <!-- Link annotations, below the cursors so a remote pointer is never
+           swallowed by a link's hit area -->
+      <app-page-links [pageNumber]="pageNumber" [zoom]="zoom"
+                      [pageHeight]="pageHeight() / zoom"></app-page-links>
 
       <!-- Other people's pointers -->
       <app-remote-cursors [pageNumber]="pageNumber" [zoom]="zoom"></app-remote-cursors>
