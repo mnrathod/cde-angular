@@ -6,12 +6,14 @@ import {
   FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule
 } from '@angular/forms';
 import { PdfFormService, PdfFormField } from '../../../core/services/pdf-form.service';
+import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
 
 /**
  * Renders a PDF's AcroForm fields as an editable form and writes the values
- * back into a downloadable copy. Field metadata (kind, options, required,
- * max length) comes from the server, so the control and its validation match
- * what the PDF itself declares rather than being guessed here.
+ * back into the document as a new version. Field metadata (kind, options,
+ * required, max length) comes from the server, so the control and its
+ * validation match what the PDF itself declares rather than being guessed
+ * here.
  */
 @Component({
   selector: 'app-pdf-form',
@@ -151,6 +153,7 @@ export class PdfFormComponent implements OnInit {
 
   private formService = inject(PdfFormService);
   private fb          = inject(FormBuilder);
+  private state       = inject(ViewerStateService);
 
   readonly fields        = signal<PdfFormField[]>([]);
   readonly loading       = signal(true);
@@ -171,6 +174,12 @@ export class PdfFormComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.loadFields();
+  }
+
+  private loadFields() {
+    this.loading.set(true);
+    this.error.set('');
     this.formService.getFields(this.documentId).subscribe({
       next: response => {
         this.loading.set(false);
@@ -229,21 +238,23 @@ export class PdfFormComponent implements OnInit {
     this.submitting.set(true);
     this.statusMessage.set('');
     this.formService.fillForm(this.documentId, values, this.flattenControl.value).subscribe({
-      next: blob => {
+      next: result => {
         this.submitting.set(false);
-        const url = URL.createObjectURL(blob);
-        const a   = document.createElement('a');
-        a.href = url; a.download = `${this.documentName}_filled.pdf`; a.click();
-        URL.revokeObjectURL(url);
         this.statusIsError.set(false);
-        this.statusMessage.set('Filled PDF downloaded.');
+        this.statusMessage.set(`Saved as version ${result.version} — ${result.summary}`);
+        // Reload so the viewer shows the filled document; the next operation
+        // then runs against these values rather than the empty form.
+        this.state.applyVersionCommit(result.version, result.summary);
+        // Flattening drops the interactive fields, so re-read them: what the
+        // panel is showing no longer exists in the document.
+        if (this.flattenControl.value) this.loadFields();
       },
       error: err => {
         this.submitting.set(false);
         this.statusIsError.set(true);
         this.statusMessage.set(err.status === 503
           ? 'The document converter service is not running.'
-          : 'Filling the form failed.');
+          : err.error?.message ?? 'Filling the form failed.');
       }
     });
   }

@@ -6,21 +6,26 @@ import { AnnotationService } from '../../../core/services/viewer/annotation.serv
 import { AnnotationThreadComponent } from '../markup/annotation-thread.component';
 import { DocumentSignatureComponent } from '../markup/document-signature.component';
 import { PdfFormComponent } from '../markup/pdf-form.component';
+import { VersionHistoryComponent } from '../markup/version-history.component';
 import { Annotation } from '../../../core/models';
 
 @Component({
   selector: 'app-viewer-sidebar',
   standalone: true,
-  imports: [CommonModule, FormsModule, AnnotationThreadComponent, DocumentSignatureComponent, PdfFormComponent],
+  imports: [
+    CommonModule, FormsModule, AnnotationThreadComponent,
+    DocumentSignatureComponent, PdfFormComponent, VersionHistoryComponent
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="w-60 bg-white border-l border-gray-200 flex flex-col flex-shrink-0">
 
-      <!-- Tab bar -->
-      <div class="flex border-b border-gray-200 flex-shrink-0">
+      <!-- Tab bar. Wraps rather than compressing: nine tabs across 240px
+           would leave each too narrow to read its label. -->
+      <div class="flex flex-wrap border-b border-gray-200 flex-shrink-0">
         @for (tab of tabs; track tab.id) {
           <button (click)="state.sidebarTab.set(tab.id)"
-            class="flex-1 py-2 text-xs font-medium transition-colors border-b-2"
+            class="flex-1 min-w-[3.75rem] py-2 text-xs font-medium transition-colors border-b-2"
             [class]="state.sidebarTab() === tab.id
               ? 'border-accent text-accent'
               : 'border-transparent text-gray-500 hover:text-gray-700'">
@@ -191,6 +196,13 @@ import { Annotation } from '../../../core/models';
         </div>
       }
 
+      <!-- Version history tab -->
+      @if (state.sidebarTab() === 'versions') {
+        <div class="flex-1 overflow-y-auto">
+          <app-version-history></app-version-history>
+        </div>
+      }
+
       <!-- Redact tab -->
       @if (state.sidebarTab() === 'redact') {
         <div class="flex-1 overflow-y-auto p-3">
@@ -277,6 +289,7 @@ export class ViewerSidebarComponent {
     { id: 'measure'     as const, icon: '📐', label: 'Measure' },
     { id: 'thumbnails'  as const, icon: '⊞', label: 'Pages' },
     { id: 'search'      as const, icon: '🔍', label: 'Search' },
+    { id: 'versions'    as const, icon: '🕐', label: 'History' },
   ];
 
   goToPage(page: number) {

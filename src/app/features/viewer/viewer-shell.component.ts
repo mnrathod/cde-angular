@@ -1,5 +1,5 @@
 import {
-  Component, inject, OnInit, OnDestroy, signal,
+  Component, inject, OnInit, OnDestroy, signal, effect,
   ViewChildren, QueryList, ChangeDetectionStrategy
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -162,6 +162,17 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
   imageUrl = '';
   entityCount = 0;
 
+  constructor() {
+    // Redact/OCR/flatten/form-fill rewrite the document server-side and
+    // commit a new version. Re-fetch so the viewer shows the result and the
+    // next operation runs against it rather than the copy already in memory.
+    effect(() => {
+      const token = this.state.reloadToken();
+      if (token === 0) return;   // no commit yet — ngOnInit does the first load
+      this.loadDocument(this.state.documentId());
+    });
+  }
+
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));
     if (!id) { this.router.navigate(['/']); return; }
@@ -189,8 +200,13 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
           // which the backend correctly rejects as unauthenticated (403).
           const bytes  = await firstValueFrom(this.http.get(url, { responseType: 'arraybuffer' }));
           const pdfDoc = await this.pdfEngine.openDocument(bytes);
+          // Release the previous document before swapping it out — reloading
+          // after a version commit would otherwise leak a pdf.js worker and
+          // its page buffers on every operation.
+          this.state.pdfDoc()?.destroy?.();
           this.state.pdfDoc.set(pdfDoc);
           this.state.totalPages.set(pdfDoc.numPages);
+          this.state.currentVersion.set(data.version ?? 1);
           this.state.viewerData.set({ ...data, type: 'pdf' });
         } else {
           this.state.viewerData.set(data);

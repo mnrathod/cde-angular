@@ -4,7 +4,6 @@ import { FormsModule } from '@angular/forms';
 import { ViewerStateService, MarkupTool } from '../../../core/services/viewer/viewer-state.service';
 import { FlattenService } from '../../../core/services/viewer/flatten.service';
 import { AnnotationService } from '../../../core/services/viewer/annotation.service';
-import { PdfEngineService } from '../../../core/services/viewer/pdf-engine.service';
 import { RedactionService } from '../../../core/services/redaction.service';
 import { OcrService } from '../../../core/services/ocr.service';
 import {
@@ -108,10 +107,13 @@ interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
         <input type="file" accept=".xfdf" class="hidden" (change)="importXfdf($event)" />
       </label>
 
-      <!-- Flatten to PDF -->
-      <button (click)="flattenPdf()" title="Flatten annotations into PDF"
-        class="h-7 px-2.5 text-xs rounded border bg-white border-gray-300 hover:bg-gray-50">
-        ⬇ Flatten PDF
+      <!-- Flatten annotations into the page -->
+      <button (click)="flattenPdf()" [disabled]="!isPdf() || flattening()"
+        [title]="!isPdf()
+          ? 'Flattening is only available for PDF documents'
+          : 'Bake annotations into the page as permanent content'"
+        class="h-7 px-2.5 text-xs rounded border bg-white border-gray-300 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
+        ▤ {{ flattening() ? 'Flattening...' : 'Flatten' }}
       </button>
 
       <!-- Scale calibration -->
@@ -145,9 +147,19 @@ interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
       <!-- Apply redaction (PDF only) -->
       @if (state.redactionRegions().length > 0) {
         <button (click)="applyRedaction()" [disabled]="redacting()"
-          title="Permanently burn these regions into a new PDF and download it"
+          title="Permanently destroy the content under these regions and commit a new version"
           class="h-7 px-2.5 text-xs rounded border bg-red-50 border-red-300 text-red-700 hover:bg-red-100 disabled:opacity-40">
           ⬛ {{ redacting() ? 'Redacting...' : 'Apply Redaction (' + state.redactionRegions().length + ')' }}
+        </button>
+      }
+
+      <!-- Outcome of the last processing run -->
+      @if (state.processingMessage()) {
+        <button (click)="state.sidebarTab.set('versions'); state.processingMessage.set('')"
+          title="Open version history"
+          class="h-7 px-2.5 text-xs rounded border bg-emerald-50 border-emerald-300 text-emerald-800
+                 hover:bg-emerald-100 max-w-[22rem] truncate">
+          ✓ {{ state.processingMessage() }}
         </button>
       }
 
@@ -211,7 +223,6 @@ interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
 export class MarkupToolbarComponent {
   state      = inject(ViewerStateService);
   annService    = inject(AnnotationService);
-  pdfEngine     = inject(PdfEngineService);
   flattenService = inject(FlattenService);
   redactionService = inject(RedactionService);
   ocrService       = inject(OcrService);
@@ -223,6 +234,7 @@ export class MarkupToolbarComponent {
   readonly saving     = signal(false);
   readonly redacting  = signal(false);
   readonly ocrRunning = signal(false);
+  readonly flattening = signal(false);
 
   @Output() saveRequested  = new EventEmitter<void>();
   @Output() printRequested = new EventEmitter<void>();
@@ -269,6 +281,12 @@ export class MarkupToolbarComponent {
     return this.state.viewerData()?.type === 'pdf';
   }
 
+  /**
+   * Burn the marked regions out of the document. The result becomes the
+   * document's current version, so the removed content is gone for every
+   * later reader and every later operation — not just in a copy the person
+   * who ran it happens to hold.
+   */
   applyRedaction() {
     const docId   = this.state.documentId();
     const regions = this.state.redactionRegions();
@@ -276,45 +294,46 @@ export class MarkupToolbarComponent {
 
     this.redacting.set(true);
     this.redactionService.redact(docId, regions).subscribe({
-      next: blob => {
+      next: result => {
         this.redacting.set(false);
-        this.downloadBlob(blob, `${this.documentName()}_redacted.pdf`);
         this.state.clearRedactionRegions();
+        this.state.applyVersionCommit(result.version, result.summary);
       },
-      error: () => {
+      error: err => {
         this.redacting.set(false);
-        alert('Redaction failed — check that the document converter service is running.');
+        this.state.processingMessage.set(this.failureMessage(err, 'Redaction'));
       }
     });
   }
 
   /**
-   * Turn a scanned PDF into a searchable one. The server adds an invisible
-   * text layer and returns a separate copy — the stored document is not
-   * modified — so the result is delivered as a download.
+   * Turn a scanned PDF into a searchable one by adding an invisible text
+   * layer. Committed as a new version, so the text is available to search,
+   * selection and any later processing rather than living in a side copy.
    */
   runOcr() {
     if (!this.isPdf()) return;
 
     this.ocrRunning.set(true);
     this.ocrService.makeSearchable(this.state.documentId()).subscribe({
-      next: response => {
+      next: result => {
         this.ocrRunning.set(false);
-        if (!response.body) return;
-        const { ocrPages, skippedPages } = this.ocrService.readCounts(response);
-        this.downloadBlob(response.body, `${this.documentName()}_searchable.pdf`);
-        alert(
-          `OCR complete — ${ocrPages} page(s) recognised` +
-          (skippedPages ? `, ${skippedPages} already searchable and left unchanged.` : '.')
-        );
+        this.state.applyVersionCommit(result.version, result.summary);
       },
       error: err => {
         this.ocrRunning.set(false);
-        alert(err.status === 503
-          ? 'OCR failed — the document converter service is not running.'
-          : 'OCR failed — check that Tesseract is installed on the converter host.');
+        this.state.processingMessage.set(this.failureMessage(err, 'OCR'));
       }
     });
+  }
+
+  /**
+   * Server error text is authored by the backend for display; anything else
+   * gets a generic line naming the likely cause rather than the exception.
+   */
+  private failureMessage(err: { status?: number; error?: { message?: string } }, action: string): string {
+    if (err.status === 503) return `${action} failed — the document converter service is not running.`;
+    return err.error?.message ?? `${action} failed.`;
   }
 
   // ── Scale calibration ────────────────────────────────────────
@@ -358,10 +377,6 @@ export class MarkupToolbarComponent {
     this.state.activeTool.set('pan');
   }
 
-  private documentName(): string {
-    return this.state.viewerData()?.name || 'document';
-  }
-
   private downloadBlob(blob: Blob, filename: string) {
     const url = URL.createObjectURL(blob);
     const a   = document.createElement('a');
@@ -383,18 +398,60 @@ export class MarkupToolbarComponent {
   saveMarkup() { this.saveRequested.emit(); }
   print()      { this.printRequested.emit(); }
 
-  async flattenPdf() {
-    const pdfDoc = this.state.pdfDoc();
+  /**
+   * Bake the markup into the page itself, server-side, and commit the result
+   * as a new version.
+   *
+   * Flattening is destructive by definition: once the shapes are page content
+   * they are no longer editable annotations, so the annotation records that
+   * produced them are removed to stop the overlay drawing a second copy on
+   * top of the baked-in one. The pre-flatten file stays in the version
+   * history, so the document itself can be restored.
+   */
+  flattenPdf() {
     const shapes = this.state.shapes();
-    if (!pdfDoc || !shapes.length) {
-      alert('No annotations to flatten, or no PDF loaded');
+    if (!this.isPdf() || !shapes.length) {
+      this.state.processingMessage.set('There are no annotations to flatten.');
       return;
     }
-    const { MarkupEngineService } = await import('../../../core/services/viewer/markup-engine.service');
-    const markupEngine = new MarkupEngineService();
-    const docName = this.state.viewerData()?.name || 'document';
-    await this.flattenService.flattenClientSide(
-      this.pdfEngine, pdfDoc, shapes, markupEngine, docName
+    if (!confirm(
+      `Flatten ${shapes.length} annotation(s) into the page?\n\n` +
+      'They become permanent page content and will no longer be editable. ' +
+      'The current version stays in the history and can be restored.'
+    )) return;
+
+    this.flattening.set(true);
+    this.flattenService.flattenToPdf({
+      documentId: this.state.documentId(),
+      shapes,
+      quality: 'print'
+    }).subscribe({
+      next: result => {
+        this.flattening.set(false);
+        this.discardFlattenedAnnotations();
+        this.state.applyVersionCommit(result.version, result.summary);
+      },
+      error: err => {
+        this.flattening.set(false);
+        this.state.processingMessage.set(this.failureMessage(err, 'Flatten'));
+      }
+    });
+  }
+
+  /**
+   * Drops the annotations now living in the page content, locally and on the
+   * server. Without this they reload on the next open and render on top of
+   * the flattened copy of themselves.
+   */
+  private discardFlattenedAnnotations() {
+    const saved = this.state.annotations();
+    this.state.shapes.set([]);
+    this.state.annotations.set([]);
+    this.state.dirty.set(false);
+    saved.forEach(annotation =>
+      this.annService.deleteAnnotation(annotation.id).subscribe({
+        error: () => { /* the flatten already succeeded; a stale record is cosmetic */ }
+      })
     );
   }
 
