@@ -8,6 +8,60 @@ const makeShape = (overrides: Partial<ShapeData> = {}): ShapeData => ({
   ...overrides
 });
 
+describe('ViewerStateService version commits', () => {
+  let state: ViewerStateService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [ViewerStateService] });
+    state = TestBed.inject(ViewerStateService);
+  });
+
+  it('starts on version 1 with no reload pending', () => {
+    expect(state.currentVersion()).toBe(1);
+    expect(state.reloadToken()).toBe(0);
+  });
+
+  it('records the committed version and asks for a reload', () => {
+    state.applyVersionCommit(3);
+
+    expect(state.currentVersion()).toBe(3);
+    expect(state.reloadToken()).toBe(1);
+  });
+
+  it('advances the token on every commit so chained operations each reload', () => {
+    state.applyVersionCommit(2);
+    state.applyVersionCommit(3);
+    state.applyVersionCommit(4);
+
+    expect(state.currentVersion()).toBe(4);
+    expect(state.reloadToken()).toBe(3);
+  });
+
+  it('keeps the outcome message where the post-commit reload cannot wipe it', () => {
+    // The reload tears the toolbar down and rebuilds it, so a message held in
+    // that component vanished exactly when it had something to report.
+    state.applyVersionCommit(3, 'Recognised 2 page(s)');
+
+    expect(state.processingMessage()).toBe('v3 — Recognised 2 page(s)');
+  });
+
+  it('leaves the previous message alone when a commit carries no summary', () => {
+    state.processingMessage.set('v1 — earlier');
+    state.applyVersionCommit(2);
+
+    expect(state.processingMessage()).toBe('v1 — earlier');
+  });
+
+  it('reloads even when a commit reports the version already displayed', () => {
+    // Restoring can land on a number the viewer is already showing; the token
+    // is what triggers the refetch, so it must move regardless.
+    state.applyVersionCommit(2);
+    state.applyVersionCommit(2);
+
+    expect(state.reloadToken()).toBe(2);
+  });
+});
+
 describe('ViewerStateService', () => {
   let service: ViewerStateService;
 

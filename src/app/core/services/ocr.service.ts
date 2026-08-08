@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpResponse } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { ProcessingResult } from './document-version.service';
 
 /** Options accepted by the server-side OCR pipeline. */
 export interface OcrOptions {
@@ -12,9 +13,8 @@ export interface OcrOptions {
   skipTextPages?: boolean;
 }
 
-/** Per-run page counts, read back from the response headers. */
-export interface OcrResult {
-  blob:         Blob;
+/** Page counts for one OCR run, read from the committed version's details. */
+export interface OcrCounts {
   ocrPages:     number;
   skippedPages: number;
 }
@@ -24,33 +24,34 @@ export interface OcrResult {
  * converter -> Tesseract), turning a scanned/image PDF into a searchable one
  * by adding an invisible text layer. The visible page is unchanged.
  *
- * OCR is PDF-only. The original document on the server is left untouched —
- * this produces a separate searchable copy for download, not an in-place edit.
+ * OCR is PDF-only. The searchable file is committed as a new version of the
+ * document, so the text layer is there for every later operation — searching,
+ * redacting, form-filling — rather than living in a separate download.
  */
 @Injectable({ providedIn: 'root' })
 export class OcrService {
   private http = inject(HttpClient);
 
-  makeSearchable(documentId: number, options: OcrOptions = {}): Observable<HttpResponse<Blob>> {
-    return this.http.post(
+  makeSearchable(documentId: number, options: OcrOptions = {}): Observable<ProcessingResult> {
+    return this.http.post<ProcessingResult>(
       `/api/documents/${documentId}/ocr`,
       {
         lang:          options.lang          ?? 'eng',
         dpi:           options.dpi           ?? 300,
         skipTextPages: options.skipTextPages ?? true
-      },
-      { responseType: 'blob', observe: 'response' }
+      }
     );
   }
 
   /**
-   * Page counts are returned as headers alongside the PDF body, since the
-   * body itself is the binary file and can't also carry a JSON summary.
+   * Page counts travel in the version's `details` rather than as response
+   * headers, which is where they had to live while the body was the PDF
+   * itself.
    */
-  readCounts(response: HttpResponse<Blob>): Omit<OcrResult, 'blob'> {
+  readCounts(result: ProcessingResult): OcrCounts {
     return {
-      ocrPages:     Number(response.headers.get('X-OCR-Pages')   ?? 0),
-      skippedPages: Number(response.headers.get('X-OCR-Skipped') ?? 0)
+      ocrPages:     Number(result.details?.['ocrPages']     ?? 0),
+      skippedPages: Number(result.details?.['skippedPages'] ?? 0)
     };
   }
 }

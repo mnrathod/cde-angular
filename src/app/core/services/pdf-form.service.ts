@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { ProcessingResult } from './document-version.service';
 
 /** Control type resolved server-side from the field's /FT plus its flag bits. */
 export type PdfFormFieldKind =
@@ -43,8 +44,12 @@ export interface PdfFormFieldsResponse {
 
 /**
  * Reads and fills PDF AcroForm fields via the backend, which proxies to the
- * Python converter (pypdf). Filling produces a separate copy for download —
- * the stored document is not modified, matching Redact/OCR/Flatten.
+ * Python converter (pypdf).
+ *
+ * Filling commits a new version of the document rather than returning a
+ * separate copy, matching Redact/OCR/Flatten — so a form can be filled on a
+ * document that was already OCR'd or redacted, and the values persist for
+ * whoever opens it next.
  */
 @Injectable({ providedIn: 'root' })
 export class PdfFormService {
@@ -63,11 +68,10 @@ export class PdfFormService {
     documentId: number,
     values: Record<string, string | boolean>,
     flatten = false
-  ): Observable<Blob> {
-    return this.http.post(
+  ): Observable<ProcessingResult> {
+    return this.http.post<ProcessingResult>(
       `/api/documents/${documentId}/form-fill`,
-      { fields: values, flatten },
-      { responseType: 'blob' }
+      { fields: values, flatten }
     );
   }
 }

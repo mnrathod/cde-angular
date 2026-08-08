@@ -141,9 +141,41 @@ export class ViewerStateService {
   // ── Sidebar ──────────────────────────────────────────────────
   readonly sidebarTab = signal<
     'annotations' | 'threads' | 'thumbnails' | 'search'
-    | 'signatures' | 'redact' | 'form' | 'measure'
+    | 'signatures' | 'redact' | 'form' | 'measure' | 'versions'
   >('annotations');
   readonly sidebarOpen  = signal(true);
+
+  // ── Versions ─────────────────────────────────────────────────
+  /** Version of the document currently rendered. */
+  readonly currentVersion = signal(1);
+
+  /**
+   * Incremented whenever a processing operation replaces the document's bytes
+   * on the server. The shell watches this and re-fetches; going through a
+   * counter rather than a direct call keeps the toolbar and form panel from
+   * needing a handle on the shell to refresh it.
+   */
+  readonly reloadToken = signal(0);
+
+  /**
+   * Outcome of the last processing run, shown in the toolbar.
+   *
+   * <p>Lives here rather than in the toolbar because the reload that follows a
+   * commit tears the toolbar down and rebuilds it — a message held in the
+   * component was wiped at exactly the moment it had something to say.
+   */
+  readonly processingMessage = signal('');
+
+  /**
+   * Records that redact/OCR/flatten/form-fill committed a new version and
+   * asks the shell to reload. This is what makes the operations compose: the
+   * viewer picks up the new bytes, so the next operation runs against them.
+   */
+  applyVersionCommit(version: number, summary = '') {
+    this.currentVersion.set(version);
+    if (summary) this.processingMessage.set(`v${version} — ${summary}`);
+    this.reloadToken.update(token => token + 1);
+  }
 
   // ── Computed ─────────────────────────────────────────────────
   readonly shapesOnCurrentPage = computed(() =>
