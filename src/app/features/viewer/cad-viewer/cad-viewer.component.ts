@@ -182,9 +182,30 @@ export class CadViewerComponent implements OnChanges {
     }
   });
 
-  transform = computed(() =>
-    `translate(${this.panX()}px, ${this.panY()}px) scale(${this.state.zoom()})`
-  );
+  transform = computed(() => {
+    const rotation = this.state.rotation();
+    const base = `translate(${this.panX()}px, ${this.panY()}px) scale(${this.state.zoom()})`;
+    if (!rotation) return base;
+
+    // The wrapper's transform-origin is top-left (which pan/zoom rely on),
+    // so rotating about it swings the drawing outside the viewport. Shifting
+    // by the rotated content's own extent brings it back to the origin.
+    const [width, height] = this.contentSize();
+    const shift = rotation === 90  ? `translate(${height}px, 0)`
+                : rotation === 180 ? `translate(${width}px, ${height}px)`
+                :                    `translate(0, ${width}px)`;
+    // Rotation is composed with pan/zoom so it applies to the drawing and
+    // its markup overlay together, keeping annotations pinned.
+    return `${base} ${shift} rotate(${rotation}deg)`;
+  });
+
+  /** Width and height of the drawing's own coordinate space. */
+  private contentSize = computed<[number, number]>(() => {
+    const parts = this.contentViewBox().split(/\s+/).map(Number);
+    return parts.length === 4 && parts.every(n => !isNaN(n))
+      ? [parts[2], parts[3]]
+      : [800, 600];
+  });
 
   processedSvg = computed((): SafeHtml => {
     if (!this.svgContent) return '';

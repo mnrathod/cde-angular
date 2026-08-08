@@ -73,6 +73,11 @@ interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
         class="h-7 px-2.5 text-xs rounded border bg-white border-gray-300 hover:bg-gray-50 disabled:opacity-40">
         ↩ Undo
       </button>
+      <button (click)="state.redo()" [disabled]="!state.canRedo()"
+        title="Redo (Ctrl+Y)"
+        class="h-7 px-2.5 text-xs rounded border bg-white border-gray-300 hover:bg-gray-50 disabled:opacity-40">
+        ↪ Redo
+      </button>
       <button (click)="state.clearAll()"
         title="Clear all markup"
         class="h-7 px-2.5 text-xs rounded border bg-white border-gray-300 hover:bg-gray-50 text-red-500">
@@ -193,6 +198,12 @@ interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
         <span class="text-xs text-gray-600 w-12 text-center">{{ (state.zoom() * 100).toFixed(0) }}%</span>
         <button (click)="state.zoomIn()"  class="h-7 w-7 text-xs rounded border bg-white border-gray-300 hover:bg-gray-50">+</button>
         <button (click)="state.zoomFit()" class="h-7 px-2 text-xs rounded border bg-white border-gray-300 hover:bg-gray-50">Fit</button>
+        <button (click)="state.rotateClockwise()"
+          [title]="'Rotate 90° clockwise' + (state.rotation() ? ' (currently ' + state.rotation() + '°)' : '')"
+          class="h-7 px-2 text-xs rounded border bg-white border-gray-300 hover:bg-gray-50"
+          [class.ring-2]="state.rotation() !== 0">
+          ⟳{{ state.rotation() ? ' ' + state.rotation() + '°' : '' }}
+        </button>
       </div>
     </div>
   `
@@ -360,6 +371,7 @@ export class MarkupToolbarComponent {
 
   onKey(e: KeyboardEvent) {
     if (e.ctrlKey && e.key === 'z')  { e.preventDefault(); this.state.undo(); return; }
+    if (e.ctrlKey && e.key === 'y')  { e.preventDefault(); this.state.redo(); return; }
     if (e.ctrlKey && e.key === 's')  { e.preventDefault(); this.saveMarkup();  return; }
     if (e.ctrlKey && e.key === 'p')  { e.preventDefault(); this.print();        return; }
     if ((e.target as HTMLElement).tagName === 'INPUT') return;

@@ -132,3 +132,98 @@ describe('ViewerStateService', () => {
     expect(undoCount).toBeLessThanOrEqual(20);
   });
 });
+
+describe('ViewerStateService undo/redo', () => {
+  let service: ViewerStateService;
+
+  const shape = (id: string): ShapeData =>
+    ({ id, tool: 'rect', pageNumber: 1, color: '#f00', strokeWidth: 2, opacity: 0 });
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [ViewerStateService] });
+    service = TestBed.inject(ViewerStateService);
+  });
+
+  it('cannot redo before anything has been undone', () => {
+    service.addShape(shape('a'));
+    expect(service.canRedo()).toBe(false);
+  });
+
+  it('redo restores what undo removed', () => {
+    service.addShape(shape('a'));
+    service.addShape(shape('b'));
+
+    service.undo();
+    expect(service.shapes().map(s => s.id)).toEqual(['a']);
+    expect(service.canRedo()).toBe(true);
+
+    service.redo();
+    expect(service.shapes().map(s => s.id)).toEqual(['a', 'b']);
+    expect(service.canRedo()).toBe(false);
+  });
+
+  it('walks back and forward through several steps', () => {
+    ['a', 'b', 'c'].forEach(id => service.addShape(shape(id)));
+
+    service.undo(); service.undo();
+    expect(service.shapes().map(s => s.id)).toEqual(['a']);
+
+    service.redo(); service.redo();
+    expect(service.shapes().map(s => s.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('a new edit after undo abandons the redo branch', () => {
+    service.addShape(shape('a'));
+    service.addShape(shape('b'));
+    service.undo();
+    expect(service.canRedo()).toBe(true);
+
+    // Diverging from the undone state must not leave 'b' redoable.
+    service.addShape(shape('c'));
+
+    expect(service.canRedo()).toBe(false);
+    expect(service.shapes().map(s => s.id)).toEqual(['a', 'c']);
+  });
+
+  it('redo is a no-op when there is nothing to redo', () => {
+    service.addShape(shape('a'));
+    const before = service.shapes();
+    service.redo();
+    expect(service.shapes()).toBe(before);
+  });
+
+  it('undo is a no-op on an empty history', () => {
+    expect(() => service.undo()).not.toThrow();
+    expect(service.shapes()).toEqual([]);
+  });
+});
+
+describe('ViewerStateService rotation', () => {
+  let service: ViewerStateService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [ViewerStateService] });
+    service = TestBed.inject(ViewerStateService);
+  });
+
+  it('steps through quarter turns and wraps back to zero', () => {
+    expect(service.rotation()).toBe(0);
+    service.rotateClockwise(); expect(service.rotation()).toBe(90);
+    service.rotateClockwise(); expect(service.rotation()).toBe(180);
+    service.rotateClockwise(); expect(service.rotation()).toBe(270);
+    service.rotateClockwise(); expect(service.rotation()).toBe(0);
+  });
+
+  it('reports a swapped footprint only on quarter turns', () => {
+    expect(service.isQuarterTurned()).toBe(false);
+    service.rotateClockwise(); expect(service.isQuarterTurned()).toBe(true);
+    service.rotateClockwise(); expect(service.isQuarterTurned()).toBe(false);
+    service.rotateClockwise(); expect(service.isQuarterTurned()).toBe(true);
+  });
+
+  it('resets to zero', () => {
+    service.rotateClockwise();
+    service.resetRotation();
+    expect(service.rotation()).toBe(0);
+  });
+});
