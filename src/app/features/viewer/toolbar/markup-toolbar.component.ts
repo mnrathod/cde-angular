@@ -7,6 +7,9 @@ import { AnnotationService } from '../../../core/services/viewer/annotation.serv
 import { PdfEngineService } from '../../../core/services/viewer/pdf-engine.service';
 import { RedactionService } from '../../../core/services/redaction.service';
 import { OcrService } from '../../../core/services/ocr.service';
+import {
+  MeasurementService, MeasurementUnit, MEASUREMENT_UNITS
+} from '../../../core/services/viewer/measurement.service';
 
 interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
 
@@ -106,6 +109,19 @@ interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
         ⬇ Flatten PDF
       </button>
 
+      <!-- Scale calibration -->
+      <button (click)="startCalibration()"
+        [class.ring-2]="state.activeTool() === 'calibrate'"
+        [title]="state.isCalibrated()
+          ? 'Recalibrate: draw a line over a known distance'
+          : 'Measurements are in pixels until the drawing is calibrated'"
+        class="h-7 px-2.5 text-xs rounded border ring-amber-400
+               {{ state.isCalibrated()
+                    ? 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                    : 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100' }}">
+        ⚖ {{ state.isCalibrated() ? scaleLabel() : 'Calibrate' }}
+      </button>
+
       <!-- OCR: scanned PDF → searchable PDF -->
       <button (click)="runOcr()" [disabled]="!isPdf() || ocrRunning()"
         [title]="!isPdf()
@@ -130,6 +146,47 @@ interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
         </button>
       }
 
+      <!-- Calibration dialog: opens once the reference line has been drawn -->
+      @if (state.pendingCalibrationPixels() > 0) {
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[600] flex items-center justify-center">
+          <div class="bg-white rounded-lg shadow-2xl p-6 w-80">
+            <h3 class="font-semibold text-gray-800 mb-1">⚖ Calibrate Scale</h3>
+            <p class="text-xs text-gray-500 mb-4">
+              The line you drew is
+              <span class="font-mono font-semibold">{{ state.pendingCalibrationPixels().toFixed(1) }} px</span>.
+              What is that distance on the drawing?
+            </p>
+
+            <div class="flex gap-2 mb-3">
+              <input type="number" [(ngModel)]="calibrationValue" name="calibrationValue"
+                min="0" step="any" placeholder="e.g. 5"
+                class="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded
+                       focus:outline-none focus:ring-2 focus:ring-accent" />
+              <select [(ngModel)]="calibrationUnit" name="calibrationUnit"
+                class="px-2 py-1.5 text-sm border border-gray-300 rounded
+                       focus:outline-none focus:ring-2 focus:ring-accent">
+                @for (unit of units; track unit) { <option [value]="unit">{{ unit }}</option> }
+              </select>
+            </div>
+
+            @if (calibrationError()) {
+              <div class="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2 mb-3">
+                {{ calibrationError() }}
+              </div>
+            }
+
+            <div class="flex gap-2 justify-end">
+              <button (click)="cancelCalibration()"
+                class="px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
+              <button (click)="applyCalibration()"
+                class="px-3 py-1.5 text-xs bg-accent text-white rounded hover:bg-blue-700 font-semibold">
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Zoom controls -->
       <div class="ml-auto flex items-center gap-1">
         <button (click)="state.zoomOut()" class="h-7 w-7 text-xs rounded border bg-white border-gray-300 hover:bg-gray-50">−</button>
@@ -147,6 +204,7 @@ export class MarkupToolbarComponent {
   flattenService = inject(FlattenService);
   redactionService = inject(RedactionService);
   ocrService       = inject(OcrService);
+  measure          = inject(MeasurementService);
 
   // Signals, not plain fields: this component is OnPush, so a bare field
   // mutated from an async HTTP callback never re-renders — the button would
@@ -178,9 +236,18 @@ export class MarkupToolbarComponent {
     { id: 'stamp',     icon: '🔴', label: 'Stamp',     key: 'P' },
     { id: 'note',      icon: '🗒',  label: 'Note',      key: 'N' },
     { id: 'dimension', icon: '↔',  label: 'Measure',   key: 'M' },
+    { id: 'area',      icon: '⬡',  label: 'Area',      key: 'Q' },
+    { id: 'radius',    icon: '◎',  label: 'Radius',    key: 'E' },
     { id: 'callout',   icon: '💬', label: 'Callout',   key: 'O' },
     { id: 'redact',    icon: '⬛', label: 'Redact',    key: 'X' },
   ];
+
+  /** Tools whose readouts depend on the drawing's scale. */
+  private static readonly MEASUREMENT_TOOLS: MarkupTool[] = ['dimension', 'area', 'radius'];
+
+  isMeasurementTool(tool: MarkupTool): boolean {
+    return MarkupToolbarComponent.MEASUREMENT_TOOLS.includes(tool);
+  }
 
   setTool(t: MarkupTool) {
     if (t === 'redact' && !this.isPdf()) return;   // matches the button's disabled state
@@ -237,6 +304,47 @@ export class MarkupToolbarComponent {
           : 'OCR failed — check that Tesseract is installed on the converter host.');
       }
     });
+  }
+
+  // ── Scale calibration ────────────────────────────────────────
+  readonly units = MEASUREMENT_UNITS;
+  calibrationValue: number | null = null;
+  calibrationUnit: MeasurementUnit = 'm';
+  readonly calibrationError = signal('');
+
+  /** Short readout for the toolbar button, e.g. "1px = 0.025 m". */
+  scaleLabel(): string {
+    const scale = this.state.measurementScale();
+    return `1px = ${Number(scale.unitsPerPixel.toFixed(5))} ${scale.unit}`;
+  }
+
+  startCalibration() {
+    this.calibrationError.set('');
+    this.calibrationValue = null;
+    // Selecting the tool is the whole action — the dialog opens by itself
+    // once the reference line has been drawn.
+    this.state.activeTool.set('calibrate');
+  }
+
+  applyCalibration() {
+    const scale = this.measure.calibrate(
+      this.state.pendingCalibrationPixels(),
+      Number(this.calibrationValue),
+      this.calibrationUnit
+    );
+    if (!scale) {
+      this.calibrationError.set('Enter a distance greater than zero.');
+      return;
+    }
+    this.state.setScale(scale);
+    this.state.pendingCalibrationPixels.set(0);
+    this.state.activeTool.set('pan');
+  }
+
+  cancelCalibration() {
+    this.state.pendingCalibrationPixels.set(0);
+    this.calibrationError.set('');
+    this.state.activeTool.set('pan');
   }
 
   private documentName(): string {

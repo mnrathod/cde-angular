@@ -7,6 +7,7 @@ import { CommonModule } from '@angular/common';
 import { PdfEngineService } from '../../../core/services/viewer/pdf-engine.service';
 import { MarkupEngineService, PointerPoint } from '../../../core/services/viewer/markup-engine.service';
 import { ViewerStateService, ShapeData, MarkupTool } from '../../../core/services/viewer/viewer-state.service';
+import { MeasurementService } from '../../../core/services/viewer/measurement.service';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
 @Component({
@@ -159,6 +160,7 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   state   = inject(ViewerStateService);
   engine  = inject(PdfEngineService);
   markup  = inject(MarkupEngineService);
+  measure = inject(MeasurementService);
   sanitizer = inject(DomSanitizer);
 
   pageWidth  = signal(0);
@@ -281,7 +283,7 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       return;
     }
 
-    if (tool === 'polygon' || tool === 'polyline') {
+    if (this.markup.isVertexTool(tool)) {
       this.handlePolyClick(pt, tool);
       return;   // click-driven — never sets `drawing`, mouseup is a no-op
     }
@@ -301,7 +303,7 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     const active = this.activeShape();
     if (!active) return;
     const pt = this.markup.getSvgPoint(e, this.svg.nativeElement);
-    if (active.tool === 'polygon' || active.tool === 'polyline') {
+    if (this.markup.isVertexTool(active.tool)) {
       this.polyHover = pt;   // rubber-band only; vertices are click-committed
       return;
     }
@@ -324,40 +326,80 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     this.activeShape.set(null);
   }
 
-  // ── Polygon / polyline: click to add a vertex, double-click to finish ──
+  // ── Vertex tools: click to add a point, double-click to finish ────
   private handlePolyClick(pt: PointerPoint, tool: MarkupTool) {
     const current = this.activeShape();
-    if (current && current.tool === tool) {
-      this.activeShape.set(this.markup.addVertex(current, pt));
-    } else {
-      this.activeShape.set(this.markup.startShape(
-        tool, pt, this.pageNumber,
-        this.state.strokeColor(), this.state.strokeWidth(), this.state.fillOpacity(),
-        'current-user'
-      ));
+    const shape = current && current.tool === tool
+      ? this.markup.addVertex(current, pt)
+      : this.markup.startShape(
+          tool, pt, this.pageNumber,
+          this.state.strokeColor(), this.state.strokeWidth(), this.state.fillOpacity(),
+          'current-user');
+
+    // Radius and calibration take exactly two clicks, so they complete
+    // themselves rather than waiting for a double-click the user has no
+    // reason to expect.
+    const required = this.markup.requiredVertices(tool);
+    if (required !== null && (shape.points?.length ?? 0) >= required) {
+      this.finishVertexShape(shape);
+      return;
     }
+    this.activeShape.set(shape);
   }
 
   onDoubleClick(e: MouseEvent) {
     const shape = this.activeShape();
-    if (!shape || (shape.tool !== 'polygon' && shape.tool !== 'polyline')) return;
+    if (!shape || !this.markup.isVertexTool(shape.tool)) return;
     e.preventDefault();
     // The dblclick's second click already added a spurious vertex — drop it.
-    const finished = this.markup.removeLastVertex(shape);
+    this.finishVertexShape(this.markup.removeLastVertex(shape));
+  }
+
+  private finishVertexShape(shape: ShapeData) {
     this.polyHover = null;
-    if (this.markup.hasMinimumSize(finished)) {
-      this.state.addShape(finished);
-    }
     this.activeShape.set(null);
+    if (!this.markup.hasMinimumSize(shape)) return;
+
+    if (this.isMeasurementTool(shape.tool)) {
+      this.commitMeasurement(shape);
+      return;
+    }
+    this.state.addShape(shape);
   }
 
   @HostListener('document:keydown.escape')
   cancelPolyInProgress() {
     const shape = this.activeShape();
-    if (shape && (shape.tool === 'polygon' || shape.tool === 'polyline')) {
+    if (shape && this.markup.isVertexTool(shape.tool)) {
       this.activeShape.set(null);
       this.polyHover = null;
     }
+  }
+
+  private isMeasurementTool(tool: MarkupTool): boolean {
+    return tool === 'dimension' || tool === 'area'
+        || tool === 'radius'    || tool === 'calibrate';
+  }
+
+  /**
+   * Turns a drawn measurement into its readouts. Lengths are computed in
+   * page pixels first and then scaled, so a calibration applied later
+   * cannot change what was already measured.
+   */
+  private commitMeasurement(shape: ShapeData) {
+    const points = shape.points ?? [];
+    const scale  = this.state.measurementScale();
+
+    // Calibration is not a measurement — it defines the scale, so it hands
+    // the drawn length to the toolbar and draws nothing.
+    if (shape.tool === 'calibrate') {
+      this.state.pendingCalibrationPixels.set(this.measure.pathLength(points) / this.zoom);
+      return;
+    }
+
+    const { shape: described, entry } = this.measure.describe(shape, scale, this.zoom);
+    this.state.addShape(described);
+    this.state.addMeasurement({ ...entry, id: shape.id, page: this.pageNumber });
   }
 
   // ── Live shape used for rendering only — appends the un-committed

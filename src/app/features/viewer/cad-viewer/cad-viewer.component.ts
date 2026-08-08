@@ -7,6 +7,7 @@ import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MarkupEngineService, PointerPoint } from '../../../core/services/viewer/markup-engine.service';
 import { ViewerStateService, ShapeData, MarkupTool } from '../../../core/services/viewer/viewer-state.service';
+import { MeasurementService } from '../../../core/services/viewer/measurement.service';
 
 export interface CadLayer {
   name:    string;
@@ -149,6 +150,7 @@ export class CadViewerComponent implements OnChanges {
   private sanitizer = inject(DomSanitizer);
   state  = inject(ViewerStateService);
   markup = inject(MarkupEngineService);
+  measure = inject(MeasurementService);
 
   layers        = signal<CadLayer[]>([]);
   // Zoom lives on ViewerStateService (shared with the top toolbar's − / + / Fit
@@ -341,7 +343,7 @@ export class CadViewerComponent implements OnChanges {
       return;
     }
 
-    if (tool === 'polygon' || tool === 'polyline') {
+    if (this.markup.isVertexTool(tool)) {
       this.handlePolyClick(pt, tool);
       return;   // click-driven — never sets `drawing`, mouseup is a no-op
     }
@@ -361,7 +363,7 @@ export class CadViewerComponent implements OnChanges {
     const active = this.activeShape();
     if (!active) return;
     const pt = this.markup.getSvgPoint(e, this.markupSvg.nativeElement);
-    if (active.tool === 'polygon' || active.tool === 'polyline') {
+    if (this.markup.isVertexTool(active.tool)) {
       this.polyHover = pt;
       return;
     }
@@ -382,33 +384,55 @@ export class CadViewerComponent implements OnChanges {
   // ── Polygon / polyline: click to add a vertex, double-click to finish ──
   private handlePolyClick(pt: PointerPoint, tool: MarkupTool) {
     const current = this.activeShape();
-    if (current && current.tool === tool) {
-      this.activeShape.set(this.markup.addVertex(current, pt));
-    } else {
-      this.activeShape.set(this.markup.startShape(
-        tool, pt, 1,
-        this.state.strokeColor(), this.state.strokeWidth(), this.state.fillOpacity(),
-        'current-user'
-      ));
+    const shape = current && current.tool === tool
+      ? this.markup.addVertex(current, pt)
+      : this.markup.startShape(
+          tool, pt, 1,
+          this.state.strokeColor(), this.state.strokeWidth(), this.state.fillOpacity(),
+          'current-user');
+
+    // Radius and calibration take exactly two clicks and complete themselves.
+    const required = this.markup.requiredVertices(tool);
+    if (required !== null && (shape.points?.length ?? 0) >= required) {
+      this.finishVertexShape(shape);
+      return;
     }
+    this.activeShape.set(shape);
   }
 
   onDoubleClick(e: MouseEvent) {
     const shape = this.activeShape();
-    if (!shape || (shape.tool !== 'polygon' && shape.tool !== 'polyline')) return;
+    if (!shape || !this.markup.isVertexTool(shape.tool)) return;
     e.preventDefault();
-    const finished = this.markup.removeLastVertex(shape);
+    this.finishVertexShape(this.markup.removeLastVertex(shape));
+  }
+
+  private finishVertexShape(shape: ShapeData) {
     this.polyHover = null;
-    if (this.markup.hasMinimumSize(finished)) {
-      this.state.addShape(finished);
-    }
     this.activeShape.set(null);
+    if (!this.markup.hasMinimumSize(shape)) return;
+
+    if (shape.tool === 'calibrate') {
+      // Calibration defines the scale rather than recording a measurement,
+      // so it hands its drawn length to the toolbar and draws nothing.
+      this.state.pendingCalibrationPixels.set(
+        this.measure.pathLength(shape.points ?? []) / this.state.zoom());
+      return;
+    }
+    if (shape.tool === 'dimension' || shape.tool === 'area' || shape.tool === 'radius') {
+      const { shape: described, entry } =
+        this.measure.describe(shape, this.state.measurementScale(), this.state.zoom());
+      this.state.addShape(described);
+      this.state.addMeasurement({ ...entry, id: shape.id, page: 1 });
+      return;
+    }
+    this.state.addShape(shape);
   }
 
   @HostListener('document:keydown.escape')
   cancelPolyInProgress() {
     const shape = this.activeShape();
-    if (shape && (shape.tool === 'polygon' || shape.tool === 'polyline')) {
+    if (shape && this.markup.isVertexTool(shape.tool)) {
       this.activeShape.set(null);
       this.polyHover = null;
     }
