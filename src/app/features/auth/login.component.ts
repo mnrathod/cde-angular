@@ -23,11 +23,16 @@ const MIN_PASSWORD_LENGTH = 6;
 
         <!-- Tabs -->
         <div class="flex gap-1 mb-6 bg-gray-100 p-1 rounded">
-          <button (click)="tab.set('login')"
+          <!--
+            type="button" because a <button> defaults to type="submit". These
+            sit outside the form today so the default is harmless, but moving
+            them inside one would silently turn a tab switch into a submit.
+          -->
+          <button type="button" (click)="tab.set('login')"
             class="flex-1 py-1.5 text-sm rounded transition-all"
             [class]="tab() === 'login' ? 'bg-white text-accent shadow-sm font-semibold' : 'text-gray-500'"
           >Sign In</button>
-          <button (click)="tab.set('register')"
+          <button type="button" (click)="tab.set('register')"
             class="flex-1 py-1.5 text-sm rounded transition-all"
             [class]="tab() === 'register' ? 'bg-white text-accent shadow-sm font-semibold' : 'text-gray-500'"
           >Register</button>

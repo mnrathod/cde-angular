@@ -22,21 +22,32 @@ const RENDER_BUFFER_PAGES = 2;
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div #scrollContainer
-      class="flex-1 overflow-y-auto flex flex-col items-center gap-3 p-4"
+      class="flex-1 overflow-auto p-4"
       style="background:#525659"
       (scroll)="onScroll($event)">
 
-      @for (page of pages(); track page) {
-        <app-pdf-page
-          [pdfDoc]="state.pdfDoc()"
-          [pageNumber]="page"
-          [zoom]="state.zoom()"
-          [searchQuery]="state.searchQuery()"
-          [active]="activePages().has(page)"
-          [id]="'pdf-page-' + page"
-          class="flex-shrink-0">
-        </app-pdf-page>
-      }
+      <!--
+        The page track is sized to its widest page but never narrower than the
+        viewport (w-max + min-w-full). Centring inside that track keeps a
+        narrow page in the middle without letting a wide one overflow to
+        negative coordinates — which is what centring directly on the
+        scrolling element does, putting the left edge of a large drawing
+        permanently out of reach. The outer overflow-auto then provides the
+        horizontal scrollbar that reaches the rest.
+      -->
+      <div class="flex flex-col items-center gap-3 w-max min-w-full mx-auto">
+        @for (page of pages(); track page) {
+          <app-pdf-page
+            [pdfDoc]="state.pdfDoc()"
+            [pageNumber]="page"
+            [zoom]="state.zoom()"
+            [searchQuery]="state.searchQuery()"
+            [active]="activePages().has(page)"
+            [id]="'pdf-page-' + page"
+            class="flex-shrink-0">
+          </app-pdf-page>
+        }
+      </div>
     </div>
   `
 })

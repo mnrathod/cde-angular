@@ -24,16 +24,26 @@ import { Annotation } from '../../../core/models';
   template: `
     <div class="w-60 bg-white border-l border-gray-200 flex flex-col flex-shrink-0">
 
-      <!-- Tab bar. Wraps rather than compressing: nine tabs across 240px
-           would leave each too narrow to read its label. -->
-      <div class="flex flex-wrap border-b border-gray-200 flex-shrink-0">
+      <!--
+        A fixed 5-column grid rather than flex-wrap. Wrapping flex items sized
+        by content produced ragged rows and left the last tab stretched alone
+        across the full width; a grid gives every panel an identical cell, so
+        the strip reads as one control and the row count never changes.
+      -->
+      <div class="grid grid-cols-5 border-b border-gray-200 flex-shrink-0">
         @for (tab of tabs; track tab.id) {
-          <button (click)="state.sidebarTab.set(tab.id)"
-            class="flex-1 min-w-[3.75rem] py-2 text-xs font-medium transition-colors border-b-2"
+          <button type="button" (click)="state.sidebarTab.set(tab.id)"
+            [title]="tab.label"
+            [attr.aria-current]="state.sidebarTab() === tab.id ? 'page' : null"
+            class="flex flex-col items-center justify-center gap-0.5 py-1.5 px-0.5
+                   transition-colors border-b-2"
             [class]="state.sidebarTab() === tab.id
-              ? 'border-accent text-accent'
-              : 'border-transparent text-gray-500 hover:text-gray-700'">
-            {{ tab.icon }} {{ tab.label }}
+              ? 'border-accent text-accent bg-blue-50/60'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'">
+            <span class="text-sm leading-none">{{ tab.icon }}</span>
+            <span class="text-[9px] leading-none font-medium w-full text-center truncate">
+              {{ tab.label }}
+            </span>
           </button>
         }
       </div>
