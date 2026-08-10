@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 
-import { DocumentVersionService, DocumentVersion } from './document-version.service';
+import { DocumentVersionService, DocumentVersion, DocumentOperation } from './document-version.service';
 import { RedactionService } from './redaction.service';
 import { OcrService } from './ocr.service';
 import { PdfFormService } from './pdf-form.service';
@@ -67,12 +67,30 @@ describe('DocumentVersionService', () => {
 
   describe('formatting', () => {
     it('labels every operation the server can report', () => {
-      expect(service.operationLabel('UPLOAD')).toBe('Uploaded');
-      expect(service.operationLabel('REDACT')).toBe('Redacted');
-      expect(service.operationLabel('OCR')).toBe('OCR');
-      expect(service.operationLabel('FLATTEN')).toBe('Flattened');
-      expect(service.operationLabel('FORM_FILL')).toBe('Form filled');
-      expect(service.operationLabel('RESTORE')).toBe('Restored');
+      // This list mirrors DocumentVersion.DocumentOperation on the server.
+      // It previously omitted PAGES and SIGN, so those two rows in the
+      // history panel showed the raw enum name while every other row read
+      // as a sentence — and the omission was invisible because the label
+      // lookup falls back to the raw value instead of failing.
+      const expected: Record<DocumentOperation, string> = {
+        UPLOAD:      'Uploaded',
+        REDACT:      'Redacted',
+        OCR:         'OCR',
+        FLATTEN:     'Flattened',
+        FORM_FILL:   'Form filled',
+        FORM_DESIGN: 'Form fields changed',
+        PAGES:       'Pages changed',
+        SIGN:        'Signed',
+        RESTORE:     'Restored'
+      };
+
+      // Exact matches rather than "is not the raw name": an unlabelled
+      // operation falls back to the raw name, which would fail these — and
+      // OCR's label is legitimately the same as its enum name, so a blanket
+      // "not the raw name" rule would flag it wrongly.
+      for (const [operation, label] of Object.entries(expected)) {
+        expect(service.operationLabel(operation as DocumentOperation)).toBe(label);
+      }
     });
 
     it('falls back to the raw name for an operation it does not know', () => {

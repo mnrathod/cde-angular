@@ -2,9 +2,16 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-/** The processing step that produced a version. */
+/**
+ * The processing step that produced a version. Mirrors
+ * DocumentVersion.DocumentOperation on the server — a value missing here
+ * still renders, but as the raw enum name, so the history panel showed
+ * "PAGES" and "SIGN" where every other row read as a sentence.
+ */
 export type DocumentOperation =
-  | 'UPLOAD' | 'REDACT' | 'OCR' | 'FLATTEN' | 'FORM_FILL' | 'RESTORE';
+  | 'UPLOAD' | 'REDACT' | 'OCR' | 'FLATTEN'
+  | 'FORM_FILL' | 'FORM_DESIGN'
+  | 'PAGES' | 'SIGN' | 'RESTORE';
 
 export interface DocumentVersion {
   version:     number;
@@ -40,12 +47,15 @@ export interface ProcessingResult {
 
 /** Labels for the history panel, keyed by the server's operation names. */
 const OPERATION_LABELS: Record<DocumentOperation, string> = {
-  UPLOAD:    'Uploaded',
-  REDACT:    'Redacted',
-  OCR:       'OCR',
-  FLATTEN:   'Flattened',
-  FORM_FILL: 'Form filled',
-  RESTORE:   'Restored'
+  UPLOAD:      'Uploaded',
+  REDACT:      'Redacted',
+  OCR:         'OCR',
+  FLATTEN:     'Flattened',
+  FORM_FILL:   'Form filled',
+  FORM_DESIGN: 'Form fields changed',
+  PAGES:       'Pages changed',
+  SIGN:        'Signed',
+  RESTORE:     'Restored'
 };
 
 @Injectable({ providedIn: 'root' })
