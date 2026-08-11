@@ -136,6 +136,27 @@ export class MarkupEngineService {
     return tool === 'radius' ? 2 : tool === 'calibrate' ? 2 : null;
   }
 
+  /**
+   * How a tool is completed, for the toolbar to show.
+   *
+   * Lives here rather than in the toolbar because it is a property of how the
+   * tool is drawn, not of how it is presented. The toolbar previously carried
+   * its own list naming only polygon and polyline, which left Area, Length and
+   * Radius with no indication that a shape has to be closed at all — and an
+   * unfinished shape simply never produces a reading, so the tool looks broken
+   * rather than unfinished.
+   *
+   * @returns an empty string for tools that are drawn by dragging.
+   */
+  completionHint(tool: MarkupTool): string {
+    if (!this.isVertexTool(tool)) return '';
+
+    const fixed = this.requiredVertices(tool);
+    return fixed
+      ? `click ${fixed} points`
+      : 'click each point, double-click the last to finish';
+  }
+
   withPreviewPoint(shape: ShapeData, pt: PointerPoint | null): ShapeData {
     if (!pt || !this.isVertexTool(shape.tool)) return shape;
     return { ...shape, points: [...(shape.points || []), pt] };

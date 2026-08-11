@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { MarkupEngineService } from './markup-engine.service';
-import { ShapeData } from './viewer-state.service';
+import { ShapeData, MarkupTool } from './viewer-state.service';
 
 describe('MarkupEngineService', () => {
   let service: MarkupEngineService;
@@ -174,5 +174,45 @@ describe('MarkupEngineService', () => {
   it('parseShapesJson should return [] for invalid JSON', () => {
     expect(service.parseShapesJson('not json')).toEqual([]);
     expect(service.parseShapesJson('')).toEqual([]);
+  });
+
+  // ── completion hints ──────────────────────────────────────────
+  describe('completionHint', () => {
+    it('tells you a double-click ends every tool built by clicking points', () => {
+      // Area, Length, polygon and polyline are all built the same way. The
+      // toolbar used to name only polygon and polyline, so the measurement
+      // tools gave no clue a shape has to be closed — and an unfinished
+      // shape never produces a reading, which reads as the tool being broken.
+      for (const tool of ['polygon', 'polyline', 'dimension', 'area'] as MarkupTool[]) {
+        expect(service.completionHint(tool)).toContain('double-click');
+      }
+    });
+
+    it('names the click count for tools that end on one', () => {
+      // Promising a double-click here would be wrong: these finish by
+      // themselves on the second click.
+      for (const tool of ['radius', 'calibrate'] as MarkupTool[]) {
+        expect(service.completionHint(tool)).toBe('click 2 points');
+        expect(service.completionHint(tool)).not.toContain('double-click');
+      }
+    });
+
+    it('says nothing for tools that are dragged', () => {
+      for (const tool of ['rect', 'circle', 'line', 'freehand'] as MarkupTool[]) {
+        expect(service.completionHint(tool)).toBe('');
+      }
+    });
+
+    it('explains every vertex tool, so a new one cannot go undocumented', () => {
+      const all: MarkupTool[] = [
+        'pan', 'select', 'line', 'arrow', 'rect', 'circle', 'ellipse',
+        'polygon', 'polyline', 'freehand', 'cloud', 'text', 'highlight',
+        'underline', 'strikeout', 'squiggly', 'stamp', 'note', 'callout',
+        'dimension', 'area', 'radius', 'calibrate', 'redact', 'formfield'
+      ];
+      const unexplained = all.filter(
+        tool => service.isVertexTool(tool) && service.completionHint(tool) === '');
+      expect(unexplained).toEqual([]);
+    });
   });
 });
