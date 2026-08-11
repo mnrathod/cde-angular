@@ -14,6 +14,11 @@ export type MarkupTool =
   | 'dimension' | 'area' | 'radius' | 'calibrate'
   | 'redact' | 'formfield';
 
+/** The panels available in the viewer's side bar. */
+export type SidebarTab =
+  | 'annotations' | 'threads' | 'thumbnails' | 'search' | 'signatures'
+  | 'redact' | 'form' | 'measure' | 'versions' | 'outline';
+
 /** A committed measurement, kept so the reader can review earlier results. */
 export interface MeasurementEntry {
   id:      string;
@@ -185,10 +190,7 @@ export class ViewerStateService {
   readonly showAnnotations = signal(true);
 
   // ── Sidebar ──────────────────────────────────────────────────
-  readonly sidebarTab = signal<
-    'annotations' | 'threads' | 'thumbnails' | 'search'
-    | 'signatures' | 'redact' | 'form' | 'measure' | 'versions' | 'outline'
-  >('annotations');
+  readonly sidebarTab = signal<SidebarTab>('annotations');
   readonly sidebarOpen  = signal(true);
 
   // ── Versions ─────────────────────────────────────────────────
@@ -320,7 +322,22 @@ export class ViewerStateService {
 
   zoomIn()    { this.zoom.update(z => Math.min(z + 0.25, 5)); }
   zoomOut()   { this.zoom.update(z => Math.max(z - 0.25, 0.25)); }
-  zoomFit()   { this.zoom.set(1.0); }
+  /**
+   * Return to 1:1 and recentre.
+   *
+   * Zoom alone is not enough to restore the view: a drawing panned far off
+   * screen stays off screen at 100%. Viewers that track their own pan offset
+   * watch `fitRequests` and clear it, which is why this bumps a counter rather
+   * than only setting the zoom — setting zoom to a value it already holds
+   * notifies nobody.
+   */
+  zoomFit() {
+    this.zoom.set(1.0);
+    this.fitRequests.update(count => count + 1);
+  }
+
+  /** Incremented on every "fit to window". See `zoomFit`. */
+  readonly fitRequests = signal(0);
 
   private pushUndoSnapshot() {
     const current = this.shapes();

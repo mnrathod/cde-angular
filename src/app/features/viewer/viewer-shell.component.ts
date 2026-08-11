@@ -15,6 +15,8 @@ import { DocumentService } from '../../core/services/document.service';
 import { AuthService } from '../../core/services/auth.service';
 
 import { MarkupToolbarComponent } from './toolbar/markup-toolbar.component';
+import { ToolRailComponent } from './toolbar/tool-rail.component';
+import { IconComponent } from '../../shared/components/icon.component';
 import { ViewerSidebarComponent } from './sidebar/viewer-sidebar.component';
 import { PdfViewerComponent } from './pdf-viewer/pdf-viewer.component';
 import { CadViewerComponent } from './cad-viewer/cad-viewer.component';
@@ -31,9 +33,11 @@ import { CollaborationService, CollaborationEvent } from '../../core/services/co
   imports: [
     CommonModule,
     MarkupToolbarComponent,
+    ToolRailComponent,
     ViewerSidebarComponent,
     PdfViewerComponent,
     CadViewerComponent,
+    IconComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -42,9 +46,11 @@ import { CollaborationService, CollaborationEvent } from '../../core/services/co
       <!-- ── Top bar ────────────────────────────────────────────── -->
       <div class="flex items-center h-11 px-3 gap-2 flex-shrink-0 text-white"
            style="background:var(--nav);box-shadow:0 2px 4px rgba(0,0,0,.15)">
-        <button (click)="goBack()"
-          class="text-xs px-3 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20 transition-colors">
-          ← Back
+        <button type="button" (click)="goBack()" title="Back to documents"
+          class="h-7 px-2.5 inline-flex items-center gap-1.5 text-xs rounded-md
+                 bg-white/10 hover:bg-white/20 transition-colors">
+          <app-icon name="arrow-left" [size]="15" />
+          <span>Back</span>
         </button>
 
         <div class="flex items-center gap-2 flex-1 min-w-0">
@@ -78,20 +84,29 @@ import { CollaborationService, CollaborationEvent } from '../../core/services/co
         <!-- Page navigation (PDF only) -->
         @if (state.totalPages() > 1) {
           <div class="flex items-center gap-1 text-xs">
-            <button (click)="state.navigateTo(state.currentPage()-1)"
-              [disabled]="state.currentPage() <= 1"
-              class="px-2 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20 disabled:opacity-30">‹</button>
-            <span class="w-20 text-center">{{ state.currentPage() }} / {{ state.totalPages() }}</span>
-            <button (click)="state.navigateTo(state.currentPage()+1)"
-              [disabled]="state.currentPage() >= state.totalPages()"
-              class="px-2 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20 disabled:opacity-30">›</button>
+            <button type="button" (click)="state.navigateTo(state.currentPage()-1)"
+              [disabled]="state.currentPage() <= 1" title="Previous page" aria-label="Previous page"
+              class="w-7 h-7 inline-flex items-center justify-center rounded-md
+                     bg-white/10 hover:bg-white/20 disabled:opacity-30">
+              <app-icon name="chevron-left" [size]="15" />
+            </button>
+            <span class="w-20 text-center tabular-nums">{{ state.currentPage() }} / {{ state.totalPages() }}</span>
+            <button type="button" (click)="state.navigateTo(state.currentPage()+1)"
+              [disabled]="state.currentPage() >= state.totalPages()" title="Next page" aria-label="Next page"
+              class="w-7 h-7 inline-flex items-center justify-center rounded-md
+                     bg-white/10 hover:bg-white/20 disabled:opacity-30">
+              <app-icon name="chevron-right" [size]="15" />
+            </button>
           </div>
         }
 
         <!-- Toggle sidebar -->
-        <button (click)="state.sidebarOpen.update(v => !v)"
-          class="text-xs px-2 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20">
-          ⊞
+        <button type="button" (click)="state.sidebarOpen.update(v => !v)"
+          [title]="state.sidebarOpen() ? 'Hide side panel' : 'Show side panel'"
+          [attr.aria-pressed]="state.sidebarOpen()"
+          class="w-7 h-7 inline-flex items-center justify-center rounded-md
+                 bg-white/10 hover:bg-white/20">
+          <app-icon name="panel" [size]="15" />
         </button>
       </div>
 
@@ -105,8 +120,10 @@ import { CollaborationService, CollaborationEvent } from '../../core/services/co
 
       @if (!state.loading() && state.errorMsg()) {
         <div class="flex-1 flex items-center justify-center" style="background:#0a0c14">
-          <div class="max-w-md p-6 bg-red-900/30 rounded-lg border border-red-500/30 text-red-300 text-sm">
-            ⚠️ {{ state.errorMsg() }}
+          <div class="max-w-md p-6 bg-red-900/30 rounded-lg border border-red-500/30
+                      text-red-300 text-sm flex items-start gap-2.5">
+            <app-icon name="warning" [size]="18" class="mt-px flex-shrink-0" />
+            <span>{{ state.errorMsg() }}</span>
           </div>
         </div>
       }
@@ -121,6 +138,13 @@ import { CollaborationService, CollaborationEvent } from '../../core/services/co
         </app-markup-toolbar>
 
         <div class="flex flex-1 overflow-hidden min-h-0">
+
+          <!--
+            Tools sit beside the document rather than above it: horizontal
+            chrome is charged against the page being read, vertical chrome
+            is not.
+          -->
+          <app-tool-rail></app-tool-rail>
 
           <!-- Content area -->
           <div class="flex-1 overflow-hidden flex flex-col min-w-0">

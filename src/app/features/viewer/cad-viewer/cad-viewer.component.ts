@@ -1,5 +1,5 @@
 import {
-  Component, inject, signal, computed, Input, OnChanges,
+  Component, inject, signal, computed, effect, Input, OnChanges,
   SimpleChanges, ChangeDetectionStrategy, ElementRef, ViewChild, HostListener
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -27,8 +27,13 @@ export interface CadLayer {
       <!-- SVG canvas -->
       <div #svgContainer
         class="flex-1 overflow-auto flex items-start justify-center p-4 relative"
-        style="background:#1a1d27; cursor: grab"
-        (wheel)="onWheel($event)">
+        style="background:#1a1d27"
+        [style.cursor]="containerCursor()"
+        (wheel)="onWheel($event)"
+        (mousedown)="startPan($event)"
+        (mousemove)="continuePan($event)"
+        (mouseup)="endPan()"
+        (mouseleave)="endPan()">
 
         <div #svgWrap [style.transform]="transform()"
              style="transform-origin: top left; transition: transform .1s; position: relative; display: inline-block;">
@@ -123,13 +128,6 @@ export interface CadLayer {
           }
         </div>
 
-        <!-- Zoom controls -->
-        <div class="p-2 border-t border-gray-200 flex items-center justify-center gap-2">
-          <button (click)="zoomOut()" class="h-7 w-7 text-sm rounded border border-gray-300 bg-white hover:bg-gray-50">−</button>
-          <span class="text-xs text-gray-500 w-12 text-center">{{ (state.zoom() * 100).toFixed(0) }}%</span>
-          <button (click)="zoomIn()"  class="h-7 w-7 text-sm rounded border border-gray-300 bg-white hover:bg-gray-50">+</button>
-          <button (click)="resetZoom()" class="h-7 px-2 text-xs rounded border border-gray-300 bg-white hover:bg-gray-50">Fit</button>
-        </div>
       </div>
     </div>
   `,
@@ -144,6 +142,7 @@ export class CadViewerComponent implements OnChanges {
   @Input() entityCount = 0;
   private _dxfV = signal('');
   private _entC = signal(0);
+  @ViewChild('svgContainer') svgContainer!: ElementRef<HTMLDivElement>;
   @ViewChild('svgWrap') svgWrap!: ElementRef<HTMLDivElement>;
   @ViewChild('markupSvg') markupSvg!: ElementRef<SVGSVGElement>;
 
@@ -156,8 +155,65 @@ export class CadViewerComponent implements OnChanges {
   // Zoom lives on ViewerStateService (shared with the top toolbar's − / + / Fit
   // controls) — NOT a local signal, otherwise the toolbar's zoom buttons
   // silently have no effect on this viewer (the bug this fixes).
-  panX          = signal(0);
-  panY          = signal(0);
+  constructor() {
+    // "Fit to window" lives only in the command bar now, so this viewer has to
+    // hear about it: zoom alone leaves a drawing that has been scrolled away
+    // from still off screen.
+    effect(() => {
+      this.state.fitRequests();
+      this.recentreView();
+    });
+  }
+
+  // ── Panning ──────────────────────────────────────────────────
+  // The drawing is positioned by the scroll offset of its container rather
+  // than by a translate of its own, so the scrollbars, the wheel and a drag
+  // all move the same thing and cannot disagree. An earlier pair of panX/panY
+  // signals fed the transform but were never assigned by anything, so the
+  // grab cursor promised a drag that did nothing at all.
+  private panOrigin: { x: number; y: number; left: number; top: number } | null = null;
+
+  /**
+   * A signal rather than a check on panOrigin: the cursor is a computed, and a
+   * computed cannot see a plain field change, so the grab/grabbing swap would
+   * never render.
+   */
+  private readonly panning = signal(false);
+
+  containerCursor = computed(() =>
+    this.state.activeTool() !== 'pan' ? 'default'
+      : this.panning() ? 'grabbing' : 'grab');
+
+  startPan(event: MouseEvent) {
+    if (this.state.activeTool() !== 'pan') return;
+    const container = this.svgContainer.nativeElement;
+    this.panOrigin = {
+      x: event.clientX, y: event.clientY,
+      left: container.scrollLeft, top: container.scrollTop
+    };
+    this.panning.set(true);
+    event.preventDefault();
+  }
+
+  continuePan(event: MouseEvent) {
+    if (!this.panOrigin) return;
+    const container = this.svgContainer.nativeElement;
+    container.scrollLeft = this.panOrigin.left - (event.clientX - this.panOrigin.x);
+    container.scrollTop  = this.panOrigin.top  - (event.clientY - this.panOrigin.y);
+  }
+
+  endPan() {
+    this.panOrigin = null;
+    this.panning.set(false);
+  }
+
+  /** Centres the drawing horizontally and returns to the top. */
+  private recentreView() {
+    const container = this.svgContainer?.nativeElement;
+    if (!container) return;
+    container.scrollTop  = 0;
+    container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
+  }
   visibleCount  = computed(() => this.layers().filter(l => l.visible).length);
 
   // ── Markup ───────────────────────────────────────────────────
@@ -184,7 +240,7 @@ export class CadViewerComponent implements OnChanges {
 
   transform = computed(() => {
     const rotation = this.state.rotation();
-    const base = `translate(${this.panX()}px, ${this.panY()}px) scale(${this.state.zoom()})`;
+    const base = `scale(${this.state.zoom()})`;
     if (!rotation) return base;
 
     // The wrapper's transform-origin is top-left (which pan/zoom rely on),
@@ -345,7 +401,6 @@ export class CadViewerComponent implements OnChanges {
 
   zoomIn()    { this.state.zoomIn(); }
   zoomOut()   { this.state.zoomOut(); }
-  resetZoom() { this.state.zoomFit(); this.panX.set(0); this.panY.set(0); }
 
   // ── Markup drawing — mirrors PdfPageComponent's pointer handling,
   //    against this drawing's own viewBox instead of a rendered PDF page ──
