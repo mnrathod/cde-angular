@@ -1,7 +1,8 @@
 import { Component, inject, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
+import { ViewerStateService, SidebarTab } from '../../../core/services/viewer/viewer-state.service';
+import { IconComponent, IconName } from '../../../shared/components/icon.component';
 import { AnnotationService } from '../../../core/services/viewer/annotation.service';
 import { AnnotationThreadComponent } from '../markup/annotation-thread.component';
 import { DocumentSignatureComponent } from '../markup/document-signature.component';
@@ -18,7 +19,8 @@ import { Annotation } from '../../../core/models';
   imports: [
     CommonModule, FormsModule, AnnotationThreadComponent,
     DocumentSignatureComponent, PdfFormComponent, VersionHistoryComponent,
-    PageOrganiserComponent, RedactionPanelComponent, OutlinePanelComponent
+    PageOrganiserComponent, RedactionPanelComponent, OutlinePanelComponent,
+    IconComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -40,7 +42,7 @@ import { Annotation } from '../../../core/models';
             [class]="state.sidebarTab() === tab.id
               ? 'border-accent text-accent bg-blue-50/60'
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'">
-            <span class="text-sm leading-none">{{ tab.icon }}</span>
+            <app-icon [name]="tab.icon" [size]="16" />
             <span class="text-[9px] leading-none font-medium w-full text-center truncate">
               {{ tab.label }}
             </span>
@@ -257,17 +259,17 @@ export class ViewerSidebarComponent {
 
   @Output() pageSelected = new EventEmitter<number>();
 
-  readonly tabs = [
-    { id: 'annotations' as const, icon: '✍', label: 'Notes' },
-    { id: 'threads'     as const, icon: '💬', label: 'Threads' },
-    { id: 'signatures'  as const, icon: '🔏', label: 'Sign' },
-    { id: 'redact'      as const, icon: '⬛', label: 'Redact' },
-    { id: 'form'        as const, icon: '📝', label: 'Form' },
-    { id: 'measure'     as const, icon: '📐', label: 'Measure' },
-    { id: 'thumbnails'  as const, icon: '⊞', label: 'Pages' },
-    { id: 'search'      as const, icon: '🔍', label: 'Search' },
-    { id: 'outline'     as const, icon: '☰', label: 'Outline' },
-    { id: 'versions'    as const, icon: '🕐', label: 'History' },
+  readonly tabs: ReadonlyArray<{ id: SidebarTab; icon: IconName; label: string }> = [
+    { id: 'annotations', icon: 'pen',        label: 'Notes' },
+    { id: 'threads',     icon: 'comment',    label: 'Threads' },
+    { id: 'signatures',  icon: 'signature',  label: 'Sign' },
+    { id: 'redact',      icon: 'redact',     label: 'Redact' },
+    { id: 'form',        icon: 'form-field', label: 'Form' },
+    { id: 'measure',     icon: 'length',     label: 'Measure' },
+    { id: 'thumbnails',  icon: 'pages',      label: 'Pages' },
+    { id: 'search',      icon: 'search',     label: 'Search' },
+    { id: 'outline',     icon: 'outline',    label: 'Outline' },
+    { id: 'versions',    icon: 'history',    label: 'History' },
   ];
 
   goToPage(page: number) {
