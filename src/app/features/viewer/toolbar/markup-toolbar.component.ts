@@ -11,6 +11,7 @@ import { OcrService } from '../../../core/services/ocr.service';
 import {
   MeasurementService, MeasurementUnit, MEASUREMENT_UNITS
 } from '../../../core/services/viewer/measurement.service';
+import { MarkupEngineService } from '../../../core/services/viewer/markup-engine.service';
 
 interface Tool { id: MarkupTool; icon: string; label: string; key: string; }
 
@@ -235,6 +236,18 @@ export interface ToolGroup {
           }
         }
 
+        <!--
+          How to finish a click-built shape, shown while one is selected. A
+          tooltip alone is not enough: you have to already suspect there is
+          something to learn before you hover, and the tools that need this
+          most are the ones people reach for first.
+        -->
+        @if (vertexToolHint()) {
+          <div class="flex items-center px-3 text-[11px] text-accent flex-shrink-0">
+            {{ vertexToolHint() }}
+          </div>
+        }
+
         <!-- Status: applies to every tab, so it lives outside the switch. -->
         <div class="flex items-center gap-2 px-3 ml-auto flex-shrink-0">
           <!-- Apply redaction (PDF only) -->
@@ -332,6 +345,7 @@ export class MarkupToolbarComponent {
   redactionService = inject(RedactionService);
   ocrService       = inject(OcrService);
   measure          = inject(MeasurementService);
+  engine           = inject(MarkupEngineService);
 
   // Signals, not plain fields: this component is OnPush, so a bare field
   // mutated from an async HTTP callback never re-renders — the button would
@@ -446,13 +460,24 @@ export class MarkupToolbarComponent {
     return null;
   }
 
+  /**
+   * The completion hint comes from the engine rather than a list of tool ids
+   * kept here, which named only polygon and polyline and so left Area, Length
+   * and Radius unexplained.
+   */
   toolHint(t: Tool): string {
     if (t.id === 'formfield') return 'Draw a form field, then name it in the Form panel';
     if (t.id === 'redact' && !this.isPdf()) return 'Redaction is only available for PDF documents';
-    if (t.id === 'polygon' || t.id === 'polyline') {
-      return `${t.label} (${t.key}) — click to add points, double-click to finish`;
-    }
-    return `${t.label} (${t.key})`;
+
+    const base = `${t.label} (${t.key})`;
+    const hint = this.engine.completionHint(t.id);
+    return hint ? `${base} — ${hint}` : base;
+  }
+
+  /** Shown beside the tools while a click-built tool is selected. */
+  vertexToolHint(): string {
+    const hint = this.engine.completionHint(this.state.activeTool());
+    return hint ? `${hint.charAt(0).toUpperCase()}${hint.slice(1)}.` : '';
   }
 
   setTool(t: MarkupTool) {
