@@ -1,7 +1,8 @@
 import { Component, inject, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ViewerStateService, SidebarTab } from '../../../core/services/viewer/viewer-state.service';
+import { ViewerStateService, SidebarTab, SearchResult } from '../../../core/services/viewer/viewer-state.service';
+import { DrawingMatch } from '../../../core/services/viewer/drawing-search.service';
 import { IconComponent, IconName } from '../../../shared/components/icon.component';
 import { AnnotationService } from '../../../core/services/viewer/annotation.service';
 import { AnnotationThreadComponent } from '../markup/annotation-thread.component';
@@ -240,12 +241,26 @@ import { Annotation } from '../../../core/models';
             @for (result of state.searchResults(); track $index) {
               <div (click)="goToSearchResult(result)"
                 class="px-3 py-2 text-xs border-b border-gray-100 cursor-pointer hover:bg-blue-50">
-                <div class="font-medium text-gray-600 mb-0.5">Page {{ result.pageIndex }}</div>
-                <div class="text-gray-500">...{{ result.text }}...</div>
+                @if (state.totalPages() > 1) {
+                  <div class="font-medium text-gray-600 mb-0.5">Page {{ result.pageIndex }}</div>
+                }
+                <div class="text-gray-500">{{ result.text }}</div>
               </div>
             }
+            <!--
+              "No matches found" is only true when there was something to look
+              through. A drawing whose text has not been indexed, or an image,
+              has nothing to search, and saying so is the difference between a
+              document that holds no match and a viewer that cannot look.
+            -->
             @if (state.searchQuery() && state.searchResults().length === 0) {
-              <div class="text-center text-gray-400 text-xs py-8">No matches found</div>
+              @if (state.searchable()) {
+                <div class="text-center text-gray-400 text-xs py-8">No matches found</div>
+              } @else {
+                <div class="text-center text-gray-400 text-xs py-8 px-4">
+                  This document has no text to search.
+                </div>
+              }
             }
           </div>
         </div>
@@ -277,9 +292,19 @@ export class ViewerSidebarComponent {
     this.pageSelected.emit(page);
   }
 
-  goToSearchResult(result: any) {
-    this.goToPage(result.pageIndex);
+  /**
+   * Show the match. A PDF scrolls to the page; a drawing has one sheet, so it
+   * marks the hit where it sits and brings that into view instead.
+   */
+  goToSearchResult(result: SearchResult) {
     this.state.searchIndex.set(result.matchIndex);
+
+    const hit = (result as DrawingMatch).item;
+    if (hit) {
+      this.state.searchFocus.set(hit);
+      return;
+    }
+    this.goToPage(result.pageIndex);
   }
 
   doSearch() {

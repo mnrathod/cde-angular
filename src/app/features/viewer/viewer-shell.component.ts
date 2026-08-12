@@ -23,6 +23,7 @@ import { CadViewerComponent } from './cad-viewer/cad-viewer.component';
 import { PdfPageComponent } from './pdf-viewer/pdf-page.component';
 import { ViewerData } from '../../core/models';
 import { CollaborationService, CollaborationEvent } from '../../core/services/collaboration.service';
+import { DrawingSearchService } from '../../core/services/viewer/drawing-search.service';
 
 @Component({
   selector: 'app-viewer-shell',
@@ -206,6 +207,7 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
   private auth   = inject(AuthService);
 
   collaboration = inject(CollaborationService);
+  private drawingSearch = inject(DrawingSearchService);
 
   imageUrl = '';
   entityCount = 0;
@@ -388,16 +390,33 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  /**
+   * Search whichever kind of document is open.
+   *
+   * This used to read the PDF document and return the moment there wasn't
+   * one, so a converted CAD drawing — which has plenty of text, in its title
+   * block alone — answered every query with "No matches found" whether the
+   * words were on the drawing or not.
+   */
   private async runSearch() {
-    const pdfDoc = this.state.pdfDoc();
-    const query  = this.state.searchQuery();
-    if (!pdfDoc || !query) return;
-    const results = await this.pdfEngine.searchDocument(pdfDoc, query);
-    this.state.searchResults.set(results);
-    // Navigate to first result
-    if (results.length > 0) {
-      this.state.navigateTo(results[0].pageIndex);
+    const query = this.state.searchQuery().trim();
+    if (!query) {
+      this.state.searchResults.set([]);
+      this.state.searchFocus.set(null);
+      return;
     }
+
+    const pdfDoc = this.state.pdfDoc();
+    if (pdfDoc) {
+      const results = await this.pdfEngine.searchDocument(pdfDoc, query);
+      this.state.searchResults.set(results);
+      if (results.length) this.state.navigateTo(results[0].pageIndex);
+      return;
+    }
+
+    const matches = this.drawingSearch.search(this.state.drawingText(), query);
+    this.state.searchResults.set(matches);
+    this.state.searchFocus.set(matches.length ? matches[0].item : null);
   }
 
 
