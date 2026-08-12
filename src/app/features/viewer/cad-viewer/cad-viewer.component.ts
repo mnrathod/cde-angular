@@ -460,6 +460,16 @@ export class CadViewerComponent implements OnChanges {
   // ── Polygon / polyline: click to add a vertex, double-click to finish ──
   private handlePolyClick(pt: PointerPoint, tool: MarkupTool) {
     const current = this.activeShape();
+
+    // Clicking the first vertex again closes the outline — the same gesture
+    // every drawing tool uses, and one that works when a double-click does
+    // not register.
+    if (current && current.tool === tool
+        && this.markup.closesShape(current, pt, this.closeTolerance())) {
+      this.finishVertexShape(current);
+      return;
+    }
+
     const shape = current && current.tool === tool
       ? this.markup.addVertex(current, pt)
       : this.markup.startShape(
@@ -481,6 +491,36 @@ export class CadViewerComponent implements OnChanges {
     if (!shape || !this.markup.isVertexTool(shape.tool)) return;
     e.preventDefault();
     this.finishVertexShape(this.markup.removeLastVertex(shape));
+  }
+
+  /**
+   * Finish the shape from the keyboard. Enter is the primary way out: unlike
+   * a double-click it does not depend on two presses landing close enough
+   * together in time and space to be recognised as one gesture.
+   */
+  @HostListener('document:keydown.enter')
+  finishFromKeyboard() {
+    const shape = this.activeShape();
+    if (!this.markup.canFinish(shape)) return;
+    this.finishVertexShape(shape!);
+  }
+
+  /** Abandon a half-drawn shape. Without this it could not be got rid of. */
+  @HostListener('document:keydown.escape')
+  cancelVertexShape() {
+    const shape = this.activeShape();
+    if (!shape || !this.markup.isVertexTool(shape.tool)) return;
+    this.activeShape.set(null);
+    this.polyHover = null;
+  }
+
+  /**
+   * How near the first vertex a click has to land to close the shape, in the
+   * drawing's own coordinates. Divided by zoom so the target stays a constant
+   * size on screen rather than shrinking as the drawing is zoomed out.
+   */
+  private closeTolerance(): number {
+    return 10 / this.state.zoom();
   }
 
   private finishVertexShape(shape: ShapeData) {
