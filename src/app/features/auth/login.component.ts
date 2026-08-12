@@ -22,18 +22,25 @@ const MIN_PASSWORD_LENGTH = 6;
           <span class="font-bold text-lg text-gray-800">Platform</span>
         </div>
 
-        <!-- Tabs -->
-        <div class="flex gap-1 mb-6 bg-gray-100 p-1 rounded">
-          <!--
-            type="button" because a <button> defaults to type="submit". These
-            sit outside the form today so the default is harmless, but moving
-            them inside one would silently turn a tab switch into a submit.
-          -->
-          <button type="button" (click)="showTab('login')"
+        <!--
+          Tabs, announced as tabs. Without role="tab" the Sign In tab and the
+          Sign In submit button are two buttons with the same accessible name
+          and nothing to tell them apart — ambiguous to a screen reader, and
+          to anything else selecting by role and name.
+
+          type="button" because a <button> defaults to type="submit". These
+          sit outside the form today so the default is harmless, but moving
+          them inside one would silently turn a tab switch into a submit.
+        -->
+        <div role="tablist" aria-label="Sign in or register"
+             class="flex gap-1 mb-6 bg-gray-100 p-1 rounded">
+          <button type="button" role="tab" (click)="showTab('login')"
+            [attr.aria-selected]="tab() === 'login'"
             class="flex-1 py-1.5 text-sm rounded transition-all"
             [class]="tab() === 'login' ? 'bg-white text-accent shadow-sm font-semibold' : 'text-gray-500'"
           >Sign In</button>
-          <button type="button" (click)="showTab('register')"
+          <button type="button" role="tab" (click)="showTab('register')"
+            [attr.aria-selected]="tab() === 'register'"
             class="flex-1 py-1.5 text-sm rounded transition-all"
             [class]="tab() === 'register' ? 'bg-white text-accent shadow-sm font-semibold' : 'text-gray-500'"
           >Register</button>
@@ -50,15 +57,15 @@ const MIN_PASSWORD_LENGTH = 6;
         @if (tab() === 'login') {
           <form (ngSubmit)="doLogin()" class="space-y-4">
             <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1">Username</label>
-              <input [(ngModel)]="username" name="username" type="text" required
+              <label for="login-username" class="block text-xs font-medium text-gray-600 mb-1">Username</label>
+              <input id="login-username" [(ngModel)]="username" name="username" type="text" required
                 autocomplete="username"
                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 placeholder="admin" />
             </div>
             <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1">Password</label>
-              <input [(ngModel)]="password" name="password" type="password" required
+              <label for="login-password" class="block text-xs font-medium text-gray-600 mb-1">Password</label>
+              <input id="login-password" [(ngModel)]="password" name="password" type="password" required
                 autocomplete="current-password"
                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                 placeholder="••••••••" />
@@ -84,20 +91,20 @@ const MIN_PASSWORD_LENGTH = 6;
         @if (tab() === 'register') {
           <form (ngSubmit)="doRegister()" class="space-y-4">
             <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1">Username</label>
-              <input [(ngModel)]="username" name="username" type="text" required
+              <label for="register-username" class="block text-xs font-medium text-gray-600 mb-1">Username</label>
+              <input id="register-username" [(ngModel)]="username" name="username" type="text" required
                 autocomplete="username"
                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
             </div>
             <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
-              <input [(ngModel)]="email" name="email" type="email"
+              <label for="register-email" class="block text-xs font-medium text-gray-600 mb-1">Email</label>
+              <input id="register-email" [(ngModel)]="email" name="email" type="email"
                 autocomplete="email"
                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
             </div>
             <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1">Password</label>
-              <input [(ngModel)]="password" name="password" type="password" required
+              <label for="register-password" class="block text-xs font-medium text-gray-600 mb-1">Password</label>
+              <input id="register-password" [(ngModel)]="password" name="password" type="password" required
                 autocomplete="new-password"
                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
             </div>

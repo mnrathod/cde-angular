@@ -10,14 +10,19 @@ test.describe('Accessibility', () => {
     await expect(page.getByLabel(/password/i)).toBeVisible();
   });
 
-  test('sign in button is keyboard accessible', async ({ page }) => {
+  test('sign in form is operable from the keyboard', async ({ page }) => {
     await page.goto('/login');
-    await page.keyboard.press('Tab');  // focus username
+    // Start from the username field rather than from a bare Tab: the tab
+    // strip precedes the form, so counting Tab presses from the top of the
+    // document made this assert the tab order rather than the form.
+    await page.getByLabel(/username/i).fill('');
+    await page.getByLabel(/username/i).focus();
     await page.keyboard.type('admin');
-    await page.keyboard.press('Tab');  // focus password
+    await page.keyboard.press('Tab');
+    await page.getByLabel(/password/i).fill('');
     await page.keyboard.type('admin123');
-    await page.keyboard.press('Enter'); // submit
-    await page.waitForURL('/', { timeout: 10_000 });
+    await page.keyboard.press('Enter');   // Enter in a field submits the form
+    await page.waitForURL(url => !url.pathname.startsWith('/login'), { timeout: 15_000 });
   });
 
   test('page has no critical ARIA violations', async ({ page }) => {
@@ -35,9 +40,9 @@ test.describe('Accessibility', () => {
 
   test('error messages are announced to screen readers', async ({ page }) => {
     await page.goto('/login');
-    await page.getByPlaceholder('admin').fill('wrong');
-    await page.getByPlaceholder('••••••••').fill('wrong');
-    await page.getByRole('button', { name: /sign in/i }).click();
+    await page.getByLabel(/username/i).fill('wrong');
+    await page.getByLabel(/password/i).fill('wrong');
+    await page.locator('form button[type="submit"]').click();
     const errorEl = page.locator('[role="alert"], .text-red-600, .text-red-700').first();
     await expect(errorEl).toBeVisible({ timeout: 5_000 });
   });

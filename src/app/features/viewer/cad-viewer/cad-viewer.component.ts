@@ -420,7 +420,7 @@ export class CadViewerComponent implements OnChanges {
     }
 
     if (this.markup.isVertexTool(tool)) {
-      this.handlePolyClick(pt, tool);
+      this.handlePolyClick(pt, tool, (e as MouseEvent).detail ?? 1);
       return;   // click-driven — never sets `drawing`, mouseup is a no-op
     }
 
@@ -458,14 +458,13 @@ export class CadViewerComponent implements OnChanges {
   }
 
   // ── Polygon / polyline: click to add a vertex, double-click to finish ──
-  private handlePolyClick(pt: PointerPoint, tool: MarkupTool) {
+  private handlePolyClick(pt: PointerPoint, tool: MarkupTool, clickDetail = 1) {
     const current = this.activeShape();
 
-    // Clicking the first vertex again closes the outline — the same gesture
-    // every drawing tool uses, and one that works when a double-click does
-    // not register.
+    // One decision covers every way of ending the shape, so the PDF page and
+    // the CAD drawing cannot drift apart on which gestures work.
     if (current && current.tool === tool
-        && this.markup.closesShape(current, pt, this.closeTolerance())) {
+        && this.markup.finishesShape(current, pt, this.closeTolerance(), clickDetail)) {
       this.finishVertexShape(current);
       return;
     }
@@ -515,12 +514,13 @@ export class CadViewerComponent implements OnChanges {
   }
 
   /**
-   * How near the first vertex a click has to land to close the shape, in the
-   * drawing's own coordinates. Divided by zoom so the target stays a constant
-   * size on screen rather than shrinking as the drawing is zoomed out.
+   * How near a vertex a click has to land to end the shape, expressed in this
+   * overlay's own coordinates. Taken from the element's screen transform so it
+   * is always the same distance to the eye, whatever the viewBox scale or the
+   * zoom level.
    */
   private closeTolerance(): number {
-    return 10 / this.state.zoom();
+    return this.markup.toleranceInUserUnits(this.markupSvg.nativeElement);
   }
 
   private finishVertexShape(shape: ShapeData) {
