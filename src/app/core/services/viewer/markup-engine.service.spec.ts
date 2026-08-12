@@ -219,45 +219,62 @@ describe('MarkupEngineService', () => {
   });
 
   // ── closing a click-built shape ───────────────────────────────
-  describe('closesShape', () => {
-    const polygon = (points: { x: number; y: number }[]): ShapeData => ({
-      id: 'c1', tool: 'area', pageNumber: 1, color: '#F00',
+  describe('finishesShape', () => {
+    const square = [{ x: 100, y: 100 }, { x: 200, y: 100 }, { x: 200, y: 200 }];
+    const area = (points = square, tool: MarkupTool = 'area'): ShapeData => ({
+      id: 'c1', tool, pageNumber: 1, color: '#F00',
       strokeWidth: 2, opacity: 0.15, points
     });
 
-    it('closes when the click lands back on the first vertex', () => {
-      const shape = polygon([{ x: 100, y: 100 }, { x: 200, y: 100 }, { x: 200, y: 200 }]);
-      expect(service.closesShape(shape, { x: 100, y: 100 }, 10)).toBe(true);
-      // A hand is not exact — near enough must also close, or the gesture is
-      // no more reliable than the double-click it replaces.
-      expect(service.closesShape(shape, { x: 106, y: 96 }, 10)).toBe(true);
+    it('finishes on a browser-recognised double-click', () => {
+      expect(service.finishesShape(area(), { x: 500, y: 500 }, 10, 2)).toBe(true);
     });
 
-    it('does not close on a click that is merely nearby', () => {
-      const shape = polygon([{ x: 100, y: 100 }, { x: 200, y: 100 }, { x: 200, y: 200 }]);
-      expect(service.closesShape(shape, { x: 130, y: 100 }, 10)).toBe(false);
+    it('finishes on a click back on the first vertex', () => {
+      expect(service.finishesShape(area(), { x: 100, y: 100 }, 10, 1)).toBe(true);
+      // A hand is not exact — near enough must also close.
+      expect(service.finishesShape(area(), { x: 106, y: 96 }, 10, 1)).toBe(true);
     });
 
-    it('will not close a shape that has too few points to be anything', () => {
-      // Two points enclose no area, so closing here would commit an empty
-      // measurement instead of leaving the shape open for another vertex.
-      const shape = polygon([{ x: 100, y: 100 }, { x: 200, y: 100 }]);
-      expect(service.closesShape(shape, { x: 100, y: 100 }, 10)).toBe(false);
+    it('finishes on a second click on the vertex just placed', () => {
+      // This is what a slow double-click amounts to. The browser reports two
+      // ordinary clicks once the presses are more than about half a second
+      // apart, so detail stays 1 and there is no dblclick event — relying on
+      // either meant the shape could never be closed by someone clicking
+      // deliberately.
+      expect(service.finishesShape(area(), { x: 200, y: 200 }, 10, 1)).toBe(true);
+      expect(service.finishesShape(area(), { x: 197, y: 204 }, 10, 1)).toBe(true);
+    });
+
+    it('adds a vertex for a click that is merely nearby', () => {
+      expect(service.finishesShape(area(), { x: 240, y: 150 }, 10, 1)).toBe(false);
+    });
+
+    it('will not finish a shape with too few points to be anything', () => {
+      // Two points enclose no area, so a repeat click has to keep building
+      // rather than commit an empty measurement.
+      const twoPoints = [{ x: 100, y: 100 }, { x: 200, y: 100 }];
+      expect(service.finishesShape(area(twoPoints), { x: 200, y: 100 }, 10, 1)).toBe(false);
+      expect(service.finishesShape(area(twoPoints), { x: 200, y: 100 }, 10, 2)).toBe(false);
     });
 
     it('leaves fixed-click-count tools alone', () => {
-      // Radius and Calibrate finish on their own second click. Treating a
-      // click near the start as "close" would end them a click early.
+      // Radius and Calibrate complete on their own second click. Ending them
+      // early here would cost the point that defines them.
       for (const tool of ['radius', 'calibrate'] as MarkupTool[]) {
-        const shape = { ...polygon([{ x: 100, y: 100 }, { x: 200, y: 100 }]), tool };
-        expect(service.closesShape(shape, { x: 100, y: 100 }, 10)).toBe(false);
+        const shape = area([{ x: 100, y: 100 }], tool);
+        expect(service.finishesShape(shape, { x: 100, y: 100 }, 10, 2)).toBe(false);
       }
     });
 
     it('ignores tools that are dragged rather than clicked', () => {
       const rect: ShapeData = { id: 'r1', tool: 'rect', pageNumber: 1, color: '#F00',
         strokeWidth: 2, opacity: 0, x: 100, y: 100, width: 50, height: 50 };
-      expect(service.closesShape(rect, { x: 100, y: 100 }, 10)).toBe(false);
+      expect(service.finishesShape(rect, { x: 100, y: 100 }, 10, 2)).toBe(false);
+    });
+
+    it('finishes nothing when no shape is being drawn', () => {
+      expect(service.finishesShape(null, { x: 1, y: 1 }, 10, 2)).toBe(false);
     });
   });
 

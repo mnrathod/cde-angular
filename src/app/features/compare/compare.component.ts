@@ -24,14 +24,21 @@ import { Document, CompareResult, ChangeItem } from '../../core/models';
           <span class="text-lg">🔍</span>
           <span class="font-semibold text-sm">Compare Documents</span>
         </div>
-        <button (click)="openVisualCompare()" [disabled]="!doc1() || !doc2()"
+        <button type="button" (click)="openVisualCompare()" [disabled]="!doc1() || !doc2()"
+          aria-label="Visual compare"
           class="text-xs px-3 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20 disabled:opacity-40"
           title="Open visual overlay comparison">
           👁 Visual
         </button>
-        <button (click)="swapFiles()"
+        <button type="button" (click)="swapFiles()" aria-label="Swap files" title="Swap the two files"
           class="text-xs px-3 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20">⇄ Swap</button>
-        <button (click)="runCompare()" [disabled]="!doc1() || !doc2() || comparing()"
+        <!--
+          aria-label rather than relying on the visible text: the label carries a
+          decorative glyph and changes to "Analysing..." while the comparison
+          runs, so the button had no stable accessible name at all.
+        -->
+        <button type="button" (click)="runCompare()" [disabled]="!doc1() || !doc2() || comparing()"
+          aria-label="Compare" title="Compare the two selected files"
           class="text-xs px-4 py-1.5 rounded font-semibold transition-colors disabled:opacity-40"
           style="background:#fff;color:var(--accent)">
           {{ comparing() ? '⏳ Analysing...' : '🔍 Compare' }}

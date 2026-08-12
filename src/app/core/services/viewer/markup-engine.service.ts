@@ -166,27 +166,67 @@ export class MarkupEngineService {
   }
 
   /**
-   * Whether a click lands back on the shape's own first vertex, which is the
-   * gesture every drawing tool uses to close an outline.
+   * Whether a click ends the shape rather than adding another vertex to it.
    *
-   * This exists because double-click was the only way to end a click-built
-   * shape. A `dblclick` event is not reliably produced by every input — a
-   * trackpad tap, a stylus, a shaky hand that drifts between the two presses,
-   * or simply clicking a little too slowly all yield two ordinary clicks. When
-   * that happened the shape could not be finished at all, and on a CAD drawing
-   * it could not even be abandoned, because nothing listened for Escape there.
+   * Double-click alone was the only way to finish, and it is not a gesture
+   * software can rely on. The browser reports one only when two presses fall
+   * inside its own window of roughly half a second and a few pixels; outside
+   * that they arrive as two ordinary clicks with nothing marking them as a
+   * pair. Someone placing a point deliberately — the normal way to work on a
+   * drawing — falls outside it constantly, so the shape gained vertices
+   * instead of closing and could not be finished however many times it was
+   * tried.
+   *
+   * A click therefore ends the shape when any of these hold, none of which
+   * depend on that window:
+   *
+   *  - the browser did recognise a double-click (`clickDetail >= 2`);
+   *  - the click lands on the first vertex, the standard gesture for closing
+   *    an outline;
+   *  - the click lands on the vertex just placed, which is what a slow
+   *    double-click amounts to — and a repeated vertex in the same spot was
+   *    never worth anything anyway.
+   *
+   * Tools with a fixed click count complete themselves and are left alone.
    *
    * @param tolerance radius in the shape's own coordinate space, so the target
    *                  stays the same apparent size at any zoom level.
+   * @param clickDetail `MouseEvent.detail` — 1 for a single press, 2 or more
+   *                    for the later presses of a rapid sequence.
    */
-  closesShape(shape: ShapeData, pt: PointerPoint, tolerance: number): boolean {
-    const points = shape.points ?? [];
-    if (!this.isVertexTool(shape.tool)) return false;
-    if (this.requiredVertices(shape.tool) !== null) return false;
-    if (points.length < this.minimumVertices(shape.tool)) return false;
+  /**
+   * The radius, in an SVG's own user units, that covers `screenPixels` on
+   * screen.
+   *
+   * Needed because "within ten pixels of that vertex" is a statement about
+   * what the eye and hand can do, while shape coordinates are in whatever
+   * space the SVG declares. A CAD drawing's viewBox is its own model units —
+   * often tens of thousands across — so a fixed ten there is a small fraction
+   * of a pixel and a click can never land inside it. Reading the element's own
+   * screen transform covers viewBox scale, zoom and any enclosing transform in
+   * one step.
+   */
+  toleranceInUserUnits(svg: SVGSVGElement, screenPixels = 10): number {
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return screenPixels;
 
-    const first = points[0];
-    return Math.hypot(pt.x - first.x, pt.y - first.y) <= tolerance;
+    const scale = Math.hypot(ctm.a, ctm.b);
+    return scale > 0 ? screenPixels / scale : screenPixels;
+  }
+
+  finishesShape(
+    shape: ShapeData | null,
+    pt: PointerPoint,
+    tolerance: number,
+    clickDetail = 1
+  ): boolean {
+    if (!this.canFinish(shape)) return false;
+    if (this.requiredVertices(shape!.tool) !== null) return false;
+
+    const points = shape!.points ?? [];
+    const near = (v: PointerPoint) => Math.hypot(pt.x - v.x, pt.y - v.y) <= tolerance;
+
+    return clickDetail >= 2 || near(points[0]) || near(points[points.length - 1]);
   }
 
   /** True when a click-built shape holds enough vertices to be committed. */
@@ -194,6 +234,7 @@ export class MarkupEngineService {
     if (!shape || !this.isVertexTool(shape.tool)) return false;
     return (shape.points?.length ?? 0) >= this.minimumVertices(shape.tool);
   }
+
 
   withPreviewPoint(shape: ShapeData, pt: PointerPoint | null): ShapeData {
     if (!pt || !this.isVertexTool(shape.tool)) return shape;
