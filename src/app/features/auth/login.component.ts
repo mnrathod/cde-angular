@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 /** Matches the backend's @Size(min = 6) on RegisterRequest.password. */
 const MIN_PASSWORD_LENGTH = 6;
@@ -28,11 +29,11 @@ const MIN_PASSWORD_LENGTH = 6;
             sit outside the form today so the default is harmless, but moving
             them inside one would silently turn a tab switch into a submit.
           -->
-          <button type="button" (click)="tab.set('login')"
+          <button type="button" (click)="showTab('login')"
             class="flex-1 py-1.5 text-sm rounded transition-all"
             [class]="tab() === 'login' ? 'bg-white text-accent shadow-sm font-semibold' : 'text-gray-500'"
           >Sign In</button>
-          <button type="button" (click)="tab.set('register')"
+          <button type="button" (click)="showTab('register')"
             class="flex-1 py-1.5 text-sm rounded transition-all"
             [class]="tab() === 'register' ? 'bg-white text-accent shadow-sm font-semibold' : 'text-gray-500'"
           >Register</button>
@@ -67,7 +68,16 @@ const MIN_PASSWORD_LENGTH = 6;
               {{ loading() ? 'Signing in...' : 'Sign In' }}
             </button>
           </form>
-          <p class="text-xs text-gray-400 text-center mt-4">Demo: admin / admin123</p>
+          <!--
+            Only in a development build. This used to read "Demo: admin /
+            admin123" unconditionally, which printed the seeded account's
+            password on the login page of every deployed environment.
+          -->
+          @if (prefilled) {
+            <p class="text-xs text-amber-600 text-center mt-4">
+              Development build — signed in as the local seed account.
+            </p>
+          }
         }
 
         <!-- Register Form -->
@@ -108,9 +118,42 @@ export class LoginComponent {
   tab      = signal<'login' | 'register'>('login');
   loading  = signal(false);
   error    = signal('');
-  username = '';
-  password = '';
   email    = '';
+
+  /**
+   * Prefilled from the environment so a development reload does not cost a
+   * retyped sign-in. `environment.production.ts` sets `demoCredentials` to
+   * null and `angular.json` swaps the whole file in for production builds, so
+   * the strings are absent from a production bundle rather than merely
+   * unreachable inside it — a runtime check would still ship them to every
+   * browser that loaded the app.
+   */
+  username = environment.demoCredentials?.username ?? '';
+  password = environment.demoCredentials?.password ?? '';
+
+  /** Whether the form arrived filled in, so the page can say why. */
+  readonly prefilled = !!environment.demoCredentials;
+
+  /**
+   * Both forms bind the same username and password, so the prefill would
+   * otherwise open Register already filled with an account that exists —
+   * a registration that can only fail as a duplicate. The seed values are
+   * for signing in, so they are cleared on the way to Register and restored
+   * on the way back.
+   */
+  showTab(tab: 'login' | 'register') {
+    if (tab === this.tab()) return;
+    this.error.set('');
+
+    if (tab === 'register') {
+      this.username = '';
+      this.password = '';
+    } else {
+      this.username = environment.demoCredentials?.username ?? '';
+      this.password = environment.demoCredentials?.password ?? '';
+    }
+    this.tab.set(tab);
+  }
 
   doLogin() {
     if (!this.username || !this.password) {
