@@ -178,13 +178,15 @@ describe('MarkupEngineService', () => {
 
   // ── completion hints ──────────────────────────────────────────
   describe('completionHint', () => {
-    it('tells you a double-click ends every tool built by clicking points', () => {
+    it('names a way to finish that does not depend on a double-click', () => {
       // Area, Length, polygon and polyline are all built the same way. The
-      // toolbar used to name only polygon and polyline, so the measurement
-      // tools gave no clue a shape has to be closed — and an unfinished
-      // shape never produces a reading, which reads as the tool being broken.
+      // hint used to say "double-click the last to finish" and that was the
+      // only way out — so when a dblclick failed to register, the shape could
+      // not be completed and the tool looked broken.
       for (const tool of ['polygon', 'polyline', 'dimension', 'area'] as MarkupTool[]) {
-        expect(service.completionHint(tool)).toContain('double-click');
+        const hint = service.completionHint(tool);
+        expect(hint).toContain('Enter');
+        expect(hint).toContain('first point');
       }
     });
 
@@ -213,6 +215,67 @@ describe('MarkupEngineService', () => {
       const unexplained = all.filter(
         tool => service.isVertexTool(tool) && service.completionHint(tool) === '');
       expect(unexplained).toEqual([]);
+    });
+  });
+
+  // ── closing a click-built shape ───────────────────────────────
+  describe('closesShape', () => {
+    const polygon = (points: { x: number; y: number }[]): ShapeData => ({
+      id: 'c1', tool: 'area', pageNumber: 1, color: '#F00',
+      strokeWidth: 2, opacity: 0.15, points
+    });
+
+    it('closes when the click lands back on the first vertex', () => {
+      const shape = polygon([{ x: 100, y: 100 }, { x: 200, y: 100 }, { x: 200, y: 200 }]);
+      expect(service.closesShape(shape, { x: 100, y: 100 }, 10)).toBe(true);
+      // A hand is not exact — near enough must also close, or the gesture is
+      // no more reliable than the double-click it replaces.
+      expect(service.closesShape(shape, { x: 106, y: 96 }, 10)).toBe(true);
+    });
+
+    it('does not close on a click that is merely nearby', () => {
+      const shape = polygon([{ x: 100, y: 100 }, { x: 200, y: 100 }, { x: 200, y: 200 }]);
+      expect(service.closesShape(shape, { x: 130, y: 100 }, 10)).toBe(false);
+    });
+
+    it('will not close a shape that has too few points to be anything', () => {
+      // Two points enclose no area, so closing here would commit an empty
+      // measurement instead of leaving the shape open for another vertex.
+      const shape = polygon([{ x: 100, y: 100 }, { x: 200, y: 100 }]);
+      expect(service.closesShape(shape, { x: 100, y: 100 }, 10)).toBe(false);
+    });
+
+    it('leaves fixed-click-count tools alone', () => {
+      // Radius and Calibrate finish on their own second click. Treating a
+      // click near the start as "close" would end them a click early.
+      for (const tool of ['radius', 'calibrate'] as MarkupTool[]) {
+        const shape = { ...polygon([{ x: 100, y: 100 }, { x: 200, y: 100 }]), tool };
+        expect(service.closesShape(shape, { x: 100, y: 100 }, 10)).toBe(false);
+      }
+    });
+
+    it('ignores tools that are dragged rather than clicked', () => {
+      const rect: ShapeData = { id: 'r1', tool: 'rect', pageNumber: 1, color: '#F00',
+        strokeWidth: 2, opacity: 0, x: 100, y: 100, width: 50, height: 50 };
+      expect(service.closesShape(rect, { x: 100, y: 100 }, 10)).toBe(false);
+    });
+  });
+
+  describe('canFinish', () => {
+    it('requires three points for an area and two for a line', () => {
+      const at = (tool: MarkupTool, count: number): ShapeData => ({
+        id: 'f1', tool, pageNumber: 1, color: '#F00', strokeWidth: 2, opacity: 0,
+        points: Array.from({ length: count }, (_, i) => ({ x: i * 10, y: 0 }))
+      });
+
+      expect(service.canFinish(at('area', 2))).toBe(false);
+      expect(service.canFinish(at('area', 3))).toBe(true);
+      expect(service.canFinish(at('dimension', 1))).toBe(false);
+      expect(service.canFinish(at('dimension', 2))).toBe(true);
+    });
+
+    it('is false for nothing being drawn, so Enter does nothing', () => {
+      expect(service.canFinish(null)).toBe(false);
     });
   });
 });

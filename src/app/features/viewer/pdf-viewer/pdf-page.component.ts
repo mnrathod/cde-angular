@@ -399,6 +399,16 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   // ── Vertex tools: click to add a point, double-click to finish ────
   private handlePolyClick(pt: PointerPoint, tool: MarkupTool) {
     const current = this.activeShape();
+
+    // Clicking the first vertex again closes the outline — the same gesture
+    // every drawing tool uses, and one that works when a double-click does
+    // not register.
+    if (current && current.tool === tool
+        && this.markup.closesShape(current, pt, this.closeTolerance())) {
+      this.finishVertexShape(current);
+      return;
+    }
+
     const shape = current && current.tool === tool
       ? this.markup.addVertex(current, pt)
       : this.markup.startShape(
@@ -444,6 +454,27 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       this.activeShape.set(null);
       this.polyHover = null;
     }
+  }
+
+  /**
+   * Finish the shape from the keyboard. Enter is the primary way out: unlike
+   * a double-click it does not depend on two presses landing close enough
+   * together in time and space to be recognised as one gesture.
+   */
+  @HostListener('document:keydown.enter')
+  finishFromKeyboard() {
+    const shape = this.activeShape();
+    if (!this.markup.canFinish(shape)) return;
+    this.finishVertexShape(shape!);
+  }
+
+  /**
+   * How near the first vertex a click has to land to close the shape, in the
+   * page's own coordinates. Divided by zoom so the target stays a constant
+   * size on screen rather than shrinking as the page is zoomed out.
+   */
+  private closeTolerance(): number {
+    return 10 / this.zoom;
   }
 
   private isMeasurementTool(tool: MarkupTool): boolean {

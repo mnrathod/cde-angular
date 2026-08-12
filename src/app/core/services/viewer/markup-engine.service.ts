@@ -154,7 +154,45 @@ export class MarkupEngineService {
     const fixed = this.requiredVertices(tool);
     return fixed
       ? `click ${fixed} points`
-      : 'click each point, double-click the last to finish';
+      : 'click each point — press Enter, or click the first point again, to finish';
+  }
+
+  /**
+   * The fewest vertices a shape needs before it can be closed. Below this the
+   * shape has no area or no length, so finishing it would commit nothing.
+   */
+  minimumVertices(tool: MarkupTool): number {
+    return tool === 'area' || tool === 'polygon' ? 3 : 2;
+  }
+
+  /**
+   * Whether a click lands back on the shape's own first vertex, which is the
+   * gesture every drawing tool uses to close an outline.
+   *
+   * This exists because double-click was the only way to end a click-built
+   * shape. A `dblclick` event is not reliably produced by every input — a
+   * trackpad tap, a stylus, a shaky hand that drifts between the two presses,
+   * or simply clicking a little too slowly all yield two ordinary clicks. When
+   * that happened the shape could not be finished at all, and on a CAD drawing
+   * it could not even be abandoned, because nothing listened for Escape there.
+   *
+   * @param tolerance radius in the shape's own coordinate space, so the target
+   *                  stays the same apparent size at any zoom level.
+   */
+  closesShape(shape: ShapeData, pt: PointerPoint, tolerance: number): boolean {
+    const points = shape.points ?? [];
+    if (!this.isVertexTool(shape.tool)) return false;
+    if (this.requiredVertices(shape.tool) !== null) return false;
+    if (points.length < this.minimumVertices(shape.tool)) return false;
+
+    const first = points[0];
+    return Math.hypot(pt.x - first.x, pt.y - first.y) <= tolerance;
+  }
+
+  /** True when a click-built shape holds enough vertices to be committed. */
+  canFinish(shape: ShapeData | null): boolean {
+    if (!shape || !this.isVertexTool(shape.tool)) return false;
+    return (shape.points?.length ?? 0) >= this.minimumVertices(shape.tool);
   }
 
   withPreviewPoint(shape: ShapeData, pt: PointerPoint | null): ShapeData {
