@@ -8,6 +8,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MarkupEngineService, PointerPoint } from '../../../core/services/viewer/markup-engine.service';
 import { ViewerStateService, ShapeData, MarkupTool } from '../../../core/services/viewer/viewer-state.service';
 import { MeasurementService } from '../../../core/services/viewer/measurement.service';
+import { DrawingSearchService } from '../../../core/services/viewer/drawing-search.service';
 
 export interface CadLayer {
   name:    string;
@@ -62,6 +63,18 @@ export interface CadLayer {
             }
             @if (activeShape()) {
               <g [innerHTML]="renderShape(previewShape())"></g>
+            }
+
+            <!--
+              The search hit. A result list that only names the text leaves the
+              reader to find it by eye on a drawing that may hold hundreds of
+              labels, so the match is marked where it sits.
+            -->
+            @if (state.searchFocus(); as hit) {
+              <rect [attr.x]="hit.x - 2" [attr.y]="hit.y - hit.height"
+                    [attr.width]="hit.width + 4" [attr.height]="hit.height + 4"
+                    fill="#facc1566" stroke="#f59e0b" stroke-width="1.5"
+                    rx="2" pointer-events="none"/>
             }
           </svg>
         </div>
@@ -150,6 +163,7 @@ export class CadViewerComponent implements OnChanges {
   state  = inject(ViewerStateService);
   markup = inject(MarkupEngineService);
   measure = inject(MeasurementService);
+  private drawingSearch = inject(DrawingSearchService);
 
   layers        = signal<CadLayer[]>([]);
   // Zoom lives on ViewerStateService (shared with the top toolbar's − / + / Fit
@@ -163,6 +177,35 @@ export class CadViewerComponent implements OnChanges {
       this.state.fitRequests();
       this.recentreView();
     });
+
+    // Bring a search hit into view. Marking it is not enough on a drawing
+    // wider than the window — the mark can easily be off screen.
+    effect(() => {
+      const hit = this.state.searchFocus();
+      if (hit) this.scrollTo(hit);
+    });
+  }
+
+  /**
+   * Centre a point of the drawing in the viewport.
+   *
+   * The drawing is laid out at its natural size and then scaled by a CSS
+   * transform, which does not change the layout box — so the scroll offset a
+   * drawing coordinate corresponds to has to be worked out from the viewBox
+   * and the zoom rather than read off the element.
+   */
+  private scrollTo(target: { x: number; y: number }) {
+    const container = this.svgContainer?.nativeElement;
+    const wrap = this.svgWrap?.nativeElement;
+    if (!container || !wrap) return;
+
+    const [viewBoxWidth, viewBoxHeight] = this.contentSize();
+    const zoom = this.state.zoom();
+    const scaleX = (wrap.offsetWidth  / viewBoxWidth)  * zoom;
+    const scaleY = (wrap.offsetHeight / viewBoxHeight) * zoom;
+
+    container.scrollLeft = target.x * scaleX - container.clientWidth  / 2;
+    container.scrollTop  = target.y * scaleY - container.clientHeight / 2;
   }
 
   // ── Panning ──────────────────────────────────────────────────
@@ -289,6 +332,11 @@ export class CadViewerComponent implements OnChanges {
     if (changes['svgContent'] && this.svgContent) {
       this.parseLayers();
       this.parseViewBox();
+      // Index the drawing's own text so it can be searched. Without this the
+      // search panel had nothing to look at for a drawing and answered every
+      // query with "No matches found".
+      this.state.drawingText.set(this.drawingSearch.extractText(this.svgContent));
+      this.state.searchFocus.set(null);
     }
   }
 

@@ -1,6 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { Annotation, AnnotationType, ViewerData } from '../../models';
 import { MeasurementScale, UNCALIBRATED } from './measurement.service';
+import { DrawingTextItem } from './drawing-search.service';
 
 export type MarkupTool =
   | 'pan' | 'select'
@@ -119,6 +120,26 @@ export class ViewerStateService {
   readonly thumbnails   = signal<PageThumbnail[]>([]);
   readonly searchQuery  = signal('');
   readonly searchResults = signal<SearchResult[]>([]);
+
+  /**
+   * Text found in a converted CAD drawing, indexed when the drawing loads.
+   * Empty for a PDF, whose text comes from the PDF itself.
+   */
+  readonly drawingText = signal<ReadonlyArray<DrawingTextItem>>([]);
+
+  /**
+   * The region a search result points at, in the drawing's own coordinates.
+   * The viewer scrolls it into view and marks it; null clears the mark.
+   */
+  readonly searchFocus = signal<DrawingTextItem | null>(null);
+
+  /**
+   * False when the open document has no text to search at all — an image, say.
+   * Distinguishes "nothing here matches" from "this cannot be searched", which
+   * both used to read as "No matches found".
+   */
+  readonly searchable = computed(() =>
+    this.viewerData()?.type === 'pdf' || this.drawingText().length > 0);
   readonly searchIndex  = signal(0);
 
   // ── Markup ───────────────────────────────────────────────────
