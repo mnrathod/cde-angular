@@ -17,12 +17,42 @@ export class PdfEngineService {
     this.workerConfigured = true;
   }
 
+  /**
+   * Where pdf.js fetches the data files it does not bundle into its worker.
+   *
+   * These are not optional extras. pdf.js decodes JPEG 2000 and JBIG2 images
+   * in WebAssembly, and both are loaded from `wasmUrl` at the moment an image
+   * needing them is met. With the parameter unset it concatenates `undefined`
+   * into the path and gives up — as a console *warning*, so the page loads
+   * looking fine and the image is simply absent. JBIG2 in particular is what
+   * most scanners emit for black and white, which is most of the scanned
+   * drawings a CDE is asked to hold.
+   *
+   * cMaps decode CJK text and standard_fonts substitute for the fourteen
+   * fonts a PDF is allowed to omit; both fail the same quiet way.
+   *
+   * Resolved against `document.baseURI` so the paths survive being served
+   * from a sub-path, which is how this application is deployed behind an
+   * ingress.
+   */
+  private assetUrl(folder: string): string {
+    return new URL(`assets/pdfjs/${folder}/`, document.baseURI).toString();
+  }
+
   // ── Open PDF from ArrayBuffer or URL ────────────────────────
   async openDocument(src: ArrayBuffer | string): Promise<any> {
     await this.ensureLoaded();
+
+    const assets = {
+      wasmUrl:             this.assetUrl('wasm'),
+      cMapUrl:             this.assetUrl('cmaps'),
+      cMapPacked:          true,
+      standardFontDataUrl: this.assetUrl('standard_fonts'),
+    };
+
     const loadingTask = typeof src === 'string'
-      ? pdfjsLib.getDocument({ url: src })
-      : pdfjsLib.getDocument({ data: src });
+      ? pdfjsLib.getDocument({ url: src, ...assets })
+      : pdfjsLib.getDocument({ data: src, ...assets });
     return loadingTask.promise;
   }
 
