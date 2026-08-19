@@ -244,7 +244,7 @@ import { Annotation } from '../../../core/models';
                 @if (state.totalPages() > 1) {
                   <div class="font-medium text-gray-600 mb-0.5">Page {{ result.pageIndex }}</div>
                 }
-                <div class="text-gray-500">{{ result.text }}</div>
+                <div class="text-gray-500">{{ snippetOf(result) }}</div>
               </div>
             }
             <!--
@@ -290,6 +290,17 @@ export class ViewerSidebarComponent {
   goToPage(page: number) {
     this.state.navigateTo(page);
     this.pageSelected.emit(page);
+  }
+
+  /**
+   * How a result reads in the list.
+   *
+   * A PDF match is a window cut out of the page's text, so it usually begins
+   * and ends mid-sentence and is bracketed to say so. A drawing match is a
+   * whole label, and bracketing it would suggest text that is not there.
+   */
+  snippetOf(result: SearchResult): string {
+    return (result as DrawingMatch).item ? result.text : `…${result.text}…`;
   }
 
   /**
