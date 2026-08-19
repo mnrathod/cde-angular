@@ -29,7 +29,11 @@ export class PdfEngineService {
    * drawings a CDE is asked to hold.
    *
    * cMaps decode CJK text and standard_fonts substitute for the fourteen
-   * fonts a PDF is allowed to omit; both fail the same quiet way.
+   * fonts a PDF is allowed to omit; both fail the same quiet way. The ICC
+   * profile converts DeviceCMYK, which is what a drawing exported for print
+   * is coloured in — without it pdf.js falls back to an arithmetic
+   * approximation and every CMYK colour on the sheet comes out wrong rather
+   * than missing, which is harder to notice and worse to review against.
    *
    * Resolved against `document.baseURI` so the paths survive being served
    * from a sub-path, which is how this application is deployed behind an
@@ -48,6 +52,7 @@ export class PdfEngineService {
       cMapUrl:             this.assetUrl('cmaps'),
       cMapPacked:          true,
       standardFontDataUrl: this.assetUrl('standard_fonts'),
+      iccUrl:              this.assetUrl('iccs'),
     };
 
     const loadingTask = typeof src === 'string'
