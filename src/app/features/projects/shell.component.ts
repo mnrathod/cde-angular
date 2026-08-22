@@ -56,7 +56,12 @@ import { ChunkedUploadService } from '../../core/services/chunked-upload.service
           </div>
           <div class="flex-1 overflow-y-auto p-2">
             @for (p of projectService.projects(); track p.id) {
+              <!-- data-testid, not a styling class: the end-to-end tests used to
+                   select this row by a class name that no longer exists, and a
+                   selector that matches nothing fails silently rather than
+                   loudly. A hook that carries no style survives restyling. -->
               <div (click)="selectProject(p)"
+                data-testid="project-item"
                 class="group px-3 py-2 rounded cursor-pointer mb-0.5 transition-all text-sm"
                 [class]="selectedProject()?.id === p.id
                   ? 'bg-blue-50 border border-blue-200 text-accent'
@@ -130,6 +135,7 @@ import { ChunkedUploadService } from '../../core/services/chunked-upload.service
               <div class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">
                 @for (doc of documentService.documents(); track doc.id) {
                   <div (click)="openDocument(doc)"
+                    data-testid="document-card"
                     class="group bg-white rounded border border-gray-200 shadow-sm cursor-pointer hover:border-accent hover:-translate-y-0.5 hover:shadow-md transition-all overflow-hidden relative">
                     @if (roleService.can('canDelete')) {
                       <button (click)="confirmDeleteDocument(doc); $event.stopPropagation()"
@@ -292,7 +298,8 @@ import { ChunkedUploadService } from '../../core/services/chunked-upload.service
           <div class="space-y-3 mb-5">
             <div>
               <label class="block text-xs font-medium text-gray-600 mb-1">Document Name *</label>
-              <input [(ngModel)]="uploadMeta.name" class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+              <input [(ngModel)]="uploadMeta.name" data-testid="upload-name"
+                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
             </div>
             <div class="grid grid-cols-2 gap-2">
               <div>
