@@ -226,8 +226,14 @@ describe('PageOrganiserComponent', () => {
       organiser.deleteSelection();
       organiser.apply();
 
+      // The RFC 9457 shape the API actually returns: the readable text is
+      // `detail`, not `message`.
       httpMock.expectOne('/api/documents/7/pages/arrange')
-        .flush({ message: 'A document must keep at least one page.' },
+        .flush({ type: '/problems/document-processing-failed',
+                 title: 'Document processing failed',
+                 status: 422,
+                 detail: 'A document must keep at least one page.',
+                 traceId: '4f8a1c2e9b7d6a5f3e2d1c0b9a8f7e6d' },
                { status: 422, statusText: 'Unprocessable Entity' });
 
       expect(organiser.messageIsError()).toBe(true);

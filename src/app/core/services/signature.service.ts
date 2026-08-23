@@ -15,9 +15,19 @@ export interface SignatureRecord {
   version:     number | null;
 }
 
-/** Reply from signing. */
-export interface SignResult extends SignatureRecord {
+/**
+ * Reply from signing: the signature that was created, plus what signing did to
+ * the document.
+ *
+ * The signature is nested rather than merged into this shape, so one schema
+ * describes a signature everywhere it appears rather than two that have to be
+ * kept in step.
+ */
+export interface SignResult {
+  signature:      SignatureRecord;
   stampSvg:       string;
+  /** Version number this signing committed. */
+  version:        number;
   /**
    * True when the signature was written into the PDF itself, so any reader
    * can check it. False for documents that cannot carry one, where the

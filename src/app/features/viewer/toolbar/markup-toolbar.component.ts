@@ -17,6 +17,7 @@ import { IconComponent } from '../../../shared/components/icon.component';
 import {
   allTools, toolForKey, MEASUREMENT_TOOLS, usesStrokeStyle
 } from './tool-catalog';
+import { problemDetail } from '../../../core/handlers/problem-detail';
 
 /**
  * The command bar above the document, and the context bar beneath it.
@@ -425,7 +426,7 @@ export class MarkupToolbarComponent {
   private failureMessage(
     err: { status?: number; error?: { message?: string } }, action: string): string {
     if (err.status === 503) return `${action} failed — the document converter service is not running.`;
-    return err.error?.message ?? `${action} failed.`;
+    return problemDetail(err, `${action} failed.`);
   }
 
   // ── Scale calibration ────────────────────────────────────────

@@ -1,6 +1,7 @@
 import { Injectable, ErrorHandler, inject, signal } from '@angular/core';
 import { RemoteLoggingService } from '../services/remote-logging.service';
 import { HttpErrorResponse } from '@angular/common/http';
+import { problemDetail } from './problem-detail';
 
 export interface AppError {
   id:        string;
@@ -73,13 +74,13 @@ export class GlobalErrorHandler implements ErrorHandler {
   private httpMessage(err: HttpErrorResponse): string {
     switch (err.status) {
       case 0:   return 'Cannot connect to server. Check your network connection.';
-      case 400: return err.error?.message || 'Invalid request.';
+      case 400: return problemDetail(err, 'Invalid request.');
       case 401: return 'Your session has expired. Please sign in again.';
       case 403: return 'You do not have permission to perform this action.';
       case 404: return 'The requested resource was not found.';
-      case 409: return err.error?.message || 'A conflict occurred. Please try again.';
+      case 409: return problemDetail(err, 'A conflict occurred. Please try again.');
       case 413: return 'File is too large to upload.';
-      case 422: return err.error?.message || 'Validation failed.';
+      case 422: return problemDetail(err, 'Validation failed.');
       case 429: return 'Too many requests. Please slow down.';
       case 500: return 'Server error. Our team has been notified.';
       case 502:

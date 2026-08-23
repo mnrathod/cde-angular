@@ -181,7 +181,7 @@ export class DocumentSignatureComponent implements OnInit {
         // Signing a PDF rewrites it, so the viewer is now a version behind.
         if (result.embedded) {
           this.state.applyVersionCommit(result.version ?? 0,
-            `Signed by ${result.signerName} as ${result.role}`);
+            `Signed by ${result.signature.signerName} as ${result.signature.role}`);
         }
         this.loadSignatures();
         this.signReq = { role: 'Reviewer', reason: '' };
