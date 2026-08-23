@@ -3,10 +3,12 @@ export interface LoginRequest  { username: string; password: string; }
 export interface RegisterRequest {
   username: string;
   email:    string;
-  /** Backend enforces a 6-character minimum. */
+  /** Backend enforces a 12-character minimum, and checks against breached sets. */
   password: string;
-  /** Omitted means the backend's default (ENGINEER). */
-  role?:    string;
+  // No role. Registration needs no credential, so a role asked for here would
+  // be a role granted to whoever asked — the backend ignores it and always
+  // creates an engineer. The role actually assigned comes back on the
+  // AuthResponse.
 }
 export interface AuthResponse  { token: string; username: string; role: string; }
 

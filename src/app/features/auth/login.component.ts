@@ -3,10 +3,19 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
+import { problemDetail } from '../../core/handlers/problem-detail';
 import { environment } from '../../../environments/environment';
 
-/** Matches the backend's @Size(min = 6) on RegisterRequest.password. */
-const MIN_PASSWORD_LENGTH = 6;
+/**
+ * Matches the backend's `@Size(min = 12)` on RegisterRequest.password, and the
+ * tenant password policy's own minimum.
+ *
+ * <p>It said 6 while the server enforced 12, so the form told the user their
+ * password was long enough and the server then refused it — the exact round
+ * trip this check exists to avoid, with a contradiction on the end of it.
+ * A client-side rule that is looser than the server's is worse than none.
+ */
+const MIN_PASSWORD_LENGTH = 12;
 
 @Component({
   selector: 'app-login',
@@ -208,13 +217,15 @@ export class LoginComponent {
   }
 
   /**
-   * The backend answers a duplicate username or email with 400 and a plain
-   * string body; anything else is reported generically.
+   * A duplicate username or email comes back as a `409` problem document whose
+   * `detail` says which one and what to do about it.
+   *
+   * <p>This used to read a plain string body from a `400`, which is what the
+   * endpoint returned before errors became problem documents. The branch simply
+   * stopped matching, so every registration failure — including the two the
+   * server explains precisely — showed the generic fallback instead.
    */
-  private registrationError(err: { status?: number; error?: unknown }): string {
-    if (err.status === 400 && typeof err.error === 'string' && err.error.trim()) {
-      return err.error;
-    }
-    return 'Could not create the account. Please try again.';
+  private registrationError(err: unknown): string {
+    return problemDetail(err, 'Could not create the account. Please try again.');
   }
 }

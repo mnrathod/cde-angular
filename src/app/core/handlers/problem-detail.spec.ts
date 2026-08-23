@@ -55,4 +55,23 @@ describe('problemDetail', () => {
     expect(problemTraceId(problem({ detail: 'x' }))).toBeNull();
     expect(problemTraceId(null)).toBeNull();
   });
+
+  it('reads a registration conflict, whatever status carries it', () => {
+    // The registration form used to look for a 400 with a plain string body,
+    // which is what the endpoint returned before errors became problem
+    // documents. A duplicate username now comes back as a 409 document, so
+    // that branch stopped matching and the two failures the server explains
+    // most precisely were the two the user was told nothing about. Reading the
+    // document rather than the status is what stops that recurring.
+    expect(problemDetail({
+      status: 409,
+      error: {
+        type: '/problems/username-taken',
+        title: 'Username taken',
+        status: 409,
+        detail: 'That username is already in use. Choose another.'
+      }
+    }, 'Could not create the account.'))
+      .toBe('That username is already in use. Choose another.');
+  });
 });

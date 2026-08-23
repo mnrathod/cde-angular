@@ -21,11 +21,14 @@ test.describe('API documentation', () => {
     await page.goto(DOCS, { waitUntil: 'networkidle' });
     await page.waitForSelector('.opblock');
 
-    // 52 endpoints today. Asserted as a floor rather than an equality so
-    // adding one does not fail this, but silently losing a controller from
-    // the document does.
-    expect(await page.locator('.opblock').count()).toBeGreaterThanOrEqual(52);
-    expect(await page.locator('.opblock-tag').count()).toBeGreaterThanOrEqual(14);
+    // 63 endpoints across 15 tags today — 52 across 14 before the Common Data
+    // Environment gained an HTTP surface. Asserted as a floor rather than an
+    // equality so adding one does not fail this, but silently losing a
+    // controller from the document does. The floor is raised when endpoints
+    // are added; leaving it at the old number would keep the test green while
+    // it stopped covering eleven of them.
+    expect(await page.locator('.opblock').count()).toBeGreaterThanOrEqual(63);
+    expect(await page.locator('.opblock-tag').count()).toBeGreaterThanOrEqual(15);
     expect(pageErrors).toEqual([]);
   });
 
