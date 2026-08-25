@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpEventType, HttpRequest } from '@angular/common/http';
-import { Observable, Subject, from, concatMap, tap, finalize } from 'rxjs';
+import { Observable, from, concatMap, tap, catchError, throwError } from 'rxjs';
+import { problemDetail } from '../handlers/problem-detail';
 
 export interface UploadProgress {
   fileName:   string;
@@ -65,7 +66,11 @@ export class ChunkedUploadService {
           }
         },
         error: err => {
-          this.setProgress(file.name, { status: 'error', message: err.message });
+          // The server's own sentence, not Angular's "Http failure response
+          // for /api/documents/upload: 422" — which tells the user nothing
+          // about the limit they hit.
+          this.setProgress(file.name, { status: 'error',
+            message: problemDetail(err, 'The upload could not be completed.') });
           observer.error(err);
         }
       });
@@ -97,7 +102,13 @@ export class ChunkedUploadService {
       fd.append('chunkIndex', String(i));
       fd.append('totalChunks', String(chunks));
       fd.append('fileName',   file.name);
-      if (i === 0) {
+
+      // On the LAST chunk, not the first. The server assembles the file on the
+      // chunk that completes the set, and it needs a project to file the
+      // document under at that moment. Sent with chunk zero instead, a
+      // single-chunk upload worked and every larger one uploaded every byte,
+      // reported success on each part, and quietly never produced a document.
+      if (i === chunks - 1) {
         Object.entries(meta).forEach(([k, v]) => fd.append(k, v));
         fd.append('projectId', String(projectId));
       }
@@ -111,17 +122,35 @@ export class ChunkedUploadService {
       );
     });
 
-    // Upload chunks sequentially
+    // Uploaded one at a time, in order. The server accepts them in any order,
+    // but sending them sequentially is what makes "the last one completes the
+    // set" true, and it keeps one slow upload from opening N connections.
     return from(chunkObs).pipe(
       concatMap(obs => obs),
-      finalize(() => {
-        // Last chunk triggers assembly — poll for completion
-        if (uploaded === chunks) {
-          this.setProgress(file.name, { progress: 95, status: 'processing',
-            message: 'Assembling file...' });
+      tap(response => {
+        // Only the final chunk answers with a document; the rest report
+        // progress. Reading the reply's shape is how a client tells them
+        // apart, which is what the endpoint documents.
+        if (response && response.id) {
+          this.setProgress(file.name, { progress: 100, status: 'done',
+            documentId: response.id });
         }
+      }),
+      catchError(err => {
+        // Without this the entry stayed at "uploading" for ever, so a refused
+        // upload looked like a stalled one. The server explains a refusal —
+        // a chunk over the limit, a file past the maximum — and that sentence
+        // is what the user needs.
+        this.setProgress(file.name, { status: 'error',
+          message: problemDetail(err, 'The upload could not be completed.') });
+        return throwError(() => err);
       })
     );
+    // There was a finalize here setting "Assembling file…" at 95%, left over
+    // from a polling step that was never built. It ran after the stream
+    // completed, so on a successful upload it overwrote the finished state
+    // with a permanent in-progress one — the upload showed as stuck at the
+    // moment it actually succeeded.
   }
 
   removeUpload(fileName: string) {
