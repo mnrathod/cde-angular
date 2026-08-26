@@ -3,24 +3,13 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
-import { problemDetail } from '../../core/handlers/problem-detail';
+import { RegisterFormComponent } from './register-form.component';
 import { environment } from '../../../environments/environment';
-
-/**
- * Matches the backend's `@Size(min = 12)` on RegisterRequest.password, and the
- * tenant password policy's own minimum.
- *
- * <p>It said 6 while the server enforced 12, so the form told the user their
- * password was long enough and the server then refused it — the exact round
- * trip this check exists to avoid, with a contradiction on the end of it.
- * A client-side rule that is looser than the server's is worse than none.
- */
-const MIN_PASSWORD_LENGTH = 12;
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule, CommonModule],
+  imports: [FormsModule, CommonModule, RegisterFormComponent],
   template: `
     <div class="min-h-screen bg-gradient-to-br from-nav to-accent flex items-center justify-center p-4">
       <div class="bg-white rounded-lg shadow-2xl p-8 w-full max-w-sm">
@@ -98,30 +87,9 @@ const MIN_PASSWORD_LENGTH = 12;
 
         <!-- Register Form -->
         @if (tab() === 'register') {
-          <form (ngSubmit)="doRegister()" class="space-y-4">
-            <div>
-              <label for="register-username" class="block text-xs font-medium text-gray-600 mb-1">Username</label>
-              <input id="register-username" [(ngModel)]="username" name="username" type="text" required
-                autocomplete="username"
-                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
-            </div>
-            <div>
-              <label for="register-email" class="block text-xs font-medium text-gray-600 mb-1">Email</label>
-              <input id="register-email" [(ngModel)]="email" name="email" type="email"
-                autocomplete="email"
-                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
-            </div>
-            <div>
-              <label for="register-password" class="block text-xs font-medium text-gray-600 mb-1">Password</label>
-              <input id="register-password" [(ngModel)]="password" name="password" type="password" required
-                autocomplete="new-password"
-                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
-            </div>
-            <button type="submit" [disabled]="loading()"
-              class="w-full bg-accent hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded text-sm transition-colors">
-              {{ loading() ? 'Creating...' : 'Create Account' }}
-            </button>
-          </form>
+          <app-register-form
+            (registered)="router.navigate(['/'])"
+            (failed)="error.set($event)" />
         }
       </div>
     </div>
@@ -129,12 +97,11 @@ const MIN_PASSWORD_LENGTH = 12;
 })
 export class LoginComponent {
   private auth   = inject(AuthService);
-  private router = inject(Router);
+  readonly router = inject(Router);
 
   tab      = signal<'login' | 'register'>('login');
   loading  = signal(false);
   error    = signal('');
-  email    = '';
 
   /**
    * Prefilled from the environment so a development reload does not cost a
@@ -151,23 +118,16 @@ export class LoginComponent {
   readonly prefilled = !!environment.demoCredentials;
 
   /**
-   * Both forms bind the same username and password, so the prefill would
-   * otherwise open Register already filled with an account that exists —
-   * a registration that can only fail as a duplicate. The seed values are
-   * for signing in, so they are cleared on the way to Register and restored
-   * on the way back.
+   * The two forms used to share username and password, so the development
+   * prefill opened Register already filled with an account that exists — a
+   * registration that could only fail as a duplicate — and switching tabs had
+   * to clear and restore the seed values to work around it. Register now owns
+   * its own fields, so there is nothing to clear; only the error belongs to
+   * the page, and it is stale the moment the tab changes.
    */
   showTab(tab: 'login' | 'register') {
     if (tab === this.tab()) return;
     this.error.set('');
-
-    if (tab === 'register') {
-      this.username = '';
-      this.password = '';
-    } else {
-      this.username = environment.demoCredentials?.username ?? '';
-      this.password = environment.demoCredentials?.password ?? '';
-    }
     this.tab.set(tab);
   }
 
@@ -186,46 +146,4 @@ export class LoginComponent {
     });
   }
 
-  doRegister() {
-    // Mirrors doLogin's guard: autofill can populate the inputs without
-    // ngModel seeing it, so never fail silently on an apparently-filled form.
-    if (!this.username || !this.email || !this.password) {
-      this.error.set('Please enter a username, email and password.');
-      return;
-    }
-    if (this.password.length < MIN_PASSWORD_LENGTH) {
-      // Stated up front rather than surfacing the server's rejection, which
-      // would cost a round trip to tell the user something knowable here.
-      this.error.set(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
-      return;
-    }
-
-    this.loading.set(true);
-    this.error.set('');
-    this.auth.register({
-      username: this.username,
-      email:    this.email,
-      password: this.password
-    }).subscribe({
-      // Registration returns a token, so the user lands signed in.
-      next:  () => this.router.navigate(['/']),
-      error: err => {
-        this.loading.set(false);
-        this.error.set(this.registrationError(err));
-      }
-    });
-  }
-
-  /**
-   * A duplicate username or email comes back as a `409` problem document whose
-   * `detail` says which one and what to do about it.
-   *
-   * <p>This used to read a plain string body from a `400`, which is what the
-   * endpoint returned before errors became problem documents. The branch simply
-   * stopped matching, so every registration failure — including the two the
-   * server explains precisely — showed the generic fallback instead.
-   */
-  private registrationError(err: unknown): string {
-    return problemDetail(err, 'Could not create the account. Please try again.');
-  }
 }

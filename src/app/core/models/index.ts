@@ -5,10 +5,18 @@ export interface RegisterRequest {
   email:    string;
   /** Backend enforces a 12-character minimum, and checks against breached sets. */
   password: string;
-  // No role. Registration needs no credential, so a role asked for here would
-  // be a role granted to whoever asked — the backend ignores it and always
-  // creates an engineer. The role actually assigned comes back on the
-  // AuthResponse.
+  /**
+   * An invitation issued by an administrator of the organisation to join.
+   * Omitted, the account gets a new organisation of its own and administers it.
+   * The invited address must match `email`, so a forwarded invitation does not
+   * admit whoever received it.
+   */
+  invitationToken?: string;
+  /** Names the new organisation. Ignored when an invitation is presented. */
+  organisationName?: string;
+  // No role, and no tenant. Registration needs no credential, so either asked
+  // for here would be granted to whoever asked. The role comes back on the
+  // AuthResponse; the organisation comes from the invitation, or is created.
 }
 export interface AuthResponse  { token: string; username: string; role: string; }
 
