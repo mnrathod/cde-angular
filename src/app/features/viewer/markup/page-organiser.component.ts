@@ -17,7 +17,7 @@ import { problemDetail } from '../../../core/handlers/problem-detail';
  * and both drag-drop tracking and the selection need to tell two copies of
  * page 3 apart.
  */
-interface DraftPage {
+export interface DraftPage {
   id:         number;
   sourcePage: number;
   rotate:     number;

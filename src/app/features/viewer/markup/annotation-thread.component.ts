@@ -26,7 +26,7 @@ import { AuthService } from '../../../core/services/auth.service';
             <!-- Annotation header -->
             <div class="flex items-start gap-2 p-3 bg-gray-50 border-b border-gray-200">
               <div class="w-7 h-7 rounded-full bg-accent flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                {{ thread.annotation.authorName?.charAt(0)?.toUpperCase() }}
+                {{ thread.annotation.authorName.charAt(0).toUpperCase() }}
               </div>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
@@ -52,7 +52,7 @@ import { AuthService } from '../../../core/services/auth.service';
                 @for (reply of thread.replies; track reply.id) {
                   <div class="group flex items-start gap-2 p-2.5 hover:bg-gray-50 transition-colors">
                     <div class="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                      {{ reply.authorName?.charAt(0)?.toUpperCase() }}
+                      {{ reply.authorName.charAt(0).toUpperCase() }}
                     </div>
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2">

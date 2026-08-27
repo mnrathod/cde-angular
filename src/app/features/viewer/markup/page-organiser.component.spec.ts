@@ -3,8 +3,23 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { CdkDragDrop } from '@angular/cdk/drag-drop';
 
-import { PageOrganiserComponent } from './page-organiser.component';
+import { PageOrganiserComponent, DraftPage } from './page-organiser.component';
 import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
+
+/**
+ * A drop event carrying only what `onDrop` reads.
+ *
+ * <p>The tests previously cast a two-field object to `CdkDragDrop<never>`,
+ * which strict mode refuses because `never` is not assignable to the element
+ * type the component declares. Naming the two fields the component actually
+ * uses is both what makes it type-check and a statement of the dependency —
+ * if `onDrop` starts reading `container` or `item`, this stops compiling
+ * rather than passing `undefined` into it.
+ */
+function dropBetween(previousIndex: number, currentIndex: number): CdkDragDrop<DraftPage[]> {
+  return { previousIndex, currentIndex } as unknown as CdkDragDrop<DraftPage[]>;
+}
+
 
 /**
  * The organiser holds a working copy of the page layout that is not written
@@ -114,7 +129,7 @@ describe('PageOrganiserComponent', () => {
   describe('editing the draft', () => {
     it('reorders on drop', () => {
       loadPages(3);
-      organiser.onDrop({ previousIndex: 2, currentIndex: 0 } as CdkDragDrop<never>);
+      organiser.onDrop(dropBetween(2, 0));
 
       expect(sourceOrder()).toEqual([3, 1, 2]);
       expect(organiser.dirty()).toBe(true);
@@ -122,7 +137,7 @@ describe('PageOrganiserComponent', () => {
 
     it('a drop that does not move anything leaves the draft clean', () => {
       loadPages(3);
-      organiser.onDrop({ previousIndex: 1, currentIndex: 1 } as CdkDragDrop<never>);
+      organiser.onDrop(dropBetween(1, 1));
 
       expect(organiser.dirty()).toBe(false);
     });
@@ -179,7 +194,7 @@ describe('PageOrganiserComponent', () => {
       loadPages(3);
       organiser.selectAll();
       organiser.rotateSelection(90);
-      organiser.onDrop({ previousIndex: 0, currentIndex: 2 } as CdkDragDrop<never>);
+      organiser.onDrop(dropBetween(0, 2));
       expect(organiser.dirty()).toBe(true);
 
       organiser.discard();

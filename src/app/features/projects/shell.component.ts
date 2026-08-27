@@ -30,7 +30,7 @@ import { ChunkedUploadService } from '../../core/services/chunked-upload.service
         <div class="flex-1"></div>
         <div class="flex items-center gap-2">
           <div class="w-7 h-7 rounded-full bg-blue-400 flex items-center justify-center text-white font-bold text-xs border-2 border-white/30">
-            {{ auth.username()?.charAt(0)?.toUpperCase() }}
+            {{ auth.username()?.charAt(0).toUpperCase() }}
           </div>
           <span class="text-white/85 text-xs">{{ auth.username() }}</span>
           <button (click)="auth.logout()"
