@@ -173,23 +173,22 @@ export class ViewerComponent implements OnInit {
     this.service.getAnnotations(id).subscribe(anns => this.annotations.set(anns));
   }
 
-  async renderPdf(data: any) {
-    // Load PDF.js dynamically
-    if (!(window as any).pdfjsLib) {
-      await this.loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
-      (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    }
+  /**
+   * Hands the document to the child viewer, which renders it through
+   * PdfEngineService and the bundled pdfjs-dist.
+   *
+   * This used to inject two <script> tags pointing at a CDN copy of pdf.js
+   * and then not use them — the actual rendering already went through the
+   * bundled engine. So the fetch bought nothing and cost a great deal: a
+   * remote script runs with full privileges on this origin, so whoever
+   * controls that CDN controls every session; the copy was several major
+   * versions behind the one in package.json, meaning known-fixed bugs were
+   * being loaded over the top of a patched library; and it made the viewer
+   * unusable in an air-gapped deployment, which is most of the sovereign
+   * and Defence scope.
+   */
+  renderPdf(_data: unknown) {
     this.viewerData.set({ type: 'pdf', name: 'Document' });
-    // PDF rendering handled by child pdf-viewer component in full implementation
-  }
-
-  loadScript(src: string): Promise<void> {
-    return new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = src; s.onload = () => res(); s.onerror = rej;
-      document.head.appendChild(s);
-    });
   }
 
   setTool(t: string) { this.activeTool.set(t); }

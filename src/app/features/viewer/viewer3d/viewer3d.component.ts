@@ -69,13 +69,17 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
 
   title      = signal('3D Model');
   loading    = signal(true);
-  loadingMsg = signal('Loading Three.js...');
+  loadingMsg = signal('Loading the 3D renderer...');
   errorMsg   = signal('');
   wireframe  = signal(false);
   stats      = signal<{label:string;value:string}[]>([]);
   layers     = signal<{name:string;color:string;visible:boolean}[]>([]);
 
-  private three: any = null;
+  /** The rendered viewport: renderer, scene, camera, controls and mesh. */
+  private viewport: any = null;
+
+  /** The three.js module namespace, loaded on first use. */
+  private threeJs: any = null;
   private animId: number | null = null;
 
   docId         = signal(0);
@@ -97,11 +101,11 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     if (this.animId) cancelAnimationFrame(this.animId);
-    this.three?.renderer?.dispose();
+    this.viewport?.renderer?.dispose();
   }
 
   async loadModel(id: number) {
-    await this.loadThreeJS();
+    await this.loadThreeJs();
     this.loadingMsg.set('Fetching model data...');
 
     this.service.get3DData(id).subscribe({
@@ -124,14 +128,31 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
     });
   }
 
-  async loadThreeJS() {
-    if ((window as any).THREE) return;
-    await this.loadScript('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
-    await this.loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js');
+  /**
+   * Loads the renderer from the bundle on first use.
+   *
+   * Three.js is ~600 KB, far past the 100 KB route-chunk budget, so it is
+   * split into its own chunk with a dynamic import and fetched only when
+   * someone actually opens a model — most sessions never do.
+   *
+   * It is imported rather than fetched from a CDN. A remote <script> runs
+   * with full privileges on this origin, so a compromised or hijacked CDN
+   * would own every session; there is no SRI to fall back on; the strict CSP
+   * refuses the request anyway; and an air-gapped deployment has no route to
+   * the CDN at all.
+   */
+  private async loadThreeJs(): Promise<void> {
+    if (this.threeJs) return;
+    const [three, orbit] = await Promise.all([
+      import('three'),
+      import('three/examples/jsm/controls/OrbitControls.js')
+    ]);
+    this.threeJs = { ...three, OrbitControls: orbit.OrbitControls };
   }
 
   buildIFCScene(data: any) {
-    const T = (window as any).THREE;
+    const T = this.threeJs;
+    if (!T) return;
     const canvas = this.canvas.nativeElement;
     const W = this.wrap.nativeElement.clientWidth - 208;
     const H = this.wrap.nativeElement.clientHeight;
@@ -177,7 +198,7 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
     camera.updateProjectionMatrix();
     grid.scale.setScalar(maxDim / 10); grid.position.y = box.min.y;
 
-    this.three = { renderer, scene, camera, controls, mesh, wireframe: false };
+    this.viewport = { renderer, scene, camera, controls, mesh, wireframe: false };
     this.loading.set(false);
 
     this.ifcStats.set({ schema: gd.schema, elementCount: gd.elementCount });
@@ -220,20 +241,12 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
 
   resetCamera() { /* re-fit */ }
   toggleWireframe() {
-    if (!this.three) return;
+    if (!this.viewport) return;
     this.wireframe.update(w => !w);
-    this.three.mesh.material.wireframe = this.wireframe();
+    this.viewport.mesh.material.wireframe = this.wireframe();
   }
   snapView(view: string) { /* set camera position */ }
   toggleLayer(layer: any) { layer.visible = !layer.visible; }
-
-  loadScript(src: string): Promise<void> {
-    return new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = src; s.onload = () => res(); s.onerror = rej;
-      document.head.appendChild(s);
-    });
-  }
 
   goBack() { this.router.navigate(['/']); }
 }

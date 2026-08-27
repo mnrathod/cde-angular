@@ -1,4 +1,4 @@
-import { Component, signal, inject, OnInit, effect } from '@angular/core';
+import { Component, signal, inject, OnInit, effect, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -30,7 +30,7 @@ import { ChunkedUploadService } from '../../core/services/chunked-upload.service
         <div class="flex-1"></div>
         <div class="flex items-center gap-2">
           <div class="w-7 h-7 rounded-full bg-blue-400 flex items-center justify-center text-white font-bold text-xs border-2 border-white/30">
-            {{ auth.username()?.charAt(0).toUpperCase() }}
+            {{ avatarInitial() }}
           </div>
           <span class="text-white/85 text-xs">{{ auth.username() }}</span>
           <button (click)="auth.logout()"
@@ -337,6 +337,17 @@ import { ChunkedUploadService } from '../../core/services/chunked-upload.service
 })
 export class ShellComponent implements OnInit {
   auth            = inject(AuthService);
+
+  /**
+   * First letter of the signed-in username, for the avatar bubble.
+   *
+   * Computed here rather than in the template because Angular's template
+   * compiler does not carry a `?.` short-circuit across the rest of the
+   * chain the way TypeScript does: `username()?.charAt(0).toUpperCase()`
+   * type-checks in a .ts file but fails template checking, and would throw
+   * at runtime for a user with no username.
+   */
+  avatarInitial = computed(() => this.auth.username()?.charAt(0)?.toUpperCase() ?? '');
   roleService     = inject(RoleService);
   uploadService   = inject(ChunkedUploadService);
   projectService  = inject(ProjectService);
