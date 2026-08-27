@@ -48,27 +48,37 @@ import { problemDetail } from '../../core/handlers/problem-detail';
 
       <!-- File selector bar -->
       <div class="flex items-center gap-3 px-4 py-2 bg-white border-b border-gray-200 flex-shrink-0">
-        <div (click)="pickFile(1)"
-          class="flex-1 border-2 rounded-lg p-3 cursor-pointer transition-all min-w-0"
+        <!-- A button, not a div with a click handler: this is the control that
+             chooses a file, so it needs to be reachable by Tab and operable by
+             Enter and Space without a directive re-implementing what the
+             element already does (1A.2). text-left because a button centres
+             its content by default and this one holds a left-aligned card. -->
+        <button type="button" (click)="pickFile(1)"
+          class="flex-1 border-2 rounded-lg p-3 cursor-pointer transition-all min-w-0 text-left"
           [class]="doc1() ? 'border-accent bg-blue-50' : 'border-dashed border-gray-300 hover:border-accent'">
           <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">📄 File 1 — Original</div>
           <div class="font-medium text-sm truncate">{{ doc1()?.name || 'Click to select' }}</div>
           @if (doc1()) {
             <div class="text-xs text-gray-500 mt-0.5">{{ doc1()!.fileName }} {{ doc1()!.revision ? '· Rev ' + doc1()!.revision : '' }}</div>
           }
-        </div>
+        </button>
 
         <div class="text-xs font-bold text-gray-500 px-2 py-1 bg-gray-100 rounded-full flex-shrink-0">VS</div>
 
-        <div (click)="pickFile(2)"
-          class="flex-1 border-2 rounded-lg p-3 cursor-pointer transition-all min-w-0"
+        <!-- A button, not a div with a click handler: this is the control that
+             chooses a file, so it needs to be reachable by Tab and operable by
+             Enter and Space without a directive re-implementing what the
+             element already does (1A.2). text-left because a button centres
+             its content by default and this one holds a left-aligned card. -->
+        <button type="button" (click)="pickFile(2)"
+          class="flex-1 border-2 rounded-lg p-3 cursor-pointer transition-all min-w-0 text-left"
           [class]="doc2() ? 'border-accent bg-blue-50' : 'border-dashed border-gray-300 hover:border-accent'">
           <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">📄 File 2 — Revised</div>
           <div class="font-medium text-sm truncate">{{ doc2()?.name || 'Click to select' }}</div>
           @if (doc2()) {
             <div class="text-xs text-gray-500 mt-0.5">{{ doc2()!.fileName }} {{ doc2()!.revision ? '· Rev ' + doc2()!.revision : '' }}</div>
           }
-        </div>
+        </button>
       </div>
 
       <!-- Body: change list + AI sidebar -->
@@ -209,14 +219,14 @@ import { problemDetail } from '../../core/handlers/problem-detail';
           </div>
           <div class="overflow-y-auto flex-1 p-2">
             @for (doc of docs(); track doc.id) {
-              <div (click)="selectDoc(doc)"
-                class="flex items-center gap-3 p-2.5 rounded-md cursor-pointer hover:bg-gray-50 transition-colors">
+              <button type="button" (click)="selectDoc(doc)"
+                class="w-full text-left flex items-center gap-3 p-2.5 rounded-md cursor-pointer hover:bg-gray-50 transition-colors">
                 <span class="text-xl flex-shrink-0">{{ docService.getFileIcon(doc) }}</span>
                 <div class="min-w-0 flex-1">
                   <div class="font-medium text-sm truncate">{{ doc.name }}</div>
                   <div class="text-xs text-gray-500">{{ doc.fileName }} {{ doc.revision ? '· Rev ' + doc.revision : '' }}</div>
                 </div>
-              </div>
+              </button>
             }
           </div>
         </div>

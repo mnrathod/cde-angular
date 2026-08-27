@@ -60,6 +60,11 @@ import { ChunkedUploadService } from '../../core/services/chunked-upload.service
                    select this row by a class name that no longer exists, and a
                    selector that matches nothing fails silently rather than
                    loudly. A hook that carries no style survives restyling. -->
+              <!-- The row keeps its click for pointer convenience, but the
+                   keyboard path goes through the name button below. The row
+                   cannot itself be a button because it contains one, and a
+                   button inside a button is invalid HTML that browsers recover
+                   from in different ways. -->
               <div (click)="selectProject(p)"
                 data-testid="project-item"
                 class="group px-3 py-2 rounded cursor-pointer mb-0.5 transition-all text-sm"
@@ -67,7 +72,9 @@ import { ChunkedUploadService } from '../../core/services/chunked-upload.service
                   ? 'bg-blue-50 border border-blue-200 text-accent'
                   : 'hover:bg-gray-50 text-gray-700'">
                 <div class="flex items-center gap-1">
-                  <div class="font-medium truncate flex-1">{{ p.name }}</div>
+                  <button type="button" (click)="selectProject(p); $event.stopPropagation()"
+                    class="font-medium truncate flex-1 text-left bg-transparent border-0 p-0 cursor-pointer"
+                    [attr.aria-current]="selectedProject()?.id === p.id ? 'true' : null">{{ p.name }}</button>
                   @if (roleService.can('canCreateProject')) {
                     <button (click)="openProjectDialog(p); $event.stopPropagation()"
                       title="Edit project"
@@ -134,6 +141,9 @@ import { ChunkedUploadService } from '../../core/services/chunked-upload.service
             } @else {
               <div class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">
                 @for (doc of documentService.documents(); track doc.id) {
+                  <!-- As above: the card holds a delete button, so the card is
+                       not itself a button. The document name carries the
+                       keyboard-reachable open action. -->
                   <div (click)="openDocument(doc)"
                     data-testid="document-card"
                     class="group bg-white rounded border border-gray-200 shadow-sm cursor-pointer hover:border-accent hover:-translate-y-0.5 hover:shadow-md transition-all overflow-hidden relative">
@@ -150,7 +160,8 @@ import { ChunkedUploadService } from '../../core/services/chunked-upload.service
                       {{ documentService.getFileIcon(doc) }}
                     </div>
                     <div class="p-2.5">
-                      <div class="text-xs font-semibold text-gray-800 truncate">{{ doc.name }}</div>
+                      <button type="button" (click)="openDocument(doc); $event.stopPropagation()"
+                        class="text-xs font-semibold text-gray-800 truncate w-full text-left bg-transparent border-0 p-0 cursor-pointer">{{ doc.name }}</button>
                       <div class="text-xs text-gray-500 mt-0.5 truncate">
                         {{ doc.drawingNumber || doc.documentType }}{{ doc.revision ? ' · Rev ' + doc.revision : '' }}
                       </div>
@@ -281,16 +292,21 @@ import { ChunkedUploadService } from '../../core/services/chunked-upload.service
           <h3 class="font-semibold text-gray-800 mb-5">📂 Upload Document</h3>
 
           <!-- Drop zone -->
-          <div (click)="fileInput.click()" (dragover)="$event.preventDefault()"
+          <!-- A button wrapping the drop target, so choosing a file works from
+               the keyboard. Drag and drop stays as the pointer affordance; SC
+               2.5.7 requires a single-pointer alternative to any drag, and
+               clicking through to the file input is that alternative. -->
+          <button type="button" (click)="fileInput.click()"
+               (dragover)="$event.preventDefault()"
                (drop)="onDrop($event)"
-               class="border-2 border-dashed border-gray-300 rounded-md p-6 text-center text-gray-500 text-sm cursor-pointer hover:border-accent hover:bg-blue-50 transition-colors mb-4">
+               class="w-full border-2 border-dashed border-gray-300 rounded-md p-6 text-center text-gray-500 text-sm cursor-pointer hover:border-accent hover:bg-blue-50 transition-colors mb-4">
             <div class="text-2xl mb-2">📄</div>
             @if (selectedFile()) {
               <div class="text-accent font-medium">📎 {{ selectedFile()!.name }}</div>
             } @else {
               Click to browse or drag & drop
             }
-          </div>
+          </button>
           <input #fileInput type="file" class="hidden"
             accept=".pdf,.dxf,.dwg,.ifc,.glb,.gltf,.obj,.stl,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.svg"
             (change)="onFileSelect($event)" />

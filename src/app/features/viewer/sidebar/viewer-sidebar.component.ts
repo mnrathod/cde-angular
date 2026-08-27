@@ -239,13 +239,16 @@ import { Annotation } from '../../../core/models';
           </div>
           <div class="flex-1 overflow-y-auto">
             @for (result of state.searchResults(); track $index) {
-              <div (click)="goToSearchResult(result)"
-                class="px-3 py-2 text-xs border-b border-gray-100 cursor-pointer hover:bg-blue-50">
+              <!-- A search hit navigates the document, so it is a button.
+                   Keyboard users search more than most, and a result list that
+                   cannot be reached by Tab makes search itself unusable. -->
+              <button type="button" (click)="goToSearchResult(result)"
+                class="w-full text-left px-3 py-2 text-xs border-b border-gray-100 cursor-pointer hover:bg-blue-50">
                 @if (state.totalPages() > 1) {
                   <div class="font-medium text-gray-600 mb-0.5">Page {{ result.pageIndex }}</div>
                 }
                 <div class="text-gray-500">{{ snippetOf(result) }}</div>
-              </div>
+              </button>
             }
             <!--
               "No matches found" is only true when there was something to look

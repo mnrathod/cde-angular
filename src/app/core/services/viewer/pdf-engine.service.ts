@@ -178,7 +178,10 @@ export class PdfEngineService {
     for (let p = 1; p <= total; p++) {
       const imgUrl = await this.pageToDataUrl(pdfDoc, p, 2);
       const svg    = getSvgForPage(p);
-      win.document.write(`<div class="page"><img src="${imgUrl}"/>${svg}</div>`);
+      // Alt text on a print view still matters: the window is real HTML that
+      // a screen reader can be pointed at before the print dialog opens.
+      win.document.write(
+        `<div class="page"><img src="${imgUrl}" alt="Page ${p} of ${total}"/>${svg}</div>`);
     }
     win.document.write('</body></html>');
     win.document.close();

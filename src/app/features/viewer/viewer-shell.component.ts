@@ -168,7 +168,11 @@ import { DrawingSearchService } from '../../core/services/viewer/drawing-search.
             <!-- Image viewer -->
             @if (isImage()) {
               <div class="flex-1 overflow-auto flex items-center justify-center p-4" style="background:#0a0c14">
-                <img [src]="imageUrl" class="max-w-full max-h-full shadow-lg" />
+                <!-- The document's own name, because that is what this image
+                     is. An empty alt would be right for decoration; this is
+                     the content of the page. -->
+                <img [src]="imageUrl" class="max-w-full max-h-full shadow-lg"
+                     [alt]="state.viewerData()?.name || 'Document'" />
               </div>
             }
 
