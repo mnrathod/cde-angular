@@ -37,7 +37,10 @@ export class MeasurementService {
   pathLength(points: PointerPoint[]): number {
     let total = 0;
     for (let i = 1; i < points.length; i++) {
-      total += this.distance(points[i - 1], points[i]);
+      const from = points[i - 1];
+      const to   = points[i];
+      if (!from || !to) continue;
+      total += this.distance(from, to);
     }
     return total;
   }
@@ -45,7 +48,12 @@ export class MeasurementService {
   /** Length around a closed ring — the path plus the closing segment. */
   perimeter(points: PointerPoint[]): number {
     if (points.length < 3) return this.pathLength(points);
-    return this.pathLength(points) + this.distance(points[points.length - 1], points[0]);
+    const last  = points[points.length - 1];
+    const first = points[0];
+    // The length guard above makes both present; restated because TypeScript
+    // does not narrow an array's length into its element types.
+    if (!last || !first) return this.pathLength(points);
+    return this.pathLength(points) + this.distance(last, first);
   }
 
   /**
@@ -59,6 +67,10 @@ export class MeasurementService {
     for (let i = 0; i < points.length; i++) {
       const current = points[i];
       const next    = points[(i + 1) % points.length];
+      // The modulo keeps the index in range, so this cannot happen; skipping
+      // rather than asserting keeps the shoelace sum well-defined if the array
+      // is ever mutated during iteration.
+      if (!current || !next) continue;
       sum += current.x * next.y - next.x * current.y;
     }
     return Math.abs(sum) / 2;
@@ -120,8 +132,14 @@ export class MeasurementService {
       };
     }
 
-    if (shape.tool === 'radius') {
-      const radius      = toPage(this.distance(points[0], points[1]));
+    // Destructured before the branch so the two-vertex requirement is part of
+    // the branch condition. A radius shape with fewer than two vertices is
+    // still being drawn; it falls through to the generic path readout below
+    // rather than returning nothing, because the caller renders whatever comes
+    // back and has no null case.
+    const [centre, edge] = points;
+    if (shape.tool === 'radius' && centre && edge) {
+      const radius      = toPage(this.distance(centre, edge));
       const measurement = this.formatLength(radius, scale);
       const detail      = this.formatLength(radius * 2, scale);
       return {
@@ -131,8 +149,13 @@ export class MeasurementService {
     }
 
     const measurement   = this.formatLength(toPage(this.pathLength(points)), scale);
-    const segmentLabels = points.slice(1).map((p, i) =>
-      this.formatLength(toPage(this.distance(points[i], p)), scale));
+    // points[i] is the vertex before p, because the map runs over slice(1).
+    const segmentLabels = points.slice(1).map((p, i) => {
+      const previous = points[i];
+      return previous
+        ? this.formatLength(toPage(this.distance(previous, p)), scale)
+        : '';
+    });
     const detail = `${Math.max(points.length - 1, 0)} segment(s)`;
     return {
       shape: { ...shape, measurement, measurementDetail: detail, segmentLabels },

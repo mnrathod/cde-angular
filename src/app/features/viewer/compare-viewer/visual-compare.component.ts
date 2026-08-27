@@ -322,9 +322,10 @@ export class VisualCompareComponent implements OnInit, AfterViewInit {
   }
 
   onSliderTouchMove(e: TouchEvent) {
-    if (!e.touches.length) return;
+    const touch = e.touches[0];
+    if (!touch) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const x = Math.max(0, Math.min(e.touches[0].clientX - rect.left, rect.width));
+    const x = Math.max(0, Math.min(touch.clientX - rect.left, rect.width));
     this.sliderPos.set(x);
     e.preventDefault();
   }

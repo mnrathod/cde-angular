@@ -4,6 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 
 import { RedactionService, REDACTION_PRESETS, TextSearchResult } from './redaction.service';
 import { RedactionRegion } from './viewer/viewer-state.service';
+import { definitely } from '../../../testing/definitely';
 
 describe('RedactionService', () => {
   let service: RedactionService;
@@ -56,7 +57,7 @@ describe('RedactionService', () => {
                     x: 10, y: 20, width: 60, height: 12 }]
       });
 
-      expect(result?.matches[0].text).toBe('a@b.com');
+      expect(definitely(result?.matches[0]).text).toBe('a@b.com');
     });
 
     it('surfaces pages that cannot be searched', () => {

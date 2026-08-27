@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { ViewerStateService, ShapeData } from './viewer-state.service';
+import { definitely } from '../../../../testing/definitely';
 
 const makeShape = (overrides: Partial<ShapeData> = {}): ShapeData => ({
   id: `s-${Math.random()}`, tool: 'rect', pageNumber: 1,
@@ -104,7 +105,7 @@ describe('ViewerStateService', () => {
     const s = makeShape({ id: 'upd-id', color: '#FF0000' });
     service.addShape(s);
     service.updateShape('upd-id', { color: '#0000FF' });
-    expect(service.shapes()[0].color).toBe('#0000FF');
+    expect(definitely(service.shapes()[0]).color).toBe('#0000FF');
   });
 
   it('clearAll() should remove all shapes', () => {

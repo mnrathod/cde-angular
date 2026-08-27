@@ -183,9 +183,15 @@ export class PageOrganiserComponent {
   readonly dirty = computed(() => {
     const current = this.draft();
     if (current.length !== this.baseline.length) return true;
-    return current.some((page, index) =>
-      page.sourcePage !== this.baseline[index].sourcePage ||
-      page.rotate     !== this.baseline[index].rotate);
+    return current.some((page, index) => {
+      // Lengths were compared above, so the index is in range. Treating a
+      // missing baseline entry as "changed" is also the right answer if that
+      // ever stops holding: the draft would differ from the baseline.
+      const original = this.baseline[index];
+      return !original
+          || page.sourcePage !== original.sourcePage
+          || page.rotate     !== original.rotate;
+    });
   });
 
   readonly hasSelection = computed(() => this.selection().size > 0);

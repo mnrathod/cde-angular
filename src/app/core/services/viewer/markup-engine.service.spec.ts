@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { MarkupEngineService } from './markup-engine.service';
 import { ShapeData, MarkupTool } from './viewer-state.service';
+import { definitely } from '../../../../testing/definitely';
 
 describe('MarkupEngineService', () => {
   let service: MarkupEngineService;
@@ -167,8 +168,8 @@ describe('MarkupEngineService', () => {
     const json   = service.shapesToJson(shapes);
     const parsed = service.parseShapesJson(json);
     expect(parsed.length).toBe(1);
-    expect(parsed[0].id).toBe('s1');
-    expect(parsed[0].tool).toBe('line');
+    expect(definitely(parsed[0]).id).toBe('s1');
+    expect(definitely(parsed[0]).tool).toBe('line');
   });
 
   it('parseShapesJson should return [] for invalid JSON', () => {

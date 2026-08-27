@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 
 import { OutlineService } from './outline.service';
+import { definitely } from '../../../../testing/definitely';
 
 /**
  * A PDF is untrusted input: its bookmarks can point nowhere and its links can
@@ -42,8 +43,8 @@ describe('OutlineService', () => {
       const entries = await outline.getOutline(doc);
 
       expect(entries).toHaveLength(1);
-      expect(entries[0].title).toBe('Foundations');
-      expect(entries[0].page).toBe(3);
+      expect(definitely(entries[0]).title).toBe('Foundations');
+      expect(definitely(entries[0]).page).toBe(3);
     });
 
     it('keeps nesting and records depth', async () => {
@@ -54,16 +55,16 @@ describe('OutlineService', () => {
         }]
       });
 
-      const [top] = await outline.getOutline(doc);
+      const top = definitely((await outline.getOutline(doc))[0]);
 
       expect(top.depth).toBe(0);
-      expect(top.children[0].depth).toBe(1);
-      expect(top.children[0].children[0].depth).toBe(2);
-      expect(top.children[0].children[0].title).toBe('A.1.1');
+      expect(definitely(top.children[0]).depth).toBe(1);
+      expect(definitely(definitely(top.children[0]).children[0]).depth).toBe(2);
+      expect(definitely(definitely(top.children[0]).children[0]).title).toBe('A.1.1');
     });
 
     it('names an untitled bookmark rather than showing a blank row', async () => {
-      const [entry] = await outline.getOutline(fakeDoc({ outline: [{ title: '  ', dest: ['a'] }] }));
+      const entry = definitely((await outline.getOutline(fakeDoc({ outline: [{ title: '  ', dest: ['a'] }] })))[0]);
       expect(entry.title).toBe('(untitled)');
     });
 
@@ -73,7 +74,7 @@ describe('OutlineService', () => {
         pageIndex: async () => { throw new Error('no such page'); }
       });
 
-      expect((await outline.getOutline(doc))[0].page).toBeNull();
+      expect(definitely((await outline.getOutline(doc))[0]).page).toBeNull();
     });
   });
 
@@ -134,9 +135,9 @@ describe('OutlineService', () => {
 
     it('normalises a rectangle given corner-first', async () => {
       // PDF rectangles are two opposite corners in any order.
-      const [link] = await outline.getPageLinks(fakeDoc(), fakePage([
+      const link = definitely((await outline.getPageLinks(fakeDoc(), fakePage([
         { subtype: 'Link', rect: [110, 40, 10, 20], url: 'https://example.com' }
-      ]));
+      ])))[0]);
 
       expect(link.x).toBe(10);
       expect(link.y).toBe(20);
@@ -145,9 +146,9 @@ describe('OutlineService', () => {
 
     it('resolves an internal jump to a page', async () => {
       const doc = fakeDoc({ pageIndex: async () => 4 });
-      const [link] = await outline.getPageLinks(doc, fakePage([
+      const link = definitely((await outline.getPageLinks(doc, fakePage([
         { subtype: 'Link', rect: [0, 0, 10, 10], dest: ['ref'] }
-      ]));
+      ])))[0]);
 
       expect(link.page).toBe(5);
       expect(link.url).toBeUndefined();

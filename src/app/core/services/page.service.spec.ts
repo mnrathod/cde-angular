@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { PageService, PdfPageInfoResponse } from './page.service';
+import { definitely } from '../../../testing/definitely';
 
 describe('PageService', () => {
   let service: PageService;
@@ -35,7 +36,7 @@ describe('PageService', () => {
       pages: [{ page: 1, width: 612, height: 792, rotation: 90 }]
     });
 
-    expect(received?.pages[0].rotation).toBe(90);
+    expect(definitely(received?.pages[0]).rotation).toBe(90);
   });
 
   it('sends the whole layout to arrange, not a list of commands', () => {

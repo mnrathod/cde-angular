@@ -5,6 +5,7 @@ import { CdkDragDrop } from '@angular/cdk/drag-drop';
 
 import { PageOrganiserComponent, DraftPage } from './page-organiser.component';
 import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
+import { definitely } from '../../../../testing/definitely';
 
 /**
  * A drop event carrying only what `onDrop` reads.
@@ -52,6 +53,19 @@ describe('PageOrganiserComponent', () => {
     return organiser.draft().map(page => page.id);
   }
 
+  /**
+   * The id of the nth draft page.
+   *
+   * <p>A named accessor rather than `ids()[n]` at each call site: indexing
+   * yields `number | undefined`, and every use here follows a setup that
+   * guarantees the page exists. Asserting once, here, keeps a genuine absence
+   * a loud failure naming the index rather than a `TypeError` deep inside the
+   * component.
+   */
+  function idAt(index: number): number {
+    return definitely(ids()[index], `draft page ${index}`);
+  }
+
   function sourceOrder(): number[] {
     return organiser.draft().map(page => page.sourcePage);
   }
@@ -93,25 +107,25 @@ describe('PageOrganiserComponent', () => {
   describe('selection', () => {
     it('a plain click selects one page and replaces the previous selection', () => {
       loadPages(3);
-      organiser.toggle(ids()[0], click);
-      organiser.toggle(ids()[2], click);
+      organiser.toggle(idAt(0), click);
+      organiser.toggle(idAt(2), click);
 
       expect(organiser.selection().size).toBe(1);
-      expect(organiser.isSelected(ids()[2])).toBe(true);
+      expect(organiser.isSelected(idAt(2))).toBe(true);
     });
 
     it('ctrl-click adds to the selection', () => {
       loadPages(3);
-      organiser.toggle(ids()[0], click);
-      organiser.toggle(ids()[2], ctrlClick);
+      organiser.toggle(idAt(0), click);
+      organiser.toggle(idAt(2), ctrlClick);
 
       expect(organiser.selection().size).toBe(2);
     });
 
     it('clicking the only selected page clears it', () => {
       loadPages(2);
-      organiser.toggle(ids()[0], click);
-      organiser.toggle(ids()[0], click);
+      organiser.toggle(idAt(0), click);
+      organiser.toggle(idAt(0), click);
 
       expect(organiser.hasSelection()).toBe(false);
     });
@@ -147,10 +161,10 @@ describe('PageOrganiserComponent', () => {
       organiser.selectAll();
       organiser.rotateSelection(90);
       organiser.rotateSelection(90);
-      expect(organiser.draft()[0].rotate).toBe(180);
+      expect(definitely(organiser.draft()[0]).rotate).toBe(180);
 
       organiser.rotateSelection(180);
-      expect(organiser.draft()[0].rotate).toBe(0);
+      expect(definitely(organiser.draft()[0]).rotate).toBe(0);
       expect(organiser.dirty()).toBe(false);
     });
 
@@ -159,12 +173,12 @@ describe('PageOrganiserComponent', () => {
       organiser.selectAll();
       organiser.rotateSelection(-90);
 
-      expect(organiser.draft()[0].rotate).toBe(270);
+      expect(definitely(organiser.draft()[0]).rotate).toBe(270);
     });
 
     it('duplicates a page next to itself, with its own identity', () => {
       loadPages(2);
-      organiser.toggle(ids()[0], click);
+      organiser.toggle(idAt(0), click);
       organiser.duplicateSelection();
 
       expect(sourceOrder()).toEqual([1, 1, 2]);
@@ -175,7 +189,7 @@ describe('PageOrganiserComponent', () => {
 
     it('deletes the selected pages', () => {
       loadPages(3);
-      organiser.toggle(ids()[1], click);
+      organiser.toggle(idAt(1), click);
       organiser.deleteSelection();
 
       expect(sourceOrder()).toEqual([1, 3]);
@@ -208,9 +222,9 @@ describe('PageOrganiserComponent', () => {
   describe('applying', () => {
     it('sends the whole layout, including rotations, as one request', () => {
       loadPages(3);
-      organiser.toggle(ids()[0], click);
+      organiser.toggle(idAt(0), click);
       organiser.rotateSelection(90);
-      organiser.toggle(ids()[1], click);
+      organiser.toggle(idAt(1), click);
       organiser.deleteSelection();
       organiser.apply();
 
@@ -237,7 +251,7 @@ describe('PageOrganiserComponent', () => {
 
     it('keeps the draft and reports the reason when the server refuses', () => {
       loadPages(3);
-      organiser.toggle(ids()[0], click);
+      organiser.toggle(idAt(0), click);
       organiser.deleteSelection();
       organiser.apply();
 
@@ -259,7 +273,7 @@ describe('PageOrganiserComponent', () => {
 
     it('names the converter when it is the thing that is down', () => {
       loadPages(2);
-      organiser.toggle(ids()[0], click);
+      organiser.toggle(idAt(0), click);
       organiser.deleteSelection();
       organiser.apply();
 
@@ -310,7 +324,7 @@ describe('PageOrganiserComponent', () => {
 
     it('inserts after the selected page', () => {
       loadPages(4);
-      organiser.toggle(ids()[1], click);
+      organiser.toggle(idAt(1), click);
       organiser.insertFrom(8);
 
       httpMock.expectOne('/api/documents/8/pages')
@@ -347,8 +361,8 @@ describe('PageOrganiserComponent', () => {
   describe('extracting', () => {
     it('sends the selected source pages in document order', () => {
       loadPages(4);
-      organiser.toggle(ids()[2], click);
-      organiser.toggle(ids()[0], ctrlClick);
+      organiser.toggle(idAt(2), click);
+      organiser.toggle(idAt(0), ctrlClick);
       organiser.extractSelection();
 
       const req = httpMock.expectOne('/api/documents/7/pages/extract');
@@ -362,7 +376,7 @@ describe('PageOrganiserComponent', () => {
 
     it('sends a duplicated page once', () => {
       loadPages(2);
-      organiser.toggle(ids()[0], click);
+      organiser.toggle(idAt(0), click);
       organiser.duplicateSelection();
       organiser.selectAll();
       organiser.extractSelection();

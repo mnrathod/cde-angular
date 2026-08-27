@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 
 import { CollaborationService, CollaborationEvent } from './collaboration.service';
 import { AuthService } from './auth.service';
+import { definitely } from '../../../testing/definitely';
 
 /**
  * Exercised through applyEvent rather than a real broker: what matters is how
@@ -103,7 +104,7 @@ describe('CollaborationService', () => {
       // A cursor can arrive before the presence broadcast that introduces them.
       collaboration.applyEvent(cursorFrom('grace'));
 
-      expect(collaboration.cursors()[0].colour).toBe('#666');
+      expect(definitely(collaboration.cursors()[0]).colour).toBe('#666');
     });
 
     it('drops cursors that have stopped moving', () => {

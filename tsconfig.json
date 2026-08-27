@@ -5,17 +5,13 @@
   "compilerOptions": {
     "strict": true,
     /*
-     * noUncheckedIndexedAccess is not on yet. Measured on this revision it
-     * reports 45 findings in application code and 116 in specs — none of them
-     * a live defect: every one is a place where a runtime guard already exists
-     * (`if (pts.length < 2) return ''`) and the compiler cannot correlate the
-     * guard with the index access that follows it.
-     *
-     * Turning it on is worth doing and is tracked, but it is 161 edits to a
-     * viewer whose behaviour is covered by unit tests rather than by anything
-     * that would catch a subtly changed guard — so it is a change to make
-     * deliberately, not one to fold into a security pass.
+     * Every indexed access yields `T | undefined`, because `array[0]` on an
+     * empty array is a lie the type system otherwise tells. The findings this
+     * produced were all places where a runtime guard already existed and the
+     * compiler could not correlate it with the access that followed — so the
+     * fixes are narrowing, not new checks.
      */
+    "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,

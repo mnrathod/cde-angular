@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { DrawingSearchService } from './drawing-search.service';
+import { definitely } from '../../../../testing/definitely';
 
 /**
  * Search ran only against a PDF's text layer and gave up the moment there was
@@ -24,41 +25,41 @@ describe('DrawingSearchService', () => {
       svg('<text x="630" y="663" font-size="11">CITY BRIDGE EXPANSION</text>'));
 
     expect(items.length).toBe(1);
-    expect(items[0].text).toBe('CITY BRIDGE EXPANSION');
-    expect(items[0].x).toBe(630);
-    expect(items[0].y).toBe(663);
-    expect(items[0].width).toBeGreaterThan(0);
+    expect(definitely(items[0]).text).toBe('CITY BRIDGE EXPANSION');
+    expect(definitely(items[0]).x).toBe(630);
+    expect(definitely(items[0]).y).toBe(663);
+    expect(definitely(items[0]).width).toBeGreaterThan(0);
   });
 
   // ── anchor handling ───────────────────────────────────────────
   it('resolves a centred label to its left edge', () => {
     // Converters centre nearly every label this way. Taking x at face value
     // marked a box that began halfway through the words it was framing.
-    const [item] = service.extractText(svg(
-      '<text x="655" y="530" text-anchor="middle" font-size="10">CITY BRIDGE EXPANSION</text>'));
+    const item = definitely((service.extractText(svg(
+      '<text x="655" y="530" text-anchor="middle" font-size="10">CITY BRIDGE EXPANSION</text>')))[0]);
 
     expect(item.x).toBeCloseTo(655 - item.width / 2, 5);
     expect(item.x).toBeLessThan(655);
   });
 
   it('resolves a right-anchored label to its left edge', () => {
-    const [item] = service.extractText(svg(
-      '<text x="400" y="100" text-anchor="end" font-size="10">REV A</text>'));
+    const item = definitely((service.extractText(svg(
+      '<text x="400" y="100" text-anchor="end" font-size="10">REV A</text>')))[0]);
 
     expect(item.x).toBeCloseTo(400 - item.width, 5);
   });
 
   it('leaves a start-anchored label where it is', () => {
-    const [item] = service.extractText(svg(
-      '<text x="400" y="100" text-anchor="start" font-size="10">REV A</text>'));
+    const item = definitely((service.extractText(svg(
+      '<text x="400" y="100" text-anchor="start" font-size="10">REV A</text>')))[0]);
 
     expect(item.x).toBe(400);
   });
 
   it('honours an anchor set on an enclosing group', () => {
     // A converter often sets this once on a group rather than per label.
-    const [item] = service.extractText(svg(
-      '<g text-anchor="middle"><text x="200" y="50" font-size="10">TITLE</text></g>'));
+    const item = definitely((service.extractText(svg(
+      '<g text-anchor="middle"><text x="200" y="50" font-size="10">TITLE</text></g>')))[0]);
 
     expect(item.x).toBeCloseTo(200 - item.width / 2, 5);
   });
@@ -70,15 +71,15 @@ describe('DrawingSearchService', () => {
       '<text x="10" y="20"><tspan>CITY BRIDGE</tspan><tspan> EXPANSION</tspan></text>'));
 
     expect(items.length).toBe(1);
-    expect(items[0].text).toBe('CITY BRIDGE EXPANSION');
+    expect(definitely(items[0]).text).toBe('CITY BRIDGE EXPANSION');
   });
 
   it('takes the position from the first tspan when the text has none', () => {
     const items = service.extractText(svg(
       '<text font-size="9"><tspan x="120" y="240">ABUTMENT W</tspan></text>'));
 
-    expect(items[0].x).toBe(120);
-    expect(items[0].y).toBe(240);
+    expect(definitely(items[0]).x).toBe(120);
+    expect(definitely(items[0]).y).toBe(240);
   });
 
   it('skips empty and unpositioned text rather than indexing blanks', () => {
@@ -106,8 +107,8 @@ describe('DrawingSearchService', () => {
     it('finds a phrase regardless of case', () => {
       const matches = service.search(drawing(), 'city bridge expansion');
       expect(matches.length).toBe(1);
-      expect(matches[0].text).toBe('CITY BRIDGE EXPANSION');
-      expect(matches[0].item.x).toBe(630);
+      expect(definitely(matches[0]).text).toBe('CITY BRIDGE EXPANSION');
+      expect(definitely(matches[0]).item.x).toBe(630);
     });
 
     it('finds every label sharing a word', () => {
@@ -123,8 +124,8 @@ describe('DrawingSearchService', () => {
       const repeated = service.extractText(svg('<text x="1" y="1">SPAN A SPAN B</text>'));
       const matches = service.search(repeated, 'SPAN');
       expect(matches.length).toBe(2);
-      expect(matches[0].matchIndex).toBe(0);
-      expect(matches[1].matchIndex).toBe(7);
+      expect(definitely(matches[0]).matchIndex).toBe(0);
+      expect(definitely(matches[1]).matchIndex).toBe(7);
     });
 
     it('ignores whitespace differences between query and drawing', () => {

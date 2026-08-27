@@ -233,7 +233,11 @@ export class IfcTreeComponent implements OnChanges {
   }
 
   getIcon(type: string): string {
-    return IFC_ICONS[type] || IFC_ICONS['DEFAULT'];
+    // The fallback needs its own fallback: an index into a record is optional
+    // under noUncheckedIndexedAccess even for a key the literal defines, and
+    // an icon is decoration — returning an empty string is better than an
+    // undefined reaching the template.
+    return IFC_ICONS[type] ?? IFC_ICONS['DEFAULT'] ?? '';
   }
 
   getProperties(node: IfcNode): Array<{key: string; value: string}> {

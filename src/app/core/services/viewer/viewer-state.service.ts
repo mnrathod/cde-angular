@@ -280,6 +280,10 @@ export class ViewerStateService {
     const stack = this.undoStack();
     if (!stack.length) return;
     const previous = stack[stack.length - 1];
+    // The emptiness guard above makes this present; TypeScript does not carry
+    // a length check into an index, so the fact is restated rather than
+    // asserted with a `!`.
+    if (!previous) return;
     this.undoStack.update(s => s.slice(0, -1));
     // Bank the state being left so redo can return to it.
     this.redoStack.update(s => [...s, this.shapes()]);
@@ -291,6 +295,7 @@ export class ViewerStateService {
     const stack = this.redoStack();
     if (!stack.length) return;
     const next = stack[stack.length - 1];
+    if (!next) return;
     this.redoStack.update(s => s.slice(0, -1));
     this.undoStack.update(s => [...s, this.shapes()]);
     this.shapes.set(next);

@@ -410,13 +410,14 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
     if (pdfDoc) {
       const results = await this.pdfEngine.searchDocument(pdfDoc, query);
       this.state.searchResults.set(results);
-      if (results.length) this.state.navigateTo(results[0].pageIndex);
+      const firstHit = results[0];
+      if (firstHit) this.state.navigateTo(firstHit.pageIndex);
       return;
     }
 
     const matches = this.drawingSearch.search(this.state.drawingText(), query);
     this.state.searchResults.set(matches);
-    this.state.searchFocus.set(matches.length ? matches[0].item : null);
+    this.state.searchFocus.set(matches[0]?.item ?? null);
   }
 
 

@@ -66,7 +66,13 @@ export class AuthService {
 
   private parseToken(token: string) {
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      // A stored value that is not a JWT has no second segment, and atob(
+      // undefined) throws rather than returning nothing. The catch below would
+      // swallow it, but silently leaving the username unset on a malformed
+      // token is exactly the state that looks like "logged in but broken".
+      const claims = token.split('.')[1];
+      if (!claims) return;
+      const payload = JSON.parse(atob(claims));
       this._username.set(payload.sub || null);
     } catch { /* ignore */ }
   }

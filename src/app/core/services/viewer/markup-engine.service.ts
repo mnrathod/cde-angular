@@ -29,11 +29,19 @@ export class MarkupEngineService {
     svgEl: SVGSVGElement
   ): PointerPoint {
     const rect = svgEl.getBoundingClientRect();
+    // touches is empty on touchend, and changedTouches is empty on a
+    // touchcancel the browser synthesises when a gesture is interrupted — by
+    // an incoming call, or the app being backgrounded mid-stroke. Reading [0]
+    // unconditionally threw there; falling back to the origin ends the stroke
+    // harmlessly instead.
+    const touch = event instanceof TouchEvent
+      ? event.touches[0] ?? event.changedTouches[0]
+      : null;
     const clientX = event instanceof TouchEvent
-      ? event.touches[0]?.clientX ?? event.changedTouches[0].clientX
+      ? touch?.clientX ?? 0
       : event.clientX;
     const clientY = event instanceof TouchEvent
-      ? event.touches[0]?.clientY ?? event.changedTouches[0].clientY
+      ? touch?.clientY ?? 0
       : event.clientY;
     return {
       x: (clientX - rect.left) / (rect.width  / (svgEl.viewBox.baseVal.width  || rect.width)),
@@ -224,8 +232,11 @@ export class MarkupEngineService {
     if (this.requiredVertices(shape!.tool) !== null) return false;
 
     const points = shape!.points ?? [];
-    const near = (v: PointerPoint) => Math.hypot(pt.x - v.x, pt.y - v.y) <= tolerance;
+    const near = (v: PointerPoint | undefined) =>
+      v !== undefined && Math.hypot(pt.x - v.x, pt.y - v.y) <= tolerance;
 
+    // A shape with no vertices is not near anything, which `near` now says
+    // rather than throwing.
     return clickDetail >= 2 || near(points[0]) || near(points[points.length - 1]);
   }
 
@@ -371,9 +382,18 @@ export class MarkupEngineService {
         if (pts.length < 2) return '';
         const colour = s.tool === 'calibrate' ? CALIBRATION_COLOUR : MEASURE_COLOUR;
         const path   = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+        // `pts.length >= 2` above guarantees this, but TypeScript does not
+        // narrow an array's length, so the guarantee is restated here rather
+        // than asserted away with a `!`.
         const last   = pts[pts.length - 1];
+        if (!last) return '';
         const segments = pts.slice(1).map((p, i) => {
+          // pts[i] is the vertex before p, because the map runs over
+          // pts.slice(1). Guarded rather than asserted: the invariant is real
+          // but it lives in the slice above, and an edit there would break it
+          // silently.
           const prev = pts[i];
+          if (!prev) return '';
           return this.measureLabel((prev.x + p.x) / 2, (prev.y + p.y) / 2 - 8,
             s.segmentLabels?.[i] ?? '', colour, 10);
         }).join('');
@@ -403,6 +423,7 @@ export class MarkupEngineService {
         const pts = s.points || [];
         if (pts.length < 2) return '';
         const [centre, edge] = pts;
+        if (!centre || !edge) return '';
         const r = Math.hypot(edge.x - centre.x, edge.y - centre.y);
         return `<g data-id="${s.id}">
           <circle cx="${centre.x}" cy="${centre.y}" r="${r}"
@@ -455,7 +476,10 @@ export class MarkupEngineService {
   // ── Hit test: find shape at pointer position ─────────────────
   hitTest(shapes: ShapeData[], pt: PointerPoint, tolerance = 8): ShapeData | null {
     for (let i = shapes.length - 1; i >= 0; i--) {
-      if (this.shapeContains(shapes[i], pt, tolerance)) return shapes[i];
+      // Bound once rather than indexed twice: it removes the second access the
+      // compiler cannot prove safe, and it reads better.
+      const shape = shapes[i];
+      if (shape && this.shapeContains(shape, pt, tolerance)) return shape;
     }
     return null;
   }

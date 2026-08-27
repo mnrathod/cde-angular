@@ -301,8 +301,14 @@ export class CadViewerComponent implements OnChanges {
   /** Width and height of the drawing's own coordinate space. */
   private contentSize = computed<[number, number]>(() => {
     const parts = this.contentViewBox().split(/\s+/).map(Number);
-    return parts.length === 4 && parts.every(n => !isNaN(n))
-      ? [parts[2], parts[3]]
+    const [, , width, height] = parts;
+    // The viewBox comes from a converted drawing, so a malformed one is an
+    // input problem rather than an impossible state. Falling back to a
+    // sensible page size renders something a user can see, which beats an
+    // exception in a computed signal.
+    return parts.length === 4 && width !== undefined && height !== undefined
+        && !isNaN(width) && !isNaN(height)
+      ? [width, height]
       : [800, 600];
   });
 
