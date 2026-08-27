@@ -4,7 +4,6 @@ import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 import { RegisterFormComponent } from './register-form.component';
-import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-login',
@@ -58,8 +57,7 @@ import { environment } from '../../../environments/environment';
               <label for="login-username" class="block text-xs font-medium text-gray-600 mb-1">Username</label>
               <input id="login-username" [(ngModel)]="username" name="username" type="text" required
                 autocomplete="username"
-                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                placeholder="admin" />
+                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent" />
             </div>
             <div>
               <label for="login-password" class="block text-xs font-medium text-gray-600 mb-1">Password</label>
@@ -74,15 +72,17 @@ import { environment } from '../../../environments/environment';
             </button>
           </form>
           <!--
-            Only in a development build. This used to read "Demo: admin /
-            admin123" unconditionally, which printed the seeded account's
-            password on the login page of every deployed environment.
+            No demonstration credentials. This used to print "Demo: admin /
+            admin123" on the login page of every deployed environment; the
+            account it named no longer exists unless a deployment creates one
+            with its own password.
           -->
-          @if (prefilled) {
-            <p class="text-xs text-amber-600 text-center mt-4">
-              Development build — signed in as the local seed account.
-            </p>
-          }
+          <p class="text-xs text-gray-500 text-center mt-4">
+            No account yet?
+            <button type="button" (click)="showTab('register')"
+              class="text-accent underline hover:no-underline">Create one</button>
+            — you'll get an organisation of your own.
+          </p>
         }
 
         <!-- Register Form -->
@@ -103,19 +103,8 @@ export class LoginComponent {
   loading  = signal(false);
   error    = signal('');
 
-  /**
-   * Prefilled from the environment so a development reload does not cost a
-   * retyped sign-in. `environment.production.ts` sets `demoCredentials` to
-   * null and `angular.json` swaps the whole file in for production builds, so
-   * the strings are absent from a production bundle rather than merely
-   * unreachable inside it — a runtime check would still ship them to every
-   * browser that loaded the app.
-   */
-  username = environment.demoCredentials?.username ?? '';
-  password = environment.demoCredentials?.password ?? '';
-
-  /** Whether the form arrived filled in, so the page can say why. */
-  readonly prefilled = !!environment.demoCredentials;
+  username = '';
+  password = '';
 
   /**
    * The two forms used to share username and password, so the development

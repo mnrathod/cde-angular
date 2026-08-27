@@ -5,6 +5,7 @@ import { CompareService } from '../../core/services/compare.service';
 import { DocumentService } from '../../core/services/document.service';
 import { ProjectService } from '../../core/services/project.service';
 import { Document, CompareResult, ChangeItem } from '../../core/models';
+import { problemDetail } from '../../core/handlers/problem-detail';
 
 @Component({
   selector: 'app-compare',
@@ -288,76 +289,49 @@ export class CompareComponent implements OnInit {
     });
   }
 
-  async generateAI() {
-    const r = this.result();
-    if (!r) return;
+  generateAI() {
+    const result = this.result();
+    if (!result) return;
     this.aiLoading.set(true);
     this.aiText.set('');
     this.aiHtml.set('');
 
-    const changes = r.changes.map(c =>
-      `• ${c.type.toUpperCase()} [${c.category}] ${c.change}${c.detail ? ' — ' + c.detail : ''}`
-    ).join('\n');
-
-    const prompt = `You are a senior AEC document controller reviewing a drawing revision in a CDE.
-
-File 1: "${r.doc1Name}"${r.doc1Revision ? ' — Rev ' + r.doc1Revision : ''}
-File 2: "${r.doc2Name}"${r.doc2Revision ? ' — Rev ' + r.doc2Revision : ''}
-Type: ${r.fileType} | ${r.overall} | ${r.totalChanges} changes (${r.added} added, ${r.removed} removed)
-
-Changes:
-${changes}
-
-Produce a structured report with exactly these 5 sections:
-1. REVISION SUMMARY
-2. KEY CHANGES IDENTIFIED
-3. IMPACTED DISCIPLINES
-4. REVIEW COMMENTS
-5. SUGGESTED RFIs (format: RFI-001: Subject — Question)
-
-Under 400 words. Professional engineering language.`;
-
-    try {
-      const res = await fetch('/api/ai/messages/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json',
-                   'Authorization': 'Bearer ' + this.getToken() },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1500,
-          stream: true,
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
-
-      const reader = res.body!.getReader();
-      const dec    = new TextDecoder();
-      let buf = '', full = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        const lines = buf.split('\n'); buf = lines.pop()!;
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const raw = line.slice(6).trim();
-          if (raw === '[DONE]') continue;
-          try {
-            const evt = JSON.parse(raw);
-            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
-              full += evt.delta.text;
-              this.aiText.set(full);
-            }
-          } catch { /* skip */ }
-        }
+    // Facts, not a prompt. The prompt, the model and the token ceiling are the
+    // server's to decide: this used to assemble the whole thing here and POST
+    // it to an endpoint that forwarded it verbatim to a third party, so a
+    // browser chose what the deployment spent and no filter was possible on
+    // the way out.
+    this.compareService.getComparisonReport(result).subscribe({
+      next: response => {
+        this.aiText.set(response.report);
+        this.aiHtml.set(this.formatReport(response.report));
+        this.aiLoading.set(false);
+      },
+      error: (err: unknown) => {
+        this.aiText.set(problemDetail(err,
+          'The summary could not be produced. The comparison itself is unaffected.'));
+        this.aiLoading.set(false);
       }
-      this.aiHtml.set(this.formatReport(full));
-    } catch (e: any) {
-      this.aiText.set('Error: ' + e.message);
-    } finally {
-      this.aiLoading.set(false);
-    }
+    });
+  }
+
+  /**
+   * Escapes text before it is placed into markup.
+   *
+   * <p>formatReport builds an HTML string, and the text it builds it from is a
+   * model's output — which the data-handling rules require be treated as
+   * untrusted input, never interpolated into HTML. Angular's binding sanitiser
+   * is the second layer and would strip an injected script; this is the first,
+   * and it is the one that means a prompt-injected reply is rendered as the
+   * text it is rather than relying on the sanitiser to notice.
+   */
+  private escape(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   formatReport(text: string): string {
@@ -374,7 +348,7 @@ Under 400 words. Professional engineering language.`;
         const key = Object.keys(icons).find(k => t.toUpperCase().includes(k)) || '';
         return `<div style="display:flex;align-items:center;gap:6px;margin:12px 0 5px;padding-bottom:4px;border-bottom:1px solid #dde1e7">
           <span>${icons[key]||'•'}</span>
-          <strong style="font-size:.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:.4px">${t}</strong>
+          <strong style="font-size:.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:.4px">${this.escape(t)}</strong>
         </div>`;
       }
       if (rfiRe.test(t)) {
@@ -382,22 +356,19 @@ Under 400 words. Professional engineering language.`;
         const ref = d > 0 ? t.slice(0, d).trim() : t;
         const rest = d > 0 ? t.slice(d + 1).trim() : '';
         return `<div style="background:#fffbeb;border-left:3px solid #f59e0b;border-radius:3px;padding:6px 10px;margin:3px 0;font-size:.79rem">
-          <strong style="color:#b45309">${ref}</strong>${rest ? ' — ' + rest : ''}
+          <strong style="color:#b45309">${this.escape(ref)}</strong>${rest ? ' — ' + this.escape(rest) : ''}
         </div>`;
       }
       if (/^[•\-\*]\s+/.test(t) || /^\d+\.\s+[a-z]/i.test(t)) {
         return `<div style="display:flex;gap:6px;margin:2px 0;font-size:.79rem">
           <span style="color:var(--accent);flex-shrink:0">▸</span>
-          <span>${t.replace(/^[•\-\*]\s+/, '').replace(/^\d+\.\s+/, '')}</span>
+          <span>${this.escape(t.replace(/^[•\-\*]\s+/, '').replace(/^\d+\.\s+/, ''))}</span>
         </div>`;
       }
-      return `<p style="margin:3px 0;font-size:.79rem">${t}</p>`;
+      return `<p style="margin:3px 0;font-size:.79rem">${this.escape(t)}</p>`;
     }).join('');
   }
 
-  getToken(): string {
-    return localStorage.getItem('cde_token') || '';
-  }
 
   openVisualCompare() {
     const d1 = this.doc1(), d2 = this.doc2();

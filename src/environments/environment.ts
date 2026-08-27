@@ -2,22 +2,15 @@
  * Development configuration.
  *
  * `angular.json` replaces this file with `environment.production.ts` for
- * production builds, so anything here is absent from a production bundle
+ * production builds, so anything added here is absent from a production bundle
  * rather than merely unreachable in it.
+ *
+ * <p>This used to carry `demoCredentials`, which prefilled the login form with
+ * the seeded account's username and password. The seeded account no longer
+ * exists unless a deployment explicitly asks for one and supplies its own
+ * password, so there is nothing left to prefill — and a credential that lives
+ * in a source file is one file-replacement mistake away from being shipped.
  */
 export const environment = {
   production: false,
-
-  /**
-   * Credentials the login form starts filled in with, to save retyping them
-   * on every reload while developing against the local seed data.
-   *
-   * These are the seeded local accounts and nothing else — they are not valid
-   * against any deployed environment. The production file sets this to null,
-   * and the file replacement means the strings never appear in a production
-   * bundle at all; a runtime `if (production)` guard would still ship them to
-   * every browser that loaded the app.
-   */
-  demoCredentials: { username: 'admin', password: 'admin123' } as
-    { username: string; password: string } | null,
 };

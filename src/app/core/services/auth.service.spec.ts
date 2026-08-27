@@ -35,7 +35,7 @@ describe('AuthService', () => {
   });
 
   it('login() should store token and set signals', fakeAsync(() => {
-    service.login({ username: 'admin', password: 'admin123' }).subscribe();
+    service.login({ username: 'admin', password: 'a-synthetic-test-password' }).subscribe();
     const req = httpMock.expectOne('/api/auth/login');
     expect(req.request.method).toBe('POST');
     req.flush(MOCK_RESPONSE);
@@ -48,7 +48,7 @@ describe('AuthService', () => {
 
   it('logout() should clear token and signals', fakeAsync(() => {
     localStorage.setItem('cde_token', MOCK_TOKEN);
-    service.login({ username: 'admin', password: 'admin123' }).subscribe();
+    service.login({ username: 'admin', password: 'a-synthetic-test-password' }).subscribe();
     httpMock.expectOne('/api/auth/login').flush(MOCK_RESPONSE);
     tick();
 
@@ -60,7 +60,7 @@ describe('AuthService', () => {
   }));
 
   it('getAuthHeaders() should return Authorization header when logged in', fakeAsync(() => {
-    service.login({ username: 'admin', password: 'admin123' }).subscribe();
+    service.login({ username: 'admin', password: 'a-synthetic-test-password' }).subscribe();
     httpMock.expectOne('/api/auth/login').flush(MOCK_RESPONSE);
     tick();
 

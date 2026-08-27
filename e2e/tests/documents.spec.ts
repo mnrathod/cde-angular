@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login } from '../helpers/auth';
+import { registerAndSignIn } from '../helpers/auth';
 import * as path from 'path';
 
 /**
@@ -20,7 +20,7 @@ async function selectFirstProject(page: import('@playwright/test').Page) {
 
 test.describe('Projects', () => {
 
-  test.beforeEach(async ({ page }) => { await login(page); });
+  test.beforeEach(async ({ page }) => { await registerAndSignIn(page); });
 
   test('sidebar shows project list', async ({ page }) => {
     await expect(page.locator('aside')).toBeVisible();
@@ -50,7 +50,7 @@ test.describe('Projects', () => {
 test.describe('Upload modal', () => {
 
   test.beforeEach(async ({ page }) => {
-    await login(page);
+    await registerAndSignIn(page);
     await selectFirstProject(page);
   });
 
@@ -83,7 +83,7 @@ test.describe('Upload modal', () => {
 
 test.describe('Compare', () => {
 
-  test.beforeEach(async ({ page }) => { await login(page); });
+  test.beforeEach(async ({ page }) => { await registerAndSignIn(page); });
 
   test('Compare page loads', async ({ page }) => {
     await page.goto('/compare');

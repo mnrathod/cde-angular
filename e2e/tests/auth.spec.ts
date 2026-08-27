@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, logout } from '../helpers/auth';
+import { registerAndSignIn, logout } from '../helpers/auth';
 
 test.describe('Authentication', () => {
 
@@ -10,7 +10,7 @@ test.describe('Authentication', () => {
   });
 
   test('successful login redirects to home', async ({ page }) => {
-    await login(page);
+    await registerAndSignIn(page);
     await expect(page.getByRole('heading', { name: 'Select a project' })).toBeVisible();
   });
 
@@ -23,7 +23,7 @@ test.describe('Authentication', () => {
   });
 
   test('sign out navigates to login', async ({ page }) => {
-    await login(page);
+    await registerAndSignIn(page);
     await logout(page);
     await expect(page).toHaveURL('/login');
   });
@@ -35,8 +35,10 @@ test.describe('Authentication', () => {
 
   test('sign in button is disabled while loading', async ({ page }) => {
     await page.goto('/login');
-    await page.getByLabel(/username/i).fill('admin');
-    await page.getByLabel(/password/i).fill('admin123');
+    // The credentials do not need to be valid: this asserts the button's
+    // state while the request is in flight, which happens either way.
+    await page.getByLabel(/username/i).fill('nobody-in-particular');
+    await page.getByLabel(/password/i).fill('not-a-real-password-at-all');
     // Selected by role, not by label: the label becomes "Signing in..." the
     // moment it is clicked, so a name-based locator stops matching exactly
     // when the assertion needs it.
