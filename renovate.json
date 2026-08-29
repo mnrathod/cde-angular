@@ -1,0 +1,70 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommitsDisabled"
+  ],
+
+  "timezone": "Australia/Sydney",
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 6,
+  "prHourlyLimit": 3,
+  "rebaseWhen": "conflicted",
+  "labels": ["dependencies"],
+
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "schedule": ["at any time"],
+    "labels": ["dependencies", "security"]
+  },
+  "osvVulnerabilityAlerts": true,
+
+  "lockFileMaintenance": {
+    "description": "package.json carries ranges; package-lock.json is what npm ci installs. Refreshing the lock on a schedule is how transitive dependencies get patched at all — nothing else updates them.",
+    "enabled": true,
+    "schedule": ["before 6am on the first day of the month"]
+  },
+
+  "packageRules": [
+    {
+      "description": "Angular ships framework, CLI, build and CDK as one release train. Bumping them separately produces a tree npm cannot resolve, and @angular/build must move with @angular/cli.",
+      "matchPackageNames": [
+        "@angular/**",
+        "@angular-devkit/**",
+        "zone.js"
+      ],
+      "groupName": "Angular"
+    },
+    {
+      "description": "The Angular compiler pins the TypeScript versions it supports, so TypeScript cannot lead an Angular upgrade — it follows one.",
+      "matchPackageNames": ["typescript"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "matchPackageNames": ["vitest", "@vitest/**", "@testing-library/**", "jsdom", "msw"],
+      "groupName": "test tooling"
+    },
+    {
+      "matchPackageNames": ["eslint", "eslint-**", "@eslint/**", "typescript-eslint", "prettier"],
+      "groupName": "lint tooling"
+    },
+    {
+      "description": "The PDF and 3D renderers are loaded from the bundle rather than a CDN (§5.12 A08), so a bump changes shipped bytes in the viewer — the most-used surface in the product. Verify rendering by hand before merging.",
+      "matchPackageNames": ["pdfjs-dist", "three", "web-ifc**"],
+      "addLabels": ["needs-visual-check"],
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "description": "Majors are reviewed deliberately. §0.2 still requires acting on them — the dashboard is where they queue, not where they are forgotten.",
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["major-update"],
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Let a new patch settle before adopting it; a version yanked within a day should never reach a PR.",
+      "matchUpdateTypes": ["minor", "patch"],
+      "minimumReleaseAge": "3 days"
+    }
+  ]
+}
