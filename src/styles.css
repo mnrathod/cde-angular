@@ -1,0 +1,135 @@
+/* Tailwind 4: one import replaces the three v3 directives, and the theme is
+   declared here rather than in tailwind.config.js — v4 reads configuration
+   from CSS, and shipping both would leave two sources of truth for the
+   brand colours.
+
+   This file is .css, not .scss. It never used a Sass feature — no nesting,
+   no $variables, no mixins — and Sass cannot resolve `@import "tailwindcss"`,
+   so keeping the extension would have meant working around a preprocessor
+   the file did not need. */
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+
+/* v4 dropped the `content` array for automatic source detection, which does
+   not find this project's classes: almost every component keeps its template
+   in the `template:` property of a .ts file, and the scanner does not treat
+   those as markup. Without this the build succeeds and emits a stylesheet
+   with the colours but none of the spacing, border or radius utilities — the
+   login screen renders as unstyled boxes. The unit tests pass either way,
+   which is why this was caught by screenshotting the built app. */
+@source "./app/**/*.{html,ts}";
+@source "./index.html";
+
+@theme {
+  /* Brand palette. Carried over from tailwind.config.js unchanged, so the
+     utilities (bg-nav, text-accent, border-border …) keep their meaning.
+     Tailwind 4's own defaults moved to oklch; these are given as the exact
+     hex the design already used rather than converted, so nothing shifts. */
+  --color-nav:     #1e3a5f;
+  --color-accent:  #1e5fbe;
+  --color-accent2: #2563eb;
+  --color-surface: #ffffff;
+  --color-bg:      #f0f2f5;
+  --color-border:  #dde1e7;
+
+  --font-sans: 'Segoe UI', system-ui, sans-serif;
+}
+
+/* Asite CSS variables */
+:root {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface2: #f5f7fa;
+  --nav: #1e3a5f;
+  --accent: #1e5fbe;
+  --accent2: #2563eb;
+  --ok: #16a34a;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --text: #1e293b;
+  --text2: #64748b;
+  --border: #dde1e7;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --r: 4px;
+}
+
+/* In @layer base, not unlayered.
+ *
+ * Tailwind 4 emits every utility inside `@layer utilities`, and in the CSS
+ * cascade unlayered rules beat layered ones outright — specificity and source
+ * order do not enter into it. Left unlayered, this one line defeats every
+ * p-*, m-* and gap-* utility in the application: the build succeeds, the 254
+ * unit tests pass, and every screen renders with its spacing collapsed.
+ *
+ * Under Tailwind 3 the same line was harmless, because utilities were
+ * unlayered too and `.p-4` simply outranked `*` on specificity. */
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13px; }
+}
+
+/*
+ * Reduced motion (WCAG 2.2 SC 2.3.3, and 2.2.2 for anything that loops).
+ *
+ * `prefers-reduced-motion: reduce` is set by people for whom movement causes
+ * genuine harm — vestibular disorders, migraine, nausea — not by people who
+ * find animation mildly annoying. Honouring it is not a preference toggle.
+ *
+ * Animations are reduced to a single frame rather than removed with
+ * `animation: none`. A spinner with no animation still reads as "loading" to
+ * a sighted user and, more importantly, any code that waits for `animationend`
+ * still fires: removing animations outright is a well-known way to leave a
+ * dialog that never finishes opening.
+ *
+ * `!important` is deliberate and is the one place it belongs — this must win
+ * against utility classes and inline styles, because the alternative is
+ * shipping motion to somebody who asked us not to.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * Focus visibility (SC 2.4.7, and the stronger appearance requirements of
+ * 2.4.11 and 2.4.13 in WCAG 2.2).
+ *
+ * `:focus-visible` rather than `:focus`, so a pointer click does not leave a
+ * ring behind while keyboard navigation always shows one. Two colours —
+ * a dark outline with a light offset ring — so the indicator stays visible
+ * against both the light surfaces and the dark viewer chrome, rather than
+ * disappearing on whichever background it was not designed against.
+ */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.85);
+}
+
+/*
+ * Buttons rebuilt from divs keep the layout they had. Without this they
+ * inherit the browser's centred, bordered, grey-backgrounded button styling
+ * and every converted card changes shape.
+ *
+ * In @layer base for the same reason as the reset above: unlayered, this beat
+ * every text-* and font-* utility in `@layer utilities`, so `text-white
+ * font-semibold` on the sign-in button rendered as dark, regular-weight text.
+ * `font: inherit` is a shorthand, so it reset font-weight too.
+ *
+ * The :focus-visible ring and the prefers-reduced-motion block below are
+ * deliberately left unlayered — those must win against a utility, which is
+ * exactly what being unlayered buys (§1A.2).
+ */
+@layer base {
+  button {
+    font: inherit;
+    color: inherit;
+  }
+}

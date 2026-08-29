@@ -1,5 +1,15 @@
 import { Injectable } from '@angular/core';
-import * as pdfjsLib from 'pdfjs-dist';
+// The `legacy` build, not the default one. pdf.js 6's default build calls
+// Map.prototype.getOrInsertComputed in PDFPageProxy.render — a very recent
+// proposal that Chromium 141 does not have, so every page render throws
+// "getOrInsertComputed is not a function" and the viewer shows nothing.
+// Verified against Chromium 141: default build fails, legacy build renders.
+//
+// It costs about 36 KB gzipped more, on a lazily-loaded route chunk that
+// never touches the §7.1 initial-bundle budget. Cheap, against a product
+// whose §6.5/§6.6 buyers run managed browser estates that lag well behind
+// current Chrome.
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 const THUMBNAIL_DPI = 0.3;   // zoom factor for thumbnail generation
 
@@ -13,7 +23,7 @@ export class PdfEngineService {
   async ensureLoaded(): Promise<void> {
     if (this.workerConfigured) return;
     pdfjsLib.GlobalWorkerOptions.workerSrc =
-      new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).toString();
+      new URL('pdfjs-dist/legacy/build/pdf.worker.mjs', import.meta.url).toString();
     this.workerConfigured = true;
   }
 

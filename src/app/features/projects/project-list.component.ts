@@ -1,10 +1,11 @@
-import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, ChangeDetectionStrategy } from "@angular/core";
+import { RouterOutlet } from "@angular/router";
 
 @Component({
-  selector: 'app-project-list',
+  selector: "app-project-list",
   standalone: true,
   imports: [RouterOutlet],
-  template: '<router-outlet />'
+  changeDetection: ChangeDetectionStrategy.Eager,
+  template: "<router-outlet />",
 })
 export class ProjectListComponent {}
