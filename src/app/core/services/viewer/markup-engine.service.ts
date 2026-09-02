@@ -139,6 +139,25 @@ export class MarkupEngineService {
     return MarkupEngineService.VERTEX_TOOLS.includes(tool);
   }
 
+  /**
+   * Tools whose shape carries a `text` field, and which therefore have to ask
+   * the user for that text before the shape is worth adding.
+   *
+   * <p>This lives here rather than in the viewers because both of them need
+   * the same answer, and when the list was written out in each of them they
+   * disagreed: `callout` was in {@link startShape} and in {@link shapeToSvg}
+   * but in neither viewer's copy, so placing one produced an empty box that
+   * could not be typed into and could not be removed except by undo. A tool
+   * added to one list and not the other fails exactly that way — silently,
+   * and only when someone reaches for it.
+   */
+  private static readonly TEXT_TOOLS: MarkupTool[] =
+    ['text', 'stamp', 'note', 'callout'];
+
+  isTextTool(tool: MarkupTool): boolean {
+    return MarkupEngineService.TEXT_TOOLS.includes(tool);
+  }
+
   /** Vertex tools that end on a fixed click count rather than a double-click. */
   requiredVertices(tool: MarkupTool): number | null {
     return tool === 'radius' ? 2 : tool === 'calibrate' ? 2 : null;

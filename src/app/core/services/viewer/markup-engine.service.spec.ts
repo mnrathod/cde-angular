@@ -219,6 +219,47 @@ describe('MarkupEngineService', () => {
     });
   });
 
+  // ── which tools have to ask for text ──────────────────────────
+  describe('isTextTool', () => {
+
+    const ALL_TOOLS: MarkupTool[] = [
+      'pan', 'select', 'line', 'arrow', 'rect', 'circle', 'ellipse',
+      'polygon', 'polyline', 'freehand', 'cloud', 'text', 'highlight',
+      'underline', 'strikeout', 'squiggly', 'stamp', 'note', 'callout',
+      'dimension', 'area', 'radius', 'calibrate', 'redact', 'formfield'
+    ];
+
+    /**
+     * Derived from what startShape actually builds rather than from a second
+     * hand-written list, because a hand-written list is what broke: `callout`
+     * carried a `text` field and neither viewer knew, so it drew an empty box
+     * that could not be typed into. Asserting against the real shape means a
+     * new text-bearing tool cannot be added without this failing.
+     */
+    it('recognises every tool whose shape carries text', () => {
+      const carriesText = ALL_TOOLS.filter(tool => {
+        const shape = service.startShape(
+          tool, pt, defaults.pageNumber, defaults.color,
+          defaults.strokeWidth, defaults.opacity
+        );
+        return 'text' in shape;
+      });
+
+      const unrecognised = carriesText.filter(tool => !service.isTextTool(tool));
+      expect(unrecognised).toEqual([]);
+    });
+
+    it('includes callout, which was the one that was missed', () => {
+      expect(service.isTextTool('callout')).toBe(true);
+    });
+
+    it('leaves dragged shapes alone, so they still draw rather than prompting', () => {
+      for (const tool of ['rect', 'circle', 'line', 'freehand'] as MarkupTool[]) {
+        expect(service.isTextTool(tool)).toBe(false);
+      }
+    });
+  });
+
   // ── closing a click-built shape ───────────────────────────────
   describe('finishesShape', () => {
     const square = [{ x: 100, y: 100 }, { x: 200, y: 100 }, { x: 200, y: 200 }];

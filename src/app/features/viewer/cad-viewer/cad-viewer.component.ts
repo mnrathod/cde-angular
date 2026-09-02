@@ -467,7 +467,7 @@ export class CadViewerComponent implements OnChanges {
     const tool = this.state.activeTool();
     const pt   = this.markup.getSvgPoint(e, this.markupSvg.nativeElement);
 
-    if (tool === 'text' || tool === 'stamp' || tool === 'note') {
+    if (this.markup.isTextTool(tool)) {
       this.drawing = true;
       this.handleTextTool(pt, tool);
       return;
@@ -615,7 +615,8 @@ export class CadViewerComponent implements OnChanges {
 
   private handleTextTool(pt: PointerPoint, tool: MarkupTool) {
     const promptText = tool === 'stamp' ? 'Stamp text:'
-      : tool === 'note' ? 'Sticky note:' : 'Enter annotation text:';
+      : tool === 'note' ? 'Sticky note:'
+      : tool === 'callout' ? 'Callout text:' : 'Enter annotation text:';
     const text = prompt(promptText);
     if (text?.trim()) {
       const shape = this.markup.startShape(

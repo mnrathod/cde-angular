@@ -325,7 +325,7 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
 
     const pt = this.markup.getSvgPoint(e, this.svg.nativeElement);
 
-    if (tool === 'text' || tool === 'stamp' || tool === 'note') {
+    if (this.markup.isTextTool(tool)) {
       this.drawing = true;
       this.handleTextTool(pt, tool);
       return;
@@ -576,7 +576,8 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   // ── Text tool — show input prompt ───────────────────────────
   private handleTextTool(pt: PointerPoint, tool: MarkupTool) {
     const promptText = tool === 'stamp' ? 'Stamp text:'
-      : tool === 'note' ? 'Sticky note:' : 'Enter annotation text:';
+      : tool === 'note' ? 'Sticky note:'
+      : tool === 'callout' ? 'Callout text:' : 'Enter annotation text:';
     const text = prompt(promptText);
     if (text?.trim()) {
       const shape = this.markup.startShape(
