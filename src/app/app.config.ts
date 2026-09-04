@@ -17,6 +17,7 @@ import {
 } from "@angular/common/http";
 import { routes } from "./app.routes";
 import { authInterceptor } from "./core/interceptors/auth.interceptor";
+import { apiBaseUrlInterceptor } from "./core/interceptors/api-base-url.interceptor";
 import { GlobalErrorHandler } from "./core/handlers/global-error.handler";
 import { provideServiceWorker } from "@angular/service-worker";
 
@@ -28,8 +29,13 @@ export const appConfig: ApplicationConfig = {
     // Router with view transitions + input binding (Angular 17+)
     provideRouter(routes, withViewTransitions(), withComponentInputBinding()),
 
-    // HTTP with auth interceptor
-    provideHttpClient(withXhr(), withInterceptors([authInterceptor])),
+    // apiBaseUrlInterceptor runs first so every later interceptor, and
+    // anything reading the request for logging or tracing, sees the URL the
+    // request will actually be sent to rather than the relative path.
+    provideHttpClient(
+      withXhr(),
+      withInterceptors([apiBaseUrlInterceptor, authInterceptor]),
+    ),
 
     // Global error handler — catches all uncaught Angular errors.
     // useExisting (not useClass) so this resolves to the SAME root

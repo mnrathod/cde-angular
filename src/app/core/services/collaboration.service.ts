@@ -2,6 +2,7 @@ import { Injectable, inject, signal, computed, OnDestroy } from '@angular/core';
 import { Client, IMessage } from '@stomp/stompjs';
 
 import { AuthService } from './auth.service';
+import { API_BASE_URL } from '../config/api-base-url';
 
 /** Someone viewing the same document. */
 export interface Participant {
@@ -65,6 +66,7 @@ const CURSOR_THROTTLE_MS = 60;
 @Injectable()
 export class CollaborationService implements OnDestroy {
   private auth = inject(AuthService);
+  private apiBaseUrl = inject(API_BASE_URL);
 
   private client: Client | null = null;
   private documentId = 0;
@@ -215,9 +217,23 @@ export class CollaborationService implements OnDestroy {
     this.client.publish({ destination, body: JSON.stringify(body) });
   }
 
-  /** Same host and scheme as the page, upgraded to ws/wss. */
+  /**
+   * The broker, derived from the configured API origin.
+   *
+   * <p>The socket is not an `HttpClient` request, so `apiBaseUrlInterceptor`
+   * never sees it — this is the one place the base URL has to be applied by
+   * hand, and the one that would otherwise be missed. Embedded in a host
+   * application, `window.location` is the host's, so the previous version
+   * opened a socket to whoever was hosting us.
+   *
+   * <p>Falls back to the page's own origin when no base URL is set, which is
+   * the same-origin deployment and the previous behaviour exactly.
+   */
   private brokerUrl(): string {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${protocol}//${window.location.host}/ws`;
+    const origin = this.apiBaseUrl
+      ? this.apiBaseUrl.replace(/\/+$/, '')
+      : `${window.location.protocol}//${window.location.host}`;
+
+    return `${origin.replace(/^http/, 'ws')}/ws`;
   }
 }
