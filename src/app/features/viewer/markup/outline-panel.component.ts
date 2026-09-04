@@ -3,8 +3,8 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
-import { OutlineService, OutlineEntry } from '../../../core/services/viewer/outline.service';
-import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
+import { OutlineService, OutlineEntry } from '../../../../viewer-core/outline.service';
+import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 
 /** An outline entry flattened for rendering, carrying its own collapsed state. */
 interface VisibleEntry {

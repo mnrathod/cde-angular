@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { DrawingSearchService } from './drawing-search.service';
-import { definitely } from '../../../../testing/definitely';
+import { definitely } from '../testing/definitely';
 
 /**
  * Search ran only against a PDF's text layer and gave up the moment there was

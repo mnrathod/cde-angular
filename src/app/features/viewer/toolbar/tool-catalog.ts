@@ -1,4 +1,4 @@
-import { MarkupTool } from '../../../core/services/viewer/viewer-state.service';
+import { MarkupTool } from '../../../../viewer-core/viewer-state.service';
 import { IconName } from '../../../shared/components/icon.component';
 
 /** One selectable tool in the rail. */

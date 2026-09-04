@@ -6,7 +6,7 @@ import { CommonModule } from '@angular/common';
 import {
   DocumentVersionService, DocumentVersion
 } from '../../../core/services/document-version.service';
-import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
+import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 
 /**
  * The document's processing history.

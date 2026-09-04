@@ -5,7 +5,7 @@ import { FormsModule } from '@angular/forms';
 import {
   RedactionService, RedactionPreset, REDACTION_PRESETS, TextSearch, TextMatch
 } from '../../../core/services/redaction.service';
-import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
+import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 import { problemDetail } from '../../../core/handlers/problem-detail';
 
 /**

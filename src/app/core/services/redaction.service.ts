@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { RedactionRegion } from './viewer/viewer-state.service';
+import { RedactionRegion } from '../../../viewer-core/viewer-state.service';
 import { ProcessingResult } from './document-version.service';
 
 /**

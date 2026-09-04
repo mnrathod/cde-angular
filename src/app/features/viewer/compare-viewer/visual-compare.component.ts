@@ -6,7 +6,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { PdfEngineService } from '../../../core/services/viewer/pdf-engine.service';
+import { PdfEngineService } from '../../../../viewer-core/pdf-engine.service';
 import { DocumentService } from '../../../core/services/document.service';
 import { Document } from '../../../core/models';
 

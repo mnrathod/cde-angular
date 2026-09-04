@@ -3,8 +3,8 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, forkJoin, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { Annotation, AnnotationReply, AnnotationRequest, AnnotationType } from '../../models';
-import { ShapeData } from './viewer-state.service';
-import { MarkupEngineService } from './markup-engine.service';
+import { ShapeData } from '../../../../viewer-core/viewer-state.service';
+import { MarkupEngineService } from '../../../../viewer-core/markup-engine.service';
 
 @Injectable({ providedIn: 'root' })
 export class AnnotationService {

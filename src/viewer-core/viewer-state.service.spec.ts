@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { ViewerStateService, ShapeData } from './viewer-state.service';
-import { definitely } from '../../../../testing/definitely';
+import { definitely } from '../testing/definitely';
 
 const makeShape = (overrides: Partial<ShapeData> = {}): ShapeData => ({
   id: `s-${Math.random()}`, tool: 'rect', pageNumber: 1,

@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { MarkupEngineService } from './markup-engine.service';
 import { ShapeData, MarkupTool } from './viewer-state.service';
-import { definitely } from '../../../../testing/definitely';
+import { definitely } from '../testing/definitely';
 
 describe('MarkupEngineService', () => {
   let service: MarkupEngineService;

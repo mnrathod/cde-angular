@@ -1,5 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { Annotation, AnnotationType, ViewerData } from '../../models';
+import { Annotation, AnnotationType, ViewerData } from './models';
 import { MeasurementScale, UNCALIBRATED } from './measurement.service';
 import { DrawingTextItem } from './drawing-search.service';
 

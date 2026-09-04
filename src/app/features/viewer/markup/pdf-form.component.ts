@@ -6,7 +6,7 @@ import {
   FormBuilder, FormGroup, FormControl, Validators, ReactiveFormsModule, FormsModule
 } from '@angular/forms';
 import { PdfFormService, PdfFormField } from '../../../core/services/pdf-form.service';
-import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
+import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 import { problemDetail } from '../../../core/handlers/problem-detail';
 
 /**

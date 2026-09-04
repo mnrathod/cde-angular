@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 
 import { OutlineService } from './outline.service';
-import { definitely } from '../../../../testing/definitely';
+import { definitely } from '../testing/definitely';
 
 /**
  * A PDF is untrusted input: its bookmarks can point nowhere and its links can

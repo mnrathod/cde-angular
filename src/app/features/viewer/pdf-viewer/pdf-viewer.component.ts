@@ -3,8 +3,8 @@ import {
   untracked, ElementRef, ViewChild, ChangeDetectionStrategy
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
-import { PdfEngineService } from '../../../core/services/viewer/pdf-engine.service';
+import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
+import { PdfEngineService } from '../../../../viewer-core/pdf-engine.service';
 import { AnnotationService } from '../../../core/services/viewer/annotation.service';
 import { PdfPageComponent } from './pdf-page.component';
 

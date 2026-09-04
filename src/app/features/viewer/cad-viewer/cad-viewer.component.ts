@@ -5,10 +5,10 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
-import { MarkupEngineService, PointerPoint } from '../../../core/services/viewer/markup-engine.service';
-import { ViewerStateService, ShapeData, MarkupTool } from '../../../core/services/viewer/viewer-state.service';
-import { MeasurementService } from '../../../core/services/viewer/measurement.service';
-import { DrawingSearchService } from '../../../core/services/viewer/drawing-search.service';
+import { MarkupEngineService, PointerPoint } from '../../../../viewer-core/markup-engine.service';
+import { ViewerStateService, ShapeData, MarkupTool } from '../../../../viewer-core/viewer-state.service';
+import { MeasurementService } from '../../../../viewer-core/measurement.service';
+import { DrawingSearchService } from '../../../../viewer-core/drawing-search.service';
 
 export interface CadLayer {
   name:    string;

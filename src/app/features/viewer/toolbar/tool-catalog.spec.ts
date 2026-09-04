@@ -1,4 +1,4 @@
-import { MarkupTool } from '../../../core/services/viewer/viewer-state.service';
+import { MarkupTool } from '../../../../viewer-core/viewer-state.service';
 import { IconComponent } from '../../../shared/components/icon.component';
 import {
   TOOL_SECTIONS, allTools, toolForKey, MEASUREMENT_TOOLS, usesStrokeStyle

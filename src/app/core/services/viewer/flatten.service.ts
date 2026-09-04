@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ShapeData } from './viewer-state.service';
+import { ShapeData } from '../../../../viewer-core/viewer-state.service';
 import { ProcessingResult } from '../document-version.service';
 
 export interface FlattenRequest {

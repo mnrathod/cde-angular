@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ProcessingResult } from './document-version.service';
-import { FormFieldDraft } from './viewer/viewer-state.service';
+import { FormFieldDraft } from '../../../viewer-core/viewer-state.service';
 
 /** Reply from placing or removing form fields. */
 export interface FormChangeResult {

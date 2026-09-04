@@ -1,8 +1,8 @@
 import { Component, inject, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ViewerStateService, SidebarTab, SearchResult } from '../../../core/services/viewer/viewer-state.service';
-import { DrawingMatch } from '../../../core/services/viewer/drawing-search.service';
+import { ViewerStateService, SidebarTab, SearchResult } from '../../../../viewer-core/viewer-state.service';
+import { DrawingMatch } from '../../../../viewer-core/drawing-search.service';
 import { IconComponent, IconName } from '../../../shared/components/icon.component';
 import { AnnotationService } from '../../../core/services/viewer/annotation.service';
 import { AnnotationThreadComponent } from '../markup/annotation-thread.component';

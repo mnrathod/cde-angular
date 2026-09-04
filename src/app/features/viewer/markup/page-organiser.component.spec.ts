@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { CdkDragDrop } from '@angular/cdk/drag-drop';
 
 import { PageOrganiserComponent, DraftPage } from './page-organiser.component';
-import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
+import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 import { definitely } from '../../../../testing/definitely';
 
 /**

@@ -7,7 +7,7 @@ import { RedactionService } from './redaction.service';
 import { OcrService } from './ocr.service';
 import { PdfFormService } from './pdf-form.service';
 import { FlattenService } from './viewer/flatten.service';
-import { RedactionRegion } from './viewer/viewer-state.service';
+import { RedactionRegion } from '../../../viewer-core/viewer-state.service';
 
 describe('DocumentVersionService', () => {
   let service: DocumentVersionService;

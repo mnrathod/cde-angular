@@ -7,8 +7,8 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
-import { ViewerStateService } from '../../core/services/viewer/viewer-state.service';
-import { PdfEngineService } from '../../core/services/viewer/pdf-engine.service';
+import { ViewerStateService } from '../../../viewer-core/viewer-state.service';
+import { PdfEngineService } from '../../../viewer-core/pdf-engine.service';
 import { AnnotationService } from '../../core/services/viewer/annotation.service';
 import { ViewerService } from '../../core/services/viewer.service';
 import { DocumentService } from '../../core/services/document.service';
@@ -23,7 +23,7 @@ import { CadViewerComponent } from './cad-viewer/cad-viewer.component';
 import { PdfPageComponent } from './pdf-viewer/pdf-page.component';
 import { ViewerData } from '../../core/models';
 import { CollaborationService, CollaborationEvent } from '../../core/services/collaboration.service';
-import { DrawingSearchService } from '../../core/services/viewer/drawing-search.service';
+import { DrawingSearchService } from '../../../viewer-core/drawing-search.service';
 
 @Component({
   selector: 'app-viewer-shell',
@@ -371,7 +371,7 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
     if (!pdfDoc) { window.print(); return; }
 
     // Import markup engine dynamically to avoid circular dep
-    const { MarkupEngineService } = await import('../../core/services/viewer/markup-engine.service');
+    const { MarkupEngineService } = await import('../../../viewer-core/markup-engine.service');
     const markupEngine = new MarkupEngineService();
 
     await this.pdfEngine.printWithAnnotations(

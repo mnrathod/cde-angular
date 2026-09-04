@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 
 import { RedactionService, REDACTION_PRESETS, TextSearchResult } from './redaction.service';
-import { RedactionRegion } from './viewer/viewer-state.service';
+import { RedactionRegion } from '../../../viewer-core/viewer-state.service';
 import { definitely } from '../../../testing/definitely';
 
 describe('RedactionService', () => {

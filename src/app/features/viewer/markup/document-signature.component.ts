@@ -2,7 +2,7 @@ import { Component, Input, signal, inject, OnInit, ChangeDetectionStrategy } fro
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SignatureService, SignatureRecord, SignRequest } from '../../../core/services/signature.service';
-import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
+import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 
 @Component({
   selector: 'app-document-signature',

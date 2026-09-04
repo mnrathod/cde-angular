@@ -52,21 +52,8 @@ export interface Document {
 }
 
 // ── Annotation ──────────────────────────────────────────────────
-export type AnnotationType   = 'COMMENT' | 'MARKUP' | 'DIMENSION' | 'CLOUD' | 'ARROW' | 'STAMP' | 'HIGHLIGHT'
-                              | 'UNDERLINE' | 'STRIKEOUT' | 'SQUIGGLY';
-export type AnnotationStatus = 'OPEN' | 'RESOLVED' | 'CLOSED';
-
-export interface Annotation {
-  id:          number;
-  documentId:  number;
-  authorName:  string;
-  type:        AnnotationType;
-  shapeData:   string;
-  comment:     string;
-  status:      AnnotationStatus;
-  pageNumber:  number;
-  createdAt:   string;
-}
+import type { AnnotationType, Annotation } from '../../../viewer-core/models';
+export type { AnnotationType, AnnotationStatus, Annotation } from '../../../viewer-core/models';
 
 export interface AnnotationRequest {
   documentId: number;
@@ -77,36 +64,7 @@ export interface AnnotationRequest {
 }
 
 // ── Viewer ──────────────────────────────────────────────────────
-export type ViewerType = 'pdf' | 'svg' | 'image' | 'ifc3d' | 'model3d' | 'office_error' | 'dwg_binary' | 'revit_binary' | 'unsupported' | 'error';
-
-export interface ViewerData {
-  type:          ViewerType;
-  content?:      string;       // SVG content
-  name?:         string;
-  drawingNumber?: string;
-  revision?:     string;
-  renderedBy?:   string;
-  error?:        string;
-  fileName?:     string;
-  ext?:          string;
-  // IFC 3D
-  gltfData?:     IFCGltfData;
-  // DWG
-  dwgVersion?:   string;
-  odaInstalled?: boolean;
-}
-
-export interface IFCGltfData {
-  positions:      string;   // base64
-  normals:        string;
-  indices:        string;
-  colors:         string;
-  vertexCount:    number;
-  triangleCount:  number;
-  elementCount:   number;
-  schema:         string;
-  bounds:         { min: number[]; max: number[] };
-}
+export type { ViewerType, ViewerData, IFCGltfData } from '../../../viewer-core/models';
 
 // ── Compare ─────────────────────────────────────────────────────
 export interface CompareRequest {

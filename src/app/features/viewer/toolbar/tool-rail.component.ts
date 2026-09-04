@@ -1,7 +1,7 @@
 import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ViewerStateService, MarkupTool } from '../../../core/services/viewer/viewer-state.service';
-import { MarkupEngineService } from '../../../core/services/viewer/markup-engine.service';
+import { ViewerStateService, MarkupTool } from '../../../../viewer-core/viewer-state.service';
+import { MarkupEngineService } from '../../../../viewer-core/markup-engine.service';
 import { IconComponent } from '../../../shared/components/icon.component';
 import { TOOL_SECTIONS, Tool } from './tool-catalog';
 

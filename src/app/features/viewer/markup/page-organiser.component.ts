@@ -6,7 +6,7 @@ import { CdkDropList, CdkDrag, CdkDragHandle, CdkDragDrop, moveItemInArray } fro
 
 import { PageService } from '../../../core/services/page.service';
 import { DocumentService } from '../../../core/services/document.service';
-import { ViewerStateService } from '../../../core/services/viewer/viewer-state.service';
+import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 import { Document } from '../../../core/models';
 import { problemDetail } from '../../../core/handlers/problem-detail';
 

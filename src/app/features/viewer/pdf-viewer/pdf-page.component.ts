@@ -4,10 +4,10 @@ import {
   ElementRef, ViewChild, ChangeDetectionStrategy, HostListener
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { PdfEngineService } from '../../../core/services/viewer/pdf-engine.service';
-import { MarkupEngineService, PointerPoint } from '../../../core/services/viewer/markup-engine.service';
-import { ViewerStateService, ShapeData, MarkupTool } from '../../../core/services/viewer/viewer-state.service';
-import { MeasurementService } from '../../../core/services/viewer/measurement.service';
+import { PdfEngineService } from '../../../../viewer-core/pdf-engine.service';
+import { MarkupEngineService, PointerPoint } from '../../../../viewer-core/markup-engine.service';
+import { ViewerStateService, ShapeData, MarkupTool } from '../../../../viewer-core/viewer-state.service';
+import { MeasurementService } from '../../../../viewer-core/measurement.service';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CollaborationService } from '../../../core/services/collaboration.service';
 import { RemoteCursorsComponent } from '../markup/remote-cursors.component';

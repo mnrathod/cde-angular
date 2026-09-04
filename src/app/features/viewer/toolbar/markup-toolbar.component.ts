@@ -4,15 +4,15 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ViewerStateService, MarkupTool } from '../../../core/services/viewer/viewer-state.service';
+import { ViewerStateService, MarkupTool } from '../../../../viewer-core/viewer-state.service';
 import { FlattenService } from '../../../core/services/viewer/flatten.service';
 import { AnnotationService } from '../../../core/services/viewer/annotation.service';
 import { RedactionService } from '../../../core/services/redaction.service';
 import { OcrService } from '../../../core/services/ocr.service';
 import {
   MeasurementService, MeasurementUnit, MEASUREMENT_UNITS
-} from '../../../core/services/viewer/measurement.service';
-import { MarkupEngineService } from '../../../core/services/viewer/markup-engine.service';
+} from '../../../../viewer-core/measurement.service';
+import { MarkupEngineService } from '../../../../viewer-core/markup-engine.service';
 import { IconComponent } from '../../../shared/components/icon.component';
 import {
   allTools, toolForKey, MEASUREMENT_TOOLS, usesStrokeStyle
