@@ -11,7 +11,7 @@ import {
 import { ActivatedRoute, Router } from "@angular/router";
 import { CommonModule } from "@angular/common";
 import { ViewerService } from "../../../core/services/viewer.service";
-import { IfcTreeComponent, IfcNode } from "./ifc-tree.component";
+import { IfcTreeComponent, IfcNode } from "../../../../viewer-core/ifc-tree.component";
 
 @Component({
   selector: "app-viewer3d",

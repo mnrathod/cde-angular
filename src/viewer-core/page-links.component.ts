@@ -3,8 +3,8 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
-import { OutlineService, PageLink } from '../../../../viewer-core/outline.service';
-import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
+import { OutlineService, PageLink } from './outline.service';
+import { ViewerStateService } from './viewer-state.service';
 
 /**
  * Link annotations on a page, made clickable.

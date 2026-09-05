@@ -11,7 +11,7 @@ import { MeasurementService } from '../../../../viewer-core/measurement.service'
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CollaborationService } from '../../../core/services/collaboration.service';
 import { RemoteCursorsComponent } from '../markup/remote-cursors.component';
-import { PageLinksComponent } from '../markup/page-links.component';
+import { PageLinksComponent } from '../../../../viewer-core/page-links.component';
 
 @Component({
   selector: 'app-pdf-page',

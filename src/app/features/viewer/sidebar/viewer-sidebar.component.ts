@@ -11,7 +11,7 @@ import { PdfFormComponent } from '../markup/pdf-form.component';
 import { VersionHistoryComponent } from '../markup/version-history.component';
 import { PageOrganiserComponent } from '../markup/page-organiser.component';
 import { RedactionPanelComponent } from '../markup/redaction-panel.component';
-import { OutlinePanelComponent } from '../markup/outline-panel.component';
+import { OutlinePanelComponent } from '../../../../viewer-core/outline-panel.component';
 import { Annotation } from '../../../core/models';
 
 @Component({

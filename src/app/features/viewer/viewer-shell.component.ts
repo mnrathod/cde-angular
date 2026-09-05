@@ -19,7 +19,7 @@ import { ToolRailComponent } from './toolbar/tool-rail.component';
 import { IconComponent } from '../../shared/components/icon.component';
 import { ViewerSidebarComponent } from './sidebar/viewer-sidebar.component';
 import { PdfViewerComponent } from './pdf-viewer/pdf-viewer.component';
-import { CadViewerComponent } from './cad-viewer/cad-viewer.component';
+import { CadViewerComponent } from '../../../viewer-core/cad-viewer.component';
 import { PdfPageComponent } from './pdf-viewer/pdf-page.component';
 import { ViewerData } from '../../core/models';
 import { CollaborationService, CollaborationEvent } from '../../core/services/collaboration.service';

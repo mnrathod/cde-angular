@@ -3,12 +3,18 @@
 /**
  * Whether the viewer core is still independent of the application.
  *
- * <p>ADR 12 ships the viewer as its own product. These services are the part
- * with nothing to sever — they render, measure, search and hold state without
- * knowing a backend exists — and the value of that is entirely in it staying
- * true. One `inject(AuthService)` added in a hurry turns a copy into an
- * untangling, and nothing else in the build would notice: the application
- * compiles perfectly well with the dependency pointing the wrong way.
+ * <p>ADR 12 ships the viewer as its own product. What lives here is the part
+ * with nothing to sever — services and components that render, measure,
+ * search and hold state without knowing a backend exists — and the value of
+ * that is entirely in it staying true. One `inject(AuthService)` added in a
+ * hurry turns a copy into an untangling, and nothing else in the build would
+ * notice: the application compiles perfectly well with the dependency
+ * pointing the wrong way.
+ *
+ * <p>Components are the likelier place for that to happen, because reaching
+ * for a service is the ordinary way to make one do something. The rules below
+ * do not distinguish between a service file and a component file, and they
+ * should not: the boundary is about direction, not about kind.
  *
  * <p>So it is asserted rather than intended. This is the same reasoning as
  * the backend's converter-URL check — a rule that only holds while everyone
