@@ -15,8 +15,8 @@ import { DocumentService } from '../../core/services/document.service';
 import { AuthService } from '../../core/services/auth.service';
 
 import { MarkupToolbarComponent } from './toolbar/markup-toolbar.component';
-import { ToolRailComponent } from './toolbar/tool-rail.component';
-import { IconComponent } from '../../shared/components/icon.component';
+import { ToolRailComponent } from '../../../viewer-core/tool-rail.component';
+import { IconComponent } from '../../../viewer-core/icon.component';
 import { ViewerSidebarComponent } from './sidebar/viewer-sidebar.component';
 import { PdfViewerComponent } from './pdf-viewer/pdf-viewer.component';
 import { CadViewerComponent } from '../../../viewer-core/cad-viewer.component';

@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ViewerStateService, SidebarTab, SearchResult } from '../../../../viewer-core/viewer-state.service';
 import { DrawingMatch } from '../../../../viewer-core/drawing-search.service';
-import { IconComponent, IconName } from '../../../shared/components/icon.component';
+import { IconComponent, IconName } from '../../../../viewer-core/icon.component';
 import { AnnotationService } from '../../../core/services/viewer/annotation.service';
 import { AnnotationThreadComponent } from '../markup/annotation-thread.component';
 import { DocumentSignatureComponent } from '../markup/document-signature.component';

@@ -31,7 +31,11 @@ export * from './outline.service';
 export * from './drawing-search.service';
 export * from './pdf-engine.service';
 
+export * from './icon.component';
+export * from './tool-catalog';
+
 export * from './cad-viewer.component';
 export * from './outline-panel.component';
 export * from './page-links.component';
 export * from './ifc-tree.component';
+export * from './tool-rail.component';

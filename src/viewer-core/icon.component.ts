@@ -1,6 +1,6 @@
 import { Component, Input, ChangeDetectionStrategy, computed, signal } from '@angular/core';
 
-/** Every icon this application draws. Compile-time checked at each call site. */
+/** Every icon the viewer draws. Compile-time checked at each call site. */
 export type IconName =
   // Navigation and view
   | 'pan' | 'select' | 'zoom-in' | 'zoom-out' | 'fit' | 'rotate'

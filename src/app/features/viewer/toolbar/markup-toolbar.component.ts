@@ -13,10 +13,10 @@ import {
   MeasurementService, MeasurementUnit, MEASUREMENT_UNITS
 } from '../../../../viewer-core/measurement.service';
 import { MarkupEngineService } from '../../../../viewer-core/markup-engine.service';
-import { IconComponent } from '../../../shared/components/icon.component';
+import { IconComponent } from '../../../../viewer-core/icon.component';
 import {
   allTools, toolForKey, MEASUREMENT_TOOLS, usesStrokeStyle
-} from './tool-catalog';
+} from '../../../../viewer-core/tool-catalog';
 import { problemDetail } from '../../../core/handlers/problem-detail';
 
 /**

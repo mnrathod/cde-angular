@@ -1,5 +1,5 @@
-import { MarkupTool } from '../../../../viewer-core/viewer-state.service';
-import { IconComponent } from '../../../shared/components/icon.component';
+import { MarkupTool } from './viewer-state.service';
+import { IconComponent } from './icon.component';
 import {
   TOOL_SECTIONS, allTools, toolForKey, MEASUREMENT_TOOLS, usesStrokeStyle
 } from './tool-catalog';
