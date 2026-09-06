@@ -6,7 +6,7 @@ import {
   RedactionService, RedactionPreset, REDACTION_PRESETS, TextSearch, TextMatch
 } from '../../../core/services/redaction.service';
 import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
-import { problemDetail } from '../../../core/handlers/problem-detail';
+import { problemMessage } from '../../../core/handlers/problem-detail';
 
 /**
  * Redaction: by hand, and by rule.
@@ -229,6 +229,6 @@ export class RedactionPanelComponent {
 
   private errorText(err: { status?: number; error?: { message?: string } }, fallback: string): string {
     if (err.status === 503) return 'The document conversion service is not running.';
-    return problemDetail(err, fallback);
+    return problemMessage(err, fallback);
   }
 }

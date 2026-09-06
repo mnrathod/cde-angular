@@ -7,7 +7,7 @@ import {
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { AuthService } from "../../core/services/auth.service";
-import { problemDetail } from "../../core/handlers/problem-detail";
+import { problemMessage } from "../../core/handlers/problem-detail";
 
 /**
  * Matches the backend's `@Size(min = 12)` on RegisterRequest.password, and the
@@ -268,7 +268,7 @@ export class RegisterFormComponent {
         error: (err: unknown) => {
           this.loading.set(false);
           this.failed.emit(
-            problemDetail(
+            problemMessage(
               err,
               "Could not create the account. Please try again.",
             ),

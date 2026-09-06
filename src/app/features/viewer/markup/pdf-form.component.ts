@@ -7,7 +7,7 @@ import {
 } from '@angular/forms';
 import { PdfFormService, PdfFormField } from '../../../core/services/pdf-form.service';
 import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
-import { problemDetail } from '../../../core/handlers/problem-detail';
+import { problemMessage } from '../../../core/handlers/problem-detail';
 
 /**
  * Renders a PDF's AcroForm fields as an editable form and writes the values
@@ -330,7 +330,7 @@ export class PdfFormComponent implements OnInit {
         this.designFailed.set(true);
         // The server names the offending field, which is more use than a
         // generic rejection when twenty boxes have been placed.
-        this.designMessage.set(problemDetail(err, 'The fields could not be added.'));
+        this.designMessage.set(problemMessage(err, 'The fields could not be added.'));
       }
     });
   }
@@ -366,7 +366,7 @@ export class PdfFormComponent implements OnInit {
         this.statusIsError.set(true);
         this.statusMessage.set(err.status === 503
           ? 'The document converter service is not running.'
-          : problemDetail(err, 'Filling the form failed.'));
+          : problemMessage(err, 'Filling the form failed.'));
       }
     });
   }

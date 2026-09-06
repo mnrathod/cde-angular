@@ -8,7 +8,7 @@ import { PageService } from '../../../core/services/page.service';
 import { DocumentService } from '../../../core/services/document.service';
 import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 import { Document } from '../../../core/models';
-import { problemDetail } from '../../../core/handlers/problem-detail';
+import { problemMessage } from '../../../core/handlers/problem-detail';
 
 /**
  * One page of the layout being edited.
@@ -463,6 +463,6 @@ export class PageOrganiserComponent {
 
   private errorText(err: { status?: number; error?: { message?: string } }, fallback: string): string {
     if (err.status === 503) return 'The document conversion service is not running.';
-    return problemDetail(err, fallback);
+    return problemMessage(err, fallback);
   }
 }

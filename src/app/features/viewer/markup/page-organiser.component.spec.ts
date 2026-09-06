@@ -266,7 +266,13 @@ describe('PageOrganiserComponent', () => {
                { status: 422, statusText: 'Unprocessable Entity' });
 
       expect(organiser.messageIsError()).toBe(true);
-      expect(organiser.message()).toBe('A document must keep at least one page.');
+      // The reference is appended now: §1.4 requires a correlation identifier
+      // the user can quote to support, and this is the only place they see
+      // one. The server's sentence still leads — it is what tells them what to
+      // do, and the identifier is only useful once they have given up doing it
+      // themselves.
+      expect(organiser.message()).toBe(
+        'A document must keep at least one page. Reference 4f8a1c2e9b7d6a5f3e2d1c0b9a8f7e6d.');
       expect(sourceOrder()).toEqual([2, 3]);
       expect(organiser.working()).toBe(false);
     });

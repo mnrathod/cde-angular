@@ -12,7 +12,7 @@ import { CompareService } from "../../core/services/compare.service";
 import { DocumentService } from "../../core/services/document.service";
 import { ProjectService } from "../../core/services/project.service";
 import { Document, CompareResult, ChangeItem } from "../../core/models";
-import { problemDetail } from "../../core/handlers/problem-detail";
+import { problemMessage } from "../../core/handlers/problem-detail";
 
 @Component({
   selector: "app-compare",
@@ -492,7 +492,7 @@ export class CompareComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.aiText.set(
-          problemDetail(
+          problemMessage(
             err,
             "The summary could not be produced. The comparison itself is unaffected.",
           ),

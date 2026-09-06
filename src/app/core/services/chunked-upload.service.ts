@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpEventType, HttpRequest } from '@angular/common/http';
 import { Observable, from, concatMap, tap, catchError, throwError } from 'rxjs';
-import { problemDetail } from '../handlers/problem-detail';
+import { problemMessage } from '../handlers/problem-detail';
 
 export interface UploadProgress {
   fileName:   string;
@@ -70,7 +70,7 @@ export class ChunkedUploadService {
           // for /api/documents/upload: 422" — which tells the user nothing
           // about the limit they hit.
           this.setProgress(file.name, { status: 'error',
-            message: problemDetail(err, 'The upload could not be completed.') });
+            message: problemMessage(err, 'The upload could not be completed.') });
           observer.error(err);
         }
       });
@@ -142,7 +142,7 @@ export class ChunkedUploadService {
         // a chunk over the limit, a file past the maximum — and that sentence
         // is what the user needs.
         this.setProgress(file.name, { status: 'error',
-          message: problemDetail(err, 'The upload could not be completed.') });
+          message: problemMessage(err, 'The upload could not be completed.') });
         return throwError(() => err);
       })
     );

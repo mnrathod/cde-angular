@@ -108,6 +108,21 @@ describe('problemMessage', () => {
       .toBe('You do not have permission to perform this action.');
   });
 
+  it('prefers what the server said about a refusal over the generic sentence', () => {
+    // A 403 is not always "you lack the permission" — registration being
+    // invitation-only is a 403 the server explains precisely. Answering with
+    // the canned line would discard the one useful sentence, which is the
+    // fault this function exists to fix.
+    expect(problemMessage({
+      status: 403,
+      error: {
+        title: 'Registration closed',
+        detail: 'This organisation is invitation-only. Ask an administrator for an invitation.'
+      }
+    }, 'Could not create the account.'))
+      .toBe('This organisation is invitation-only. Ask an administrator for an invitation.');
+  });
+
   it('quotes the reference when the server sent one', () => {
     expect(problemMessage({
       status: 422,
