@@ -6,6 +6,7 @@ import { CommonModule } from '@angular/common';
 import {
   DocumentVersionService, DocumentVersion
 } from '../../../core/services/document-version.service';
+import { problemMessage } from '../../../core/handlers/problem-detail';
 import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 
 /**
@@ -109,8 +110,8 @@ export class VersionHistoryComponent {
         this.versions.set(versions);
         this.loading.set(false);
       },
-      error: () => {
-        this.error.set('Could not load version history.');
+      error: (err: unknown) => {
+        this.error.set(problemMessage(err, 'Could not load version history.'));
         this.loading.set(false);
       }
     });

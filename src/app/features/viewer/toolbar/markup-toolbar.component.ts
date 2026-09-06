@@ -17,7 +17,7 @@ import { IconComponent } from '../../../../viewer-core/icon.component';
 import {
   allTools, toolForKey, MEASUREMENT_TOOLS, usesStrokeStyle
 } from '../../../../viewer-core/tool-catalog';
-import { problemDetail } from '../../../core/handlers/problem-detail';
+import { problemMessage } from '../../../core/handlers/problem-detail';
 
 /**
  * The command bar above the document, and the context bar beneath it.
@@ -422,11 +422,15 @@ export class MarkupToolbarComponent {
   /**
    * Server error text is authored by the backend for display; anything else
    * gets a generic line naming the likely cause rather than the exception.
+   *
+   * <p>`${action} failed.` is reached only when the response carried no
+   * problem document at all, so it must not be the answer for a request that
+   * never arrived — see `problemMessage`, which separates that case out.
    */
   private failureMessage(
     err: { status?: number; error?: { message?: string } }, action: string): string {
     if (err.status === 503) return `${action} failed — the document converter service is not running.`;
-    return problemDetail(err, `${action} failed.`);
+    return problemMessage(err, `${action} failed.`);
   }
 
   // ── Scale calibration ────────────────────────────────────────

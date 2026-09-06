@@ -1,4 +1,4 @@
-import { problemDetail, problemTraceId } from './problem-detail';
+import { problemDetail, problemTraceId, problemMessage } from './problem-detail';
 
 /**
  * The API returns RFC 9457 problem documents, where the readable text is
@@ -73,5 +73,69 @@ describe('problemDetail', () => {
       }
     }, 'Could not create the account.'))
       .toBe('That username is already in use. Choose another.');
+  });
+});
+
+/**
+ * Two failures reported from a running instance — "OCR failed." and "Could not
+ * load version history." — were both the caller's own fallback, which is what
+ * these render whenever the response carries no problem document. Version
+ * history is a plain database read and OCR needs the converter, so the two
+ * cannot share a cause inside the features they name; the fallback was
+ * describing the feature the user pressed rather than what actually happened.
+ *
+ * These pin the cases where naming the feature is a lie.
+ */
+describe('problemMessage', () => {
+
+  const problem = (body: unknown) => ({ error: body });
+
+  it('says the server was unreachable rather than blaming the feature', () => {
+    // status 0 is HttpClient's report that the request never arrived. Rendering
+    // "OCR failed." here sends the reader to look at OCR, which was never asked
+    // to do anything.
+    expect(problemMessage({ status: 0, error: null }, 'OCR failed.'))
+      .toBe('Cannot connect to server. Check your network connection.');
+  });
+
+  it('says the session expired rather than blaming the feature', () => {
+    expect(problemMessage({ status: 401, error: null }, 'Could not load version history.'))
+      .toBe('Your session has expired. Please sign in again.');
+  });
+
+  it('says the permission is missing rather than blaming the feature', () => {
+    expect(problemMessage({ status: 403, error: null }, 'OCR failed.'))
+      .toBe('You do not have permission to perform this action.');
+  });
+
+  it('quotes the reference when the server sent one', () => {
+    expect(problemMessage({
+      status: 422,
+      error: {
+        title: 'Validation failed',
+        detail: 'The document has no page 4.',
+        traceId: '7c1d9f0a3b2e5d4c6a8f1e0d9c7b5a3f'
+      }
+    }, 'Pages could not be changed.'))
+      .toBe('The document has no page 4. Reference 7c1d9f0a3b2e5d4c6a8f1e0d9c7b5a3f.');
+  });
+
+  it('offers no reference when the server sent none', () => {
+    // An invented or empty reference wastes a support search.
+    expect(problemMessage({ status: 409, error: { detail: 'Already signed.' } },
+                          'Signing failed.'))
+      .toBe('Already signed.');
+  });
+
+  it('still falls back when a 500 carries no problem document', () => {
+    // The fallback is not wrong here — the request reached the feature and the
+    // feature failed. It is only wrong for the statuses above.
+    expect(problemMessage({ status: 500, error: null }, 'OCR failed.'))
+      .toBe('OCR failed.');
+  });
+
+  it('survives a null or undefined error', () => {
+    expect(problemMessage(null, 'OCR failed.')).toBe('OCR failed.');
+    expect(problemMessage(undefined, 'OCR failed.')).toBe('OCR failed.');
   });
 });
