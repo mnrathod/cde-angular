@@ -111,6 +111,29 @@
           }
         }
       }
+    },
+    "viewer-core": {
+      "projectType": "library",
+      "root": "src/viewer-core",
+      "sourceRoot": "src/viewer-core",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:ng-packagr",
+          "options": {
+            "project": "src/viewer-core/ng-package.json"
+          },
+          "configurations": {
+            "production": {
+              "tsConfig": "src/viewer-core/tsconfig.lib.json"
+            },
+            "development": {
+              "tsConfig": "src/viewer-core/tsconfig.lib.json"
+            }
+          },
+          "defaultConfiguration": "production"
+        }
+      }
     }
   }
 }

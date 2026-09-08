@@ -1,0 +1,17 @@
+{
+  "name": "@cde/viewer-core",
+  "version": "0.1.0",
+  "description": "Server-independent rendering core of the CDE document viewer: PDF and CAD rendering, markup, measurement, outline navigation and drawing search. Knows no backend exists.",
+  "license": "UNLICENSED",
+  "sideEffects": false,
+  "peerDependencies": {
+    "@angular/common": "^22.1.4",
+    "@angular/core": "^22.1.4",
+    "@angular/forms": "^22.1.4",
+    "@angular/platform-browser": "^22.1.4",
+    "pdfjs-dist": "^6.2.108"
+  },
+  "dependencies": {
+    "tslib": "^2.8.1"
+  }
+}

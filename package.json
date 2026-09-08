@@ -39,6 +39,7 @@
     "@testing-library/angular": "^19.4.2",
     "jasmine-marbles": "^0.9.2",
     "jsdom": "^30.0.1",
+    "ng-packagr": "^22.1.1",
     "postcss": "^8.5.26",
     "prettier": "^3.9.6",
     "tailwindcss": "^4.3.3",

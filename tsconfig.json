@@ -21,7 +21,27 @@
     "experimentalDecorators": true,
     "importHelpers": true,
     "target": "ES2022",
-    "module": "preserve"
+    "module": "preserve",
+    /*
+     * The viewer library resolves to its SOURCE, not to dist/. Mapping to the
+     * built output is the usual Angular monorepo pattern, but it makes a fresh
+     * clone fail to typecheck until someone has run a library build, and the
+     * failure names a missing module rather than a missing step. Pointing at
+     * the source keeps one build and one truth; ng-packagr reads the same
+     * files when it produces the publishable package.
+     *
+     * The application may import EITHER this specifier or the relative path —
+     * both reach the same files. The boundary that matters is the other
+     * direction, and viewer-core.boundary.spec.ts is what enforces it.
+     *
+     * No `baseUrl`: it is deprecated in TypeScript 6 and stops working in 7,
+     * and §0.2 rules out building on something already on that path. Modern
+     * `paths` entries resolve relative to this file, which is what the leading
+     * `./` means here.
+     */
+    "paths": {
+      "@cde/viewer-core": ["./src/viewer-core/index.ts"]
+    }
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,
