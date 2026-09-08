@@ -5,9 +5,21 @@ Regenerates `docs/Viewer-Product-Technical-Architecture.docx` and
 
 ```bash
 cd tools/docx
-npm init -y && npm install docx     # see "The dependency" below
+npm init -y && npm install docx            # see "The dependency" below
 node arch.js && node guide.js
-mv *.docx ../../docs/
+
+# PDF/UA export — the same standard §1A.4 imposes on the product's own exports
+OPTS='pdf:writer_pdf_Export:{"UseTaggedPDF":{"type":"boolean","value":"true"},"PDFUACompliance":{"type":"boolean","value":"true"}}'
+soffice --headless --convert-to "$OPTS" --outdir . *.docx
+
+mv *.docx *.pdf ../../docs/
+```
+
+Verify the export is actually tagged rather than assuming the flags took:
+
+```bash
+pdfinfo ../../docs/Viewer-Product-Integration-Guide.pdf | grep -E 'Tagged|Pages'
+# Tagged: yes
 ```
 
 ## Why this exists
@@ -74,10 +86,37 @@ print({b: text.count(b) for b in ('**', '`', '\\n')})   # all should be 0
 PY
 ```
 
-**LibreOffice cannot render anything in the dev container.** `soffice` fails
-with "source file could not be loaded" on a plain `.txt`, so the usual
-convert-to-PDF-and-look verification is unavailable there. What can still be
-checked: the skill's XSD validator
-(`scripts/office/validate.py`, needs `defusedxml` and `lxml`), the archive
-parts, and the text extraction above. **Layout has not been visually verified**
-— if a column is cramped or a code block wraps badly, that is why.
+**Bold in a table cell must be set on the run, not around it.** `cell()` passes
+`bold` down into `runs()`. An earlier version rewrapped the returned runs —
+`new TextRun({ ...run, bold: true })` — which spreads a *class instance* and so
+yields its internals rather than `{text, font, size}`. Every bold cell rendered
+**completely empty**: all six table headers, and the one cell in Figure 1 that
+says the ingress is BUILT. The XML checks above did not catch it, because the
+runs existed and were well-formed; they simply had no text. Only a rendered
+page showed it.
+
+That is the argument for the render step below being mandatory rather than
+nice-to-have.
+
+## Rendering, and the trap in this container
+
+`soffice` ships here with **only `libreoffice-core` and `libreoffice-common`** —
+no application modules. With no `writer.xcd` there is no Writer, so LibreOffice
+cannot load a `.docx`, and cannot load a plain `.txt` either. The symptom is a
+flat `Error: source file could not be loaded` for every input, which reads like
+a corrupt file and is actually a missing package:
+
+```bash
+apt-get install -y libreoffice-writer poppler-utils
+```
+
+The converter service's own Dockerfile installs what it needs; this is a gap in
+the development container only. Worth knowing because the error blames your
+document.
+
+With that installed, look at the output rather than trusting it:
+
+```bash
+pdftoppm -jpeg -r 80 ../../docs/Viewer-Product-Technical-Architecture.pdf page
+# then open page-1.jpg … page-9.jpg
+```

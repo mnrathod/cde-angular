@@ -128,7 +128,7 @@ const children = [
     '  "detail": "The source URL resolves to a private address (10.0.4.19).",',
     '  "traceId": "4f8a1c2e9b7d6a5f3e2d1c0b9a8f7e6d" }'
   ]),
-  table([2900, 900, 5946], [
+  table([2800, 1200, 5746], [
     { header: true, cells: [{ t: 'Endpoint' }, { t: 'Status', align: AlignmentType.CENTER }, { t: 'Means' }] },
     { cells: [{ t: 'POST /api/conversions' }, { t: '202', align: AlignmentType.CENTER, color: TEAL, bold: true },
       { t: 'Accepted. The Location header names the job to poll — use it rather than assembling the URL yourself' }] },
@@ -148,19 +148,30 @@ const children = [
   + 'only thing that ties your failure to our logs.'),
 
   h1('4.  Formats'),
-  table([2000, 3400, 4346], [
-    { header: true, cells: [{ t: 'Input' }, { t: 'Route' }, { t: 'Notes' }] },
-    { cells: [{ t: 'PDF' }, { t: 'Passed through; rendered by pdfjs-dist' },
+  table([1500, 1700, 2900, 3646], [
+    { header: true, cells: [{ t: 'Input' }, { t: 'Status' }, { t: 'Route' }, { t: 'Notes' }] },
+    { cells: [{ t: 'PDF' }, { t: 'Supported', color: TEAL, bold: true },
+              { t: 'Passed through; pdfjs-dist' },
               { t: 'OCR available for scanned pages, adds an invisible text layer' }] },
-    { cells: [{ t: 'DXF' }, { t: 'ezdxf → SVG (viewer) or PDF (export)' },
-              { t: 'Text is real and searchable in both' }] },
-    { cells: [{ t: 'DWG', bold: true }, { t: '→ DXF, then as above', fill: RED_BG },
-              { t: 'See the warning below', fill: RED_BG, color: RED, bold: true }] },
-    { cells: [{ t: 'Office' }, { t: 'LibreOffice → PDF' }, { t: 'docx, xlsx, pptx' }] },
-    { cells: [{ t: 'IFC' }, { t: 'Geometry + hierarchy tree' },
-              { t: 'Tree is the primary interface, not a fallback' }] }
+    { cells: [{ t: 'DXF' }, { t: 'Supported', color: TEAL, bold: true },
+              { t: 'ezdxf → SVG or PDF' }, { t: 'Text is real and searchable in both' }] },
+    { cells: [{ t: 'Office' }, { t: 'Supported', color: TEAL, bold: true },
+              { t: 'LibreOffice → PDF' }, { t: 'docx, xlsx, pptx' }] },
+    { cells: [{ t: 'IFC' }, { t: 'Supported', color: TEAL, bold: true },
+              { t: 'Geometry + hierarchy tree' },
+              { t: 'Tree is the primary interface, not a fallback' }] },
+    { cells: [{ t: 'DWG', bold: true }, { t: 'Hosted only', color: RED, bold: true, fill: RED_BG },
+              { t: '→ DXF, then as above', fill: RED_BG },
+              { t: 'Works in our hosted service. NOT shippable on-premises — see below', fill: RED_BG }] },
+    { cells: [{ t: 'DWF', bold: true }, { t: 'Not supported', color: RED, bold: true, fill: RED_BG },
+              { t: '—', fill: RED_BG },
+              { t: 'No route exists. Autodesk’s Design Web Format is not read by any component of the pipeline', fill: RED_BG }] },
+    { cells: [{ t: 'RVT / RFA', bold: true }, { t: 'Not supported', color: RED, bold: true, fill: RED_BG },
+              { t: 'Detected and refused', fill: RED_BG },
+              { t: 'Recognised by OLE2 magic bytes and rejected with REVIT_BINARY. Identified only so the error is clean', fill: RED_BG }] }
   ]),
-  caption('Table 2 — Supported inputs.'),
+  caption('Table 2 — What the pipeline actually accepts. Four supported, one hosted-only, two not '
+        + 'supported at all.'),
   note('**DWG has no clean licensing path for a distributed product.** The two converters have '
      + 'opposite problems: LibreDWG is GPL-3.0 and ships in our image (so distribution owes '
      + 'corresponding source we do not currently provide), and the ODA File Converter cannot be '
@@ -168,6 +179,32 @@ const children = [
      + '**assume DWG is unavailable unless your contract says otherwise** and you have obtained '
      + 'an ODA licence yourself. Tracked as ADR 13, referred to counsel, unresolved. Do not plan a '
      + 'DWG workflow on the assumption this resolves in your favour.'),
+
+  h2('4.1  Why RVT and DWF are absent, and what it would take'),
+  p('These two are named separately because they are the ones most often assumed, and because the '
+  + 'reason they are missing is not “nobody got to it yet”.'),
+  p('**RVT (and RFA) is a proprietary Autodesk binary with no open reader.** The pipeline detects '
+  + 'it by OLE2 magic bytes and refuses it deliberately, so you get a clean `REVIT_BINARY` error '
+  + 'rather than a corrupt render. Every route to supporting it is commercial.'),
+  table([3400, 6346], [
+    { header: true, cells: [{ t: 'Route' }, { t: 'What it costs' }] },
+    { cells: [{ t: 'Autodesk Platform Services (formerly Forge)' },
+      { t: 'A cloud API. It SENDS THE MODEL TO AUTODESK, which collides directly with the data-residency and sovereignty position — for a Defence or IRAP-scoped tenant it is not merely a cost question, it is prohibited', fill: RED_BG }] },
+    { cells: [{ t: 'Revit itself, plus an export plugin' },
+      { t: 'Windows hosts, a licence per seat, and a rendering farm that is not the product’s architecture' }] },
+    { cells: [{ t: 'A commercial SDK (ODA BimRv or equivalent)' },
+      { t: 'A vendor relationship and a per-deployment fee, with the same redistribution question ADR 13 is already stuck on' }] }
+  ]),
+  caption('Table 3 — The three routes to RVT, and why none is free.'),
+  note('The sovereignty collision is the important one. **The cheapest route is the one we can '
+     + 'least use**, because the tenants most likely to hold Revit models are also the ones whose '
+     + 'data must not leave the jurisdiction.'),
+  p('**DWF is unimplemented rather than refused.** It is a ZIP container holding W2D and W3D '
+  + 'streams, and reading it is ordinary engineering rather than a licence problem — but no '
+  + 'component of the pipeline knows the format today, so a DWF submission will fail as an '
+  + 'unrecognised type. If DWF matters to you, say so: it is schedulable work in a way RVT is not.'),
+  p('**If you need either, raise it as a commercial requirement, not a bug.** The answer involves '
+  + 'a vendor contract and, for RVT, a residency decision that engineering cannot take alone.'),
 
   h1('5.  Embedding — read before you scope it'),
   p('Three constraints, all currently blocking.'),
@@ -180,7 +217,7 @@ const children = [
     { cells: [{ t: 'Session', bold: true },
       { t: 'A bearer token from our own /api/auth/login, against our own user table. No cookie mode, no silent SSO, no token exchange', fill: RED_BG }] }
   ]),
-  caption('Table 3 — Why an embedded integration cannot be scoped yet.'),
+  caption('Table 4 — Why an embedded integration cannot be scoped yet.'),
   p('The only path that works today is **serving our Angular build from your own origin, behind '
   + 'the same web tier that proxies `/api`**. Same-origin needs no CORS entry, no framing '
   + 'relaxation, and no cross-origin token handling. It is also a deployment of our application '

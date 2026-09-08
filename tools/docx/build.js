@@ -39,11 +39,18 @@ function splitCode(s) {
   return parts;
 }
 
+// `opts.bold` forces bold across every emitted run — used by table headers and
+// emphasised cells. It must be applied HERE rather than by rewrapping the
+// returned TextRuns: spreading a TextRun instance ({...run}) yields its
+// internals, not its options, so the rewrapped run loses its text and the cell
+// renders empty. That defect was invisible in the XML checks and only showed
+// up on a rendered page.
 function runs(text, opts = {}) {
   const size = opts.size || 21;
   const color = opts.color || INK;
+  const force = opts.bold === true;
   const emit = (out, piece, bold) => out.push(new TextRun({
-    text: piece.text, bold, color,
+    text: piece.text, bold: bold || force, color,
     font: piece.code ? MONO : BODY,
     size: piece.code ? size - 2 : size
   }));
@@ -109,8 +116,7 @@ function cell(text, w, o = {}) {
       new Paragraph({
         alignment: o.align,
         spacing: { after: 40, line: 240 },
-        children: runs(t, { size: o.size || 19, color: o.color })
-          .map(r => o.bold ? new TextRun({ ...r, bold: true }) : r)
+        children: runs(t, { size: o.size || 19, color: o.color, bold: o.bold })
       }))
   });
 }

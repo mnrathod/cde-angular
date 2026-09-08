@@ -193,13 +193,15 @@ support — it is the only thing that ties your failure to our logs.
 
 ## 4. Formats
 
-| Input | Route | Notes |
-|---|---|---|
-| PDF | Passed through; rendered by `pdfjs-dist` | OCR available for scanned pages, adds an invisible text layer |
-| DXF | `ezdxf` → SVG (viewer) or PDF (export) | Text is real and searchable in both |
-| **DWG** | → DXF, then as above | **See the warning below** |
-| Office (docx, xlsx, pptx) | LibreOffice → PDF | |
-| IFC | Geometry + hierarchy tree | Tree is the primary interface, not a fallback |
+| Input | Status | Route | Notes |
+|---|---|---|---|
+| PDF | **Supported** | Passed through; rendered by `pdfjs-dist` | OCR available for scanned pages, adds an invisible text layer |
+| DXF | **Supported** | `ezdxf` → SVG (viewer) or PDF (export) | Text is real and searchable in both |
+| Office (docx, xlsx, pptx) | **Supported** | LibreOffice → PDF | |
+| IFC | **Supported** | Geometry + hierarchy tree | Tree is the primary interface, not a fallback |
+| DWG | **Hosted only** | → DXF, then as above | Works in our hosted service. **Not shippable on-premises** — see below |
+| DWF | **Not supported** | — | No route exists. Autodesk's Design Web Format is not read by any component of the pipeline |
+| RVT / RFA | **Not supported** | Detected and refused | Recognised by OLE2 magic bytes and rejected with `REVIT_BINARY`. It is identified only so the error is clean |
 
 > **DWG has no clean licensing path for a distributed product.** The two
 > converters have opposite problems: LibreDWG is GPL-3.0 and ships in our image
@@ -209,6 +211,36 @@ support — it is the only thing that ties your failure to our logs.
 > your contract says otherwise** and you have obtained an ODA licence yourself.
 > Tracked as ADR 13, referred to counsel, unresolved. Do not plan a DWG
 > workflow on the assumption this resolves in your favour.
+
+### 4.1  Why RVT and DWF are absent, and what it would take
+
+These two are named separately because they are the ones most often assumed,
+and because the reason they are missing is not "nobody got to it yet".
+
+**RVT (and RFA) is a proprietary Autodesk binary with no open reader.** The
+pipeline detects it by OLE2 magic bytes and refuses it deliberately, so you get
+a clean `REVIT_BINARY` error rather than a corrupt render. Every route to
+supporting it is commercial:
+
+| Route | What it costs |
+|---|---|
+| Autodesk Platform Services (formerly Forge) | A cloud API. **It sends the model to Autodesk**, which collides directly with the data-residency and sovereignty position — for a Defence or IRAP-scoped tenant it is not merely a cost question, it is prohibited |
+| Revit itself, plus an export plugin | Windows hosts, a licence per seat, and a rendering farm that is not the product's architecture |
+| A commercial SDK (ODA BimRv or equivalent) | A vendor relationship and a per-deployment fee, with the same redistribution question ADR 13 is already stuck on |
+
+The sovereignty collision is the important one. **The cheapest route is the one
+we can least use**, because the tenants most likely to hold Revit models are
+also the ones whose data must not leave the jurisdiction.
+
+**DWF is unimplemented rather than refused.** It is a ZIP container holding W2D
+and W3D streams, and reading it is ordinary engineering rather than a licence
+problem — but no component of the pipeline knows the format today, so a DWF
+submission will fail as an unrecognised type. If DWF matters to you, say so: it
+is schedulable work in a way RVT is not.
+
+**If you need either, raise it as a commercial requirement, not a bug.** The
+answer involves a vendor contract and, for RVT, a residency decision that
+engineering cannot take alone.
 
 ---
 
