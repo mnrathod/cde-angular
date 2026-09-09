@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Embed demo — a host application framing the CDE viewer</title>
+  <!--
+    An empty data URI, so the browser does not request /favicon.ico and log a
+    404. Shipping an icon instead would mean choosing a mark, and the product
+    does not have one yet — see docs/licences.md §3.1, where the placeholder
+    icons are an open finding.
+  -->
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="host.css">
+</head>
+<body>
+
+<a class="skip-link" href="#viewer-frame">Skip to the viewer</a>
+
+<header class="bar">
+  <h1>Host application <span class="subtle">(this page is not the viewer)</span></h1>
+  <p class="subtle">
+    Everything outside the framed area is the host. The frame is a different
+    origin and the two talk only by <code>postMessage</code>.
+  </p>
+</header>
+
+<main>
+  <section class="panel side" aria-labelledby="documents-heading">
+    <h2 id="documents-heading">Documents</h2>
+    <p class="hint">
+      The host mints a URL for the file it wants shown and sends it in
+      <code>host.init</code>. The viewer fetches it once.
+    </p>
+    <ul class="documents" id="documents"></ul>
+  </section>
+
+  <section class="panel viewer-panel" aria-labelledby="viewer-heading">
+    <h2 id="viewer-heading">The framed viewer</h2>
+    <div class="frame-wrap">
+      <iframe
+        id="viewer-frame"
+        title="CDE document viewer"
+        src="about:blank"
+        allow="fullscreen"></iframe>
+      <p class="frame-placeholder" id="frame-placeholder">
+        Choose a document to load the viewer.
+      </p>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="session-heading">
+    <h2 id="session-heading">Session</h2>
+    <p class="hint">
+      These claims are presentation only. The viewer never authorises anything
+      with them; the host decides when an operation is requested.
+    </p>
+
+    <div class="field">
+      <label for="display-name">Display name</label>
+      <input id="display-name" type="text" value="A. Surveyor" autocomplete="off">
+    </div>
+
+    <fieldset class="field">
+      <legend>Capabilities</legend>
+      <label class="check">
+        <input type="checkbox" id="cap-create" checked>
+        <span><code>markup:create</code> — the drawing tools render</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="cap-delete" checked>
+        <span><code>markup:delete</code> — the delete control renders</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="cap-sign">
+        <span><code>document:sign</code> — renders, then is refused</span>
+      </label>
+    </fieldset>
+
+    <button type="button" id="apply-identity" class="button">
+      Send host.setIdentity
+    </button>
+    <button type="button" id="send-anonymous" class="button secondary">
+      Send an empty identity
+    </button>
+    <p class="hint">
+      An empty identity is a legitimate read-only deployment, not a
+      misconfiguration — the controls hide and the viewer still works.
+    </p>
+  </section>
+
+  <section class="panel" aria-labelledby="commands-heading">
+    <h2 id="commands-heading">Drive the viewer</h2>
+    <div class="button-row">
+      <button type="button" class="button" data-command="goToPage" data-page="1">Page 1</button>
+      <button type="button" class="button" data-command="goToPage" data-page="3">Page 3</button>
+      <button type="button" class="button" data-command="setZoom" data-zoom="0.75">Zoom 75%</button>
+      <button type="button" class="button" data-command="setZoom" data-zoom="1.5">Zoom 150%</button>
+      <button type="button" class="button" data-command="search" data-query="FERROUS">
+        Search “FERROUS”
+      </button>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="markup-heading">
+    <h2 id="markup-heading">Markup the host has stored</h2>
+    <p class="hint">
+      The viewer forgets on unload; this is what remembers. The
+      <code>shapeData</code> column is stored as an opaque string and is never
+      parsed here.
+    </p>
+    <table class="markup-table">
+      <caption class="visually-hidden">
+        Markup received from the viewer and stored by the host
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Page</th>
+          <th scope="col">Type</th>
+          <th scope="col">Comment</th>
+          <th scope="col">Author (stamped here)</th>
+          <th scope="col">Action</th>
+        </tr>
+      </thead>
+      <tbody id="markup-rows">
+        <tr class="empty"><td colspan="5">Nothing yet. Draw on the document.</td></tr>
+      </tbody>
+    </table>
+    <button type="button" id="reload-markup" class="button secondary">
+      Send host.loadMarkup
+    </button>
+  </section>
+
+  <section class="panel wide" aria-labelledby="log-heading">
+    <h2 id="log-heading">Message log</h2>
+    <p class="hint">
+      Every message that crossed the boundary, newest last. Nothing here is a
+      credential — §3 rule 5 says a message never carries one.
+    </p>
+    <div class="log" id="log" role="log" aria-live="polite" aria-relevant="additions"></div>
+  </section>
+</main>
+
+<script type="module" src="host.js"></script>
+</body>
+</html>

@@ -119,8 +119,41 @@ taken. Removing the marker is that decision, not a cleanup.
 | Fonts | None | System font stack only. No font file bundled or fetched |
 | Interface icons | Own work | Inline SVG path data in `src/viewer-core/icon.component.ts` |
 | Application icons | **Third-party mark** | See §3.1 — blocks release |
+| Sample documents | Own work, generated | See §4.1 |
 | Stock imagery | None | — |
 | CSS frameworks | None | — |
+
+### 4.1 The demo's sample documents
+
+`demo/public/files/` holds three documents that ship with the repository and
+are served to anyone running the demo. They are **generated**, by
+`demo/tools/generate-samples.mjs`, and committed alongside the generator.
+
+Generating them is the licence position, not a convenience. A drawing, a
+specification or an IFC model taken from anywhere else arrives with a licence
+someone has to trace before a release, and construction sample data is
+particularly bad for this — models and drawings circulate widely with no clear
+provenance at all. A file produced by a script in this repository has none to
+trace.
+
+| File | Provenance | Notes |
+|---|---|---|
+| `sample-drawing.pdf` | Generated | PDF written directly by `tools/lib/pdf.mjs`. Uses only the **base-14 fonts** (Helvetica, Helvetica-Bold), which are referenced by name and not embedded, so no font licence attaches |
+| `sample-specification.docx` | Generated | Office Open XML written by hand and zipped by `tools/lib/zip.mjs`. Verified by opening in LibreOffice |
+| `sample-model.ifc` | Generated | ISO 10303-21 text. Writing a file **in** a published exchange format is implementing the format, not reproducing the specification — §17.5 forbids reproducing a standard's text, tables or code lists, and none of that is present. The entity names are the format's vocabulary, as element names are an XML schema's |
+
+Content: every name, party, location, dimension and identifier is invented
+(§14). Nothing describes a real project, organisation, person or asset, and the
+sheets say so on their face so a sample opened in front of a customer cannot be
+mistaken for a deliverable.
+
+The generator is deterministic, and `--check` fails if the committed files
+differ from what it produces — so "these are ours because a script made them"
+stays a fact that can be re-verified rather than a claim in this table.
+
+No dependency is used to produce them. The PDF, ZIP and IFC writers are ours,
+which is also why they are small and refuse anything they cannot encode
+correctly rather than degrading quietly.
 
 No asset is fetched at runtime from a CDN, enforced by
 `scripts/check-no-remote-code.mjs`. That gate exists for security, but it is

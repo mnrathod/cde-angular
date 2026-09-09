@@ -9,7 +9,11 @@
     "test": "ng test",
     "check:no-remote-code": "node scripts/check-no-remote-code.mjs",
     "attribution": "node scripts/generate-attribution.mjs",
-    "check:attribution": "node scripts/check-attribution.mjs"
+    "check:attribution": "node scripts/check-attribution.mjs",
+    "demo": "node demo/server.mjs",
+    "demo:samples": "node demo/tools/generate-samples.mjs",
+    "check:samples": "node demo/tools/generate-samples.mjs --check",
+    "test:demo": "playwright test --config demo/e2e/playwright.config.mjs"
   },
   "private": true,
   "packageManager": "npm@10.9.7",

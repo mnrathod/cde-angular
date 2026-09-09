@@ -4,6 +4,19 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./out-tsc/spec",
+    /*
+     * The demo host is plain JavaScript with no build step, and
+     * `protocol-conversation.spec.ts` runs the real viewer channel against the
+     * real host module so the two implementations are checked against each
+     * other rather than against a shared assumption. Testing a copy would
+     * verify the copy, so the actual shipped file is imported and `allowJs`
+     * is what lets it be.
+     *
+     * `checkJs` stays off: the demo is written the way an integrator writes
+     * one, and holding it to this repository's TypeScript settings would make
+     * it a worse example of that.
+     */
+    "allowJs": true,
     "types": [
       "vitest/globals"
     ]
@@ -11,6 +24,7 @@
   "include": [
     "src/**/*.d.ts",
     "src/**/*.spec.ts",
-    "src/test-setup.ts"
+    "src/test-setup.ts",
+    "demo/public/*.js"
   ]
 }

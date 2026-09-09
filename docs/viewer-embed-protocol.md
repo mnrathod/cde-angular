@@ -2,11 +2,25 @@
 
 How a host application mounts the CDE viewer and talks to it.
 
-**Status: specified, not implemented.** This is written before the code, on
-purpose — ADR 14's consequences section says the protocol is a published API
-and that the guide is where its awkwardness shows first. Finding a bad message
-shape here costs an edit; finding it after integrators have built against it
-costs a major version.
+**Status: implemented on both sides.** Written before the code, on purpose —
+ADR 14's consequences section says the protocol is a published API and that the
+guide is where its awkwardness shows first. Finding a bad message shape here
+costs an edit; finding it after integrators have built against it costs a major
+version.
+
+| Side | Where |
+|---|---|
+| Viewer | `src/app/features/embed/` — the `/embed` route, no auth guard |
+| Host | `demo/public/host-protocol.js` — a separate implementation, in plain JavaScript |
+| The two, checked against each other | `src/app/features/embed/protocol-conversation.spec.ts` |
+
+The demo host is deliberately **not** a shared client library. An integrator
+writes that file rather than importing it, so an awkward message shape is
+awkward there first. `demo/README.md` is the way in.
+
+Writing it changed one thing in this document, marked below: §5.1 is new,
+because the demo could not open two of its three sample files and the protocol
+had nothing to say about why.
 
 Implements **ADR 14** (`cde-platform`,
 `docs/adr/0014-viewer-embed-and-identity-contracts.md`). Read that first for
@@ -155,6 +169,38 @@ API's own handling of source URLs apply unchanged.
 **`document.externalId`** is yours and is opaque to us. It comes back on every
 event so you can file what the viewer emits without keeping a map. We key our
 own conversion jobs on a UUID; this is the field that lets you avoid caring.
+
+### 5.1 `mediaType` decides whether a server is involved
+
+> Added after the demo was built. The demo ships three sample files and could
+> open one of them; the protocol had nothing to say about why, which made a
+> correct refusal look like a defect.
+
+**PDF is the only format a browser renders on its own.** Everything else —
+Office, IFC, DWG, images needing derivation — is converted before the viewer
+has pages or geometry to show, by a conversion service that is part of the
+*viewer's* deployment, not yours. You still send one `document.url` and one
+`mediaType`; what changes is what happens behind the frame.
+
+| `mediaType` | What the viewer does |
+|---|---|
+| `application/pdf` | Fetches your URL from the browser and renders it. No server of ours is involved |
+| Anything else | Hands your URL to its own conversion service, which fetches it and returns something renderable |
+
+Two consequences worth knowing before you deploy:
+
+- **Your URL is dereferenced by whichever of the two fetches it.** For PDF that
+  is the user's browser, so the URL must be reachable from there and its
+  response must allow the viewer's origin to read it. For everything else it is
+  our conversion service, from our network. A URL that only works inside your
+  VPC will open PDFs and nothing else, and the failure will look like a format
+  problem.
+- **A viewer deployment with no conversion service reachable can still open
+  PDFs.** That is a legitimate deployment, not a broken one. Asked for anything
+  else it emits `viewer.error` with
+  `type: …/problems/conversion-required` — a 415 naming the format and saying
+  the conversion service is what is missing, rather than showing an empty
+  frame.
 
 ## 6. Messages
 

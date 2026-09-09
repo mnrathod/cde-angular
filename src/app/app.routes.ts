@@ -19,6 +19,19 @@ export const routes: Routes = [
     ]
   },
   {
+    /*
+     * The route a host application frames (ADR 14, docs/viewer-embed-protocol.md).
+     *
+     * No `authGuard`, deliberately and permanently: the embedded viewer holds
+     * no session and authorises nothing, so there is no identity here to
+     * guard. Adding one would put a login form inside someone else's iframe,
+     * which is both a broken integration and a phishing pattern.
+     */
+    path: 'embed',
+    loadComponent: () => import('./features/embed/embed-viewer.component')
+      .then(m => m.EmbedViewerComponent)
+  },
+  {
     path: 'viewer/:id',
     canActivate: [authGuard],
     loadComponent: () => import('./features/viewer/viewer-shell.component').then(m => m.ViewerShellComponent)

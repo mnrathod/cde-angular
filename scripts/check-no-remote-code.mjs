@@ -39,8 +39,21 @@ const CODE_HOSTS = [
   'stackpath.bootstrapcdn.com'
 ];
 
-const SOURCE_ROOT = join(process.cwd(), 'src');
-const SCANNED_EXTENSIONS = /\.(ts|html|css|scss)$/;
+/*
+ * Two roots, with their own floors.
+ *
+ * `demo/` was added when the embed demo shipped. It is a served surface with
+ * its own HTML and its own scripts, so it can acquire a CDN reference exactly
+ * like the application can — and being outside `src/` it would have been the
+ * one place this gate did not look. A per-root floor rather than a total is
+ * what makes that useful: a combined count would stay above any threshold
+ * while one root silently contributed nothing.
+ */
+const SCAN_ROOTS = [
+  { path: join(process.cwd(), 'src'), minimumFiles: 20 },
+  { path: join(process.cwd(), 'demo'), minimumFiles: 10 },
+];
+const SCANNED_EXTENSIONS = /\.(ts|js|mjs|html|css|scss)$/;
 
 function sourceFiles(directory) {
   return readdirSync(directory).flatMap(entry => {
@@ -51,18 +64,23 @@ function sourceFiles(directory) {
   });
 }
 
-const files = sourceFiles(SOURCE_ROOT);
 const failures = [];
+const files = [];
 
-// Without this, a wrong root would make every check below pass vacuously,
-// which is the worst kind of green: a gate that reports success precisely
-// because it inspected nothing.
-if (files.length < 20) {
-  failures.push(
-    `Only ${files.length} source files found under ${SOURCE_ROOT}. ` +
-    'That is too few to be right — the scan root is probably wrong, and a ' +
-    'scan that inspects nothing passes everything.'
-  );
+for (const root of SCAN_ROOTS) {
+  const found = sourceFiles(root.path);
+  files.push(...found);
+
+  // Without this, a wrong root would make every check below pass vacuously,
+  // which is the worst kind of green: a gate that reports success precisely
+  // because it inspected nothing.
+  if (found.length < root.minimumFiles) {
+    failures.push(
+      `Only ${found.length} source files found under ${root.path}. ` +
+      'That is too few to be right — the scan root is probably wrong, and a ' +
+      'scan that inspects nothing passes everything.'
+    );
+  }
 }
 
 for (const path of files) {

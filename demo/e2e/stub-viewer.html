@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <title>Stub viewer</title>
+  <link rel="icon" href="data:,">
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 16px; }
+    #state { font-weight: 600; }
+    button { min-height: 44px; padding: 8px 16px; font: inherit; }
+  </style>
+</head>
+<body>
+
+<!--
+  A stand-in for the real viewer, used only by demo/e2e/host.spec.mjs.
+
+  The host page cannot be tested in a browser without something to frame, and
+  the real viewer is an Angular build. This is the smallest page that speaks
+  enough of `cde.viewer.v1` to exercise the host: it completes the handshake,
+  emits markup on demand, and asks for an operation.
+
+  It is NOT a second implementation to check the protocol against — that is
+  `src/app/features/embed/protocol-conversation.spec.ts`, which runs the real
+  viewer channel against the real host module. This file exists so the host's
+  DOM wiring can be driven in a real browser across a real origin boundary.
+-->
+
+<p>Stub viewer. <span id="state">waiting for host.init</span></p>
+<p id="doc"></p>
+<button type="button" id="draw">Emit markup</button>
+<button type="button" id="sign">Request document.sign</button>
+
+<script type="module">
+  const PROTOCOL = 'cde.viewer.v1';
+  const parentOrigin = new URLSearchParams(location.search).get('parentOrigin');
+
+  let counter = 0;
+  const send = (type, payload, replyTo) => {
+    const message = { protocol: PROTOCOL, type, id: `stub-${++counter}`, payload };
+    if (replyTo) message.replyTo = replyTo;
+    // Rule 1: the host's exact origin, never '*'.
+    parent.postMessage(message, parentOrigin);
+  };
+
+  window.addEventListener('message', (event) => {
+    if (event.origin !== parentOrigin) return;             // rule 2
+    if (event.source !== parent) return;                   // rule 3
+    const message = event.data;
+    if (!message || message.protocol !== PROTOCOL) return; // §4
+
+    if (message.type === 'host.init') {
+      document.getElementById('state').textContent = 'initialised';
+      document.getElementById('doc').textContent =
+        message.payload.document?.displayName ?? '';
+      send('viewer.loaded', { pageCount: 3, mediaType: 'application/pdf' });
+    }
+    if (message.type === 'host.operationResult') {
+      document.getElementById('state').textContent = `operation ${message.payload.status}`;
+    }
+    if (message.type === 'host.command') {
+      document.getElementById('state').textContent = `command ${message.payload.command}`;
+    }
+  });
+
+  document.getElementById('draw').addEventListener('click', () => {
+    send('viewer.markupCreated', {
+      markup: {
+        markupId: `m-${Date.now()}`,
+        page: 2,
+        type: 'CLOUD',
+        shapeData: '{"points":[[10,10],[40,40]]}',
+        comment: 'Drawn by the stub',
+      },
+    });
+  });
+
+  document.getElementById('sign').addEventListener('click', () => {
+    send('viewer.operationRequest', { operation: 'document.sign', arguments: {} });
+  });
+
+  if (parentOrigin) send('viewer.ready', { version: { supported: [PROTOCOL] } });
+</script>
+</body>
+</html>
