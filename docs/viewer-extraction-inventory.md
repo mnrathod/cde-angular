@@ -124,11 +124,13 @@ Embedded in a host application on a different origin, that points at the
 host, not at us. It needs to become configuration, and the STOMP connection
 needs its own authentication rather than riding the page's session.
 
-**There is no API base URL anywhere.** Every call is a relative `/api/...`
-path. The whole frontend assumes it is served from the same origin as the
-backend. **For an embeddable product this is the single most pervasive
-change** — it touches every service, and there is no existing seam to thread
-it through.
+**~~There is no API base URL anywhere.~~ Done, 2026-09.** Every call was a
+relative `/api/...` path and the whole frontend assumed same-origin — the
+single most pervasive change, with no existing seam. There is one now:
+`API_BASE_URL` (`core/config/api-base-url.ts`), applied by
+`apiBaseUrlInterceptor` to relative `/api` paths only, and by
+`collaboration.service` by hand because an interceptor never sees a socket.
+Empty by default, so same-origin deployment still needs no configuration.
 
 **RFC 9457 problem details.** The viewer imports
 `core/handlers/problem-detail` and expects that error envelope. A host
@@ -145,9 +147,11 @@ published contract rather than being assumed.
 | `three` ^0.185.1 | MIT | Lazily imported (`import("three")`) in the 3D component only, with `OrbitControls` |
 | `@stomp/stompjs` ^7.3.0 | Apache-2.0 | Collaboration transport |
 
-All three are permissive and cause no §2.1 problem. The licence exposure in
-this product is not in the frontend — it is `dwg2dxf`, in the converter image
-(§6).
+All three are permissive and cause no §2.1 problem, which the generated
+`THIRD-PARTY-NOTICES.txt` now confirms across the whole production closure
+rather than these three. The licence exposure in this product was never in the
+frontend's dependencies — it was `dwg2dxf` in the converter image, now removed
+(§6), and it is the *icons* here that turned out to be the frontend's problem.
 
 ---
 
@@ -155,38 +159,45 @@ this product is not in the frontend — it is `dwg2dxf`, in the converter image
 
 The dependency order falls out of the above rather than being chosen:
 
-1. **Configurable API base URL.** Everything else assumes it, and it touches
-   every service. Nothing can be embedded anywhere until this exists.
-2. **Move the six pure services and their components.** No server contract
-   needed, so this is mechanical and provable — the 254-test suite covers
-   most of it.
+1. ~~**Configurable API base URL.**~~ **Done** — `API_BASE_URL` and
+   `apiBaseUrlInterceptor`, §3 above.
+2. ~~**Move the six pure services and their components.**~~ **Done** —
+   `src/viewer-core/`, a buildable package with a boundary test.
 3. **The content path.** The integrator-minted URL fetch and conversion of
    ADR 12, replacing the five content endpoints.
-4. **Decide the 17 document operations** one at a time: viewer-side against
-   the fetched copy, host callback, or not in the product.
-5. **Identity and collaboration.** Host-supplied display name; socket URL and
-   its own auth.
+4. ~~**Decide the 17 document operations** one at a time~~ — superseded by
+   **ADR 14** (`cde-platform`,
+   `docs/adr/0014-viewer-embed-and-identity-contracts.md`),
+   which proposes one rule instead of seventeen decisions: an operation that
+   only reads or computes is viewer-side, an operation that changes the
+   document is a host callback, and signing and versioning are host callbacks
+   with no exception.
+5. **Identity and collaboration.** ADR 14 proposes the identity half — the
+   viewer authenticates nobody and authorises nothing; it is given a display
+   name, a subject id to compare against, and capability flags that are UX
+   only. The socket URL is done; its authentication is not, and is the one
+   loose end that decision leaves.
 
 ---
 
 ## 6. What blocks shipping, regardless of the code
 
-**LibreDWG.** `cde-platform/docs/licences.md` §4.1 records it: the converter
-image contains a `dwg2dxf` binary built from GPL-3.0 source, with no
-corresponding-source offer accompanying it. Operating a service with it
-inside is one thing; **shipping an image to a customer is distribution, and
-GPL-3.0 §6 makes that a breach today.** Close it by publishing the source, by
-a written offer, or by requiring the ODA converter instead — but close it
-before the first install, because it constrains whether DWG support can exist
-in a distributed artifact at all.
+**~~LibreDWG.~~ Closed, 2026-09-08.** The converter image contained a
+`dwg2dxf` binary built from GPL-3.0 source with no corresponding-source offer,
+and shipping the image to a customer is distribution — a breach under GPL-3.0
+§6. Closed by removing the binary rather than by discharging the obligation
+(ADR 13). DWG now requires the operator-supplied ODA File Converter; DXF,
+Office, PDF and IFC never used it and are unaffected.
 
 **Trademarks.** "Works with Microsoft SharePoint" is nominative fair use.
 Their name in a product name, their logo, or any suggestion of partnership is
 not (§17.4). The integration documentation is where this will go wrong first.
 
-**Attribution.** A separate distribution needs its own `LICENSE`, `NOTICE`
-and `THIRD-PARTY-NOTICES.txt` (§17.2). The platform's file covers the
-platform's dependency set, not this one.
+**~~Attribution.~~ Closed, 2026-09-09.** This repository now has its own
+`LICENSE`, `NOTICE` and generated `THIRD-PARTY-NOTICES.txt` — 38 production
+components, all on the §2.1 allowed list. See `docs/licences.md`, which also
+records what writing it turned up: the PWA application icons are the Angular
+logo, which §17.4 does not permit and which blocks release.
 
 ---
 
