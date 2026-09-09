@@ -1,0 +1,103 @@
+CDE Viewer (Angular frontend)
+Copyright (c) 2026 <<< COPYRIGHT HOLDER NOT YET SET >>>. All rights reserved.
+
+See LICENSE for the terms governing this software, and for why the copyright
+holder above is still a placeholder.
+
+────────────────────────────────────────────────────────────────────────────
+THIRD-PARTY ATTRIBUTION
+────────────────────────────────────────────────────────────────────────────
+
+This product includes software developed by third parties under open-source
+licences. The complete list — every component, its version, and its licence —
+is in THIRD-PARTY-NOTICES.txt, which is generated from the resolved
+production dependency tree rather than maintained by hand, and is shipped
+with every distribution.
+
+Attribution is a licence obligation, not a courtesy: Apache-2.0 section 4(d)
+and the attribution clauses of the MIT and BSD licences require it, so a
+distribution missing that file is in breach.
+
+Notable components and their upstream projects:
+
+  Angular                              MIT          https://angular.dev
+  Angular CDK                          MIT          https://material.angular.dev/cdk
+  RxJS                                 Apache-2.0   https://rxjs.dev
+  zone.js                              MIT          https://github.com/angular/angular
+  tslib                                0BSD         https://github.com/Microsoft/tslib
+  PDF.js (pdfjs-dist)                  Apache-2.0   https://mozilla.github.io/pdf.js
+  three.js                             MIT          https://threejs.org
+  Rapier (@dimforge/rapier3d-compat)   Apache-2.0   https://rapier.rs
+  STOMP.js (@stomp/stompjs)            Apache-2.0   https://stomp-js.github.io
+  jwt-decode                           MIT          https://github.com/auth0/jwt-decode
+
+────────────────────────────────────────────────────────────────────────────
+WHAT THE ATTRIBUTION FILE COVERS
+────────────────────────────────────────────────────────────────────────────
+
+The whole production dependency closure, not only what survives tree-shaking
+into dist/. Deriving the latter would mean parsing build output and would
+under-report the moment the bundler changed, so the file is deliberately
+generous: over-attributing costs a longer list, under-attributing is a
+breach.
+
+Two consequences of that choice are visible in the list and are not mistakes:
+
+  - The twelve per-platform native builds of @napi-rs/canvas all appear. Any
+    given installation resolves one of them, but which one depends on the
+    machine.
+  - @types/three appears although it contributes no runtime code. It is
+    declared as a production dependency, so it is attributed as one.
+
+Development-only dependencies — the Angular CLI, the TypeScript compiler,
+Vitest, Playwright and their trees — are excluded. They are not redistributed
+and carry no attribution obligation.
+
+────────────────────────────────────────────────────────────────────────────
+NO REMOTELY LOADED CODE
+────────────────────────────────────────────────────────────────────────────
+
+Every third-party library is declared in package.json and bundled from the
+registry copy. Nothing is fetched from a CDN at runtime, which is enforced by
+scripts/check-no-remote-code.mjs rather than by convention.
+
+This matters for attribution as well as for security: code arriving from a
+CDN at runtime would be redistributed to the user without appearing in any
+dependency manifest, so nothing would attribute it.
+
+────────────────────────────────────────────────────────────────────────────
+FONTS, ICONS AND IMAGES
+────────────────────────────────────────────────────────────────────────────
+
+Fonts: none. The interface uses the reader's system font stack, and no font
+file is bundled or fetched.
+
+Interface icons: the viewer's own inline SVG path data (src/viewer-core/
+icon.component.ts). No third-party icon set is bundled.
+
+Application icons: the eight PNGs in public/icons, referenced by
+manifest.webmanifest, are **the Angular logo** — the defaults left in place
+from `ng generate @angular/pwa`. They are a third-party trademark presented
+as this product's identity, which section 17.4 does not permit, and they must
+be replaced with the product's own mark before release. Recorded as an open
+finding in docs/licences.md.
+
+Any addition of an asset is a licence decision under CLAUDE.md section 17.1,
+which requires a documented, permissive licence recorded in docs/licences.md
+before it enters the repository.
+
+────────────────────────────────────────────────────────────────────────────
+STANDARDS AND TRADEMARKS
+────────────────────────────────────────────────────────────────────────────
+
+This product implements requirements from ISO 19650 and other published
+standards. Standards documents are copyrighted by their publishing bodies. No
+text, table, or code list from any standard is reproduced in this product or
+its documentation.
+
+ISO 19650 is a standard published by the International Organization for
+Standardization. Autodesk, AutoCAD, DWG, DXF and Revit are trademarks of
+Autodesk, Inc.; SharePoint and Microsoft 365 are trademarks of Microsoft
+Corporation. Reference to any of them here describes what this product reads
+or interoperates with, and implies no endorsement, certification, or
+affiliation.

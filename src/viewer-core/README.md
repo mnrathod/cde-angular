@@ -95,11 +95,17 @@ behind — how a host mounts it, how it learns who the user is, and where markup
 goes — is not settled (ADR 12, step 4). The rendering API is stable in practice;
 anything touching the host is not.
 
-`UNLICENSED` is deliberate rather than an oversight. The repository has no
-`LICENSE`, `NOTICE` or `THIRD-PARTY-NOTICES.txt`, and §17.2 makes shipping that
-attribution file a licence obligation. **That must be resolved before this is
-published anywhere**, and the marker is there so an accidental `npm publish`
-fails loudly rather than quietly shipping something with no licence position.
+`UNLICENSED` is deliberate rather than an oversight, and it stays. The
+repository now has `LICENSE`, `NOTICE` and a generated
+`THIRD-PARTY-NOTICES.txt`, so the §17.2 attribution obligation is met and this
+package is covered by the repository's licence — but *whether* to publish it,
+and under what terms, is a decision nobody has taken. The marker is what makes
+an accidental `npm publish` fail loudly instead of shipping this to a public
+registry on the strength of a default. Removing it is that decision.
+
+Two things still block publication: the copyright holder in `LICENSE` is a
+placeholder, and `docs/licences.md` §3.1 records a third-party mark shipping
+as the application's PWA icons.
 
 The npm scope is provisional. A 404 on `@cde/viewer-core` means the *package*
 does not exist; it does not prove the *scope* is ours. Register it before
