@@ -13,6 +13,8 @@
     "demo": "node demo/server.mjs",
     "demo:samples": "node demo/tools/generate-samples.mjs",
     "check:samples": "node demo/tools/generate-samples.mjs --check",
+    "icons": "node tools/icons/generate-icons.mjs",
+    "check:icons": "node tools/icons/generate-icons.mjs --check",
     "test:demo": "playwright test --config demo/e2e/playwright.config.mjs"
   },
   "private": true,

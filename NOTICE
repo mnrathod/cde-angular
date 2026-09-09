@@ -75,12 +75,17 @@ file is bundled or fetched.
 Interface icons: the viewer's own inline SVG path data (src/viewer-core/
 icon.component.ts). No third-party icon set is bundled.
 
-Application icons: the eight PNGs in public/icons, referenced by
-manifest.webmanifest, are **the Angular logo** — the defaults left in place
-from `ng generate @angular/pwa`. They are a third-party trademark presented
-as this product's identity, which section 17.4 does not permit, and they must
-be replaced with the product's own mark before release. Recorded as an open
-finding in docs/licences.md.
+Application icons and favicon: the eight PNGs in public/icons and the three
+sizes inside public/favicon.ico are our own work, drawn by
+tools/icons/generate-icons.mjs from geometry in this repository. No font, no
+icon set, and no traced or copied artwork is involved. They replaced the
+Angular logo, which `ng new` and `ng generate @angular/pwa` had left in place
+as this product's identity — a third-party trademark used in a way section
+17.4 does not permit.
+
+The mark is a neutral placeholder, not a chosen brand: the product has no name
+or logo that has been through trademark clearance, and section 17.4 requires
+that before public launch. See docs/licences.md section 3.5.
 
 Any addition of an asset is a licence decision under CLAUDE.md section 17.1,
 which requires a documented, permissive licence recorded in docs/licences.md

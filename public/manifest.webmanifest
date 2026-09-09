@@ -1,9 +1,12 @@
 {
-  "name": "cde-angular",
-  "short_name": "cde-angular",
+  "name": "CDE Platform",
+  "short_name": "CDE",
+  "description": "Common Data Environment — drawing management and collaboration",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",
+  "theme_color": "#1e3a5f",
+  "background_color": "#f0f2f5",
   "icons": [
     {
       "src": "icons/icon-72x72.png",
@@ -52,6 +55,14 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Compare documents",
+      "short_name": "Compare",
+      "url": "compare",
+      "description": "Compare two drawing revisions"
     }
   ]
 }

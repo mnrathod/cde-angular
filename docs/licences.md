@@ -64,31 +64,47 @@ from `dependencies` is included even when a devDependency also reaches it.
 
 ## 3. Open findings
 
-### 3.1 The PWA application icons are the Angular logo — **BLOCKS RELEASE**
+### 3.1 The application icons were the Angular logo — **RESOLVED, with a placeholder**
 
-**Found 2026-09-09. Not fixed here: replacing them needs the product's own
-mark, which is a brand decision rather than an engineering one.**
+**Found 2026-09-09. Fixed the same day.** The trademark problem is closed; the
+branding decision it exposed is not, and is tracked as §3.5.
 
 | | |
 |---|---|
-| What | `public/icons/icon-{72,96,128,144,152,192,384,512}.png` — eight sizes, all the Angular "A" shield in Angular's pink/purple gradient |
-| Where it ships | `public/manifest.webmanifest` lists all eight as the application's icons. An installed PWA shows this on the user's home screen and in their app switcher |
-| Where it came from | The defaults from `ng generate @angular/pwa`. Left in place rather than chosen |
-| Why it is a problem | §17.4: a third party's logo may not be used without checking their trademark guidelines, and never in a way implying endorsement or affiliation. This is not nominative fair use — the mark is not being used to *refer to* Angular, it is being used *as this product's identity* |
-| Fix | Replace all eight with the product's own mark, at the same sizes. Until the product has one, any neutral placeholder that is ours is better than a mark that is not |
-| Also check | `manifest.webmanifest` still says `"name": "cde-angular"` and `"short_name": "cde-angular"`, which is the scaffold name rather than a product name |
+| What it was | The Angular "A" shield, in Angular's pink/purple gradient, as this product's identity |
+| Where it shipped | `public/icons/icon-{72,96,128,144,152,192,384,512}.png`, listed in `public/manifest.webmanifest` — an installed PWA shows this on the home screen and in the app switcher — **and `public/favicon.ico`**, which is the browser tab on every page |
+| Where it came from | The defaults from `ng generate @angular/pwa` and `ng new`. Left in place rather than chosen |
+| Why it was a problem | §17.4: a third party's logo may not be used without checking their trademark guidelines, and never in a way implying endorsement or affiliation. This was not nominative fair use — the mark was not being used to *refer to* Angular, it was being used *as this product's identity* |
+| Fixed by | `tools/icons/generate-icons.mjs`, which draws all nine files from geometry in this repository |
+
+**The favicon was missed when this finding was first written**, and it was the
+most visible instance of the three: an installed PWA icon is seen once, a
+browser tab is seen continuously. The lesson is that the finding was written
+from the manifest — the place the icons are *declared* — rather than from the
+set of image files actually shipped, and `favicon.ico` is referenced from
+`index.html` instead.
 
 Angular is a trademark of Google LLC. Using the framework carries no right to
 its mark; the MIT licence on the code is a copyright grant and is silent on
-trademarks, which is the usual arrangement and the reason this needs fixing
+trademarks, which is the usual arrangement and the reason this needed fixing
 rather than documenting.
 
-### 3.2 The copyright holder is a placeholder
+### 3.2 The copyright holder is a placeholder — **raised 2026-09-09, deferred**
 
 `LICENSE` and `NOTICE` both name `<<< COPYRIGHT HOLDER NOT YET SET >>>`. No
 legal entity is recorded anywhere in either repository, and inventing one
 would put a false owner on the copyright notice. The same placeholder is in
 `cde-platform`; both must name the same holder and should be fixed together.
+
+Put to the project on 2026-09-09 alongside the icon fix and **deliberately
+left open**: the entity is not yet decided. This is the right state to be in
+until it is. An obviously unset placeholder is a gap anyone reviewing the file
+will see; a plausible-looking wrong name is a false statement of ownership that
+survives into every distribution and every procurement pack, and nobody
+re-reads a notice that looks finished.
+
+Fixing it is one substitution in four files — `LICENSE` and `NOTICE` in each
+repository — and needs no engineering decision, only the name.
 
 ### 3.3 No licence-change baseline
 
@@ -112,13 +128,34 @@ taken. Removing the marker is that decision, not a cleanup.
 
 ---
 
+### 3.5 The current mark is a placeholder, not a brand
+
+The icons are now **ours** — which closes the trademark exposure — but they are
+not a *chosen* identity. The product has no name or mark that has been through
+trademark clearance, and §17.4 requires that before public launch.
+
+| | |
+|---|---|
+| What ships | A white sheet with a folded corner on the theme colour `#1e3a5f`, drawn by `tools/icons/generate-icons.mjs`. Neutral and generic on purpose |
+| Provenance | Entirely generated. Polygon geometry in the generator, rasterised by our own code; no font, no icon set, no traced or copied artwork |
+| Name in the manifest | `"CDE Platform"` / `"CDE"`, with `<title>CDE Platform</title>`. **Descriptive terms, not a coined mark** — "common data environment" is the industry's own vocabulary, so this asserts no trademark and infringes none. It replaces the scaffold name `cde-angular`, which leaked the repository name onto users' home screens |
+| What is still needed | A product name and mark, cleared and registered in every jurisdiction of sale, before public launch (§17.4). Until then this is deliberately unremarkable so that nobody mistakes it for the answer |
+
+`node tools/icons/generate-icons.mjs --check` fails if the committed files
+differ from the generator, so the provenance stays a fact rather than a claim.
+The generator also asserts the mark stays inside the maskable safe zone, which
+is the failure that would otherwise appear only on an Android home screen.
+
+---
+
 ## 4. Assets
 
 | Asset class | Present? | Position |
 |---|---|---|
 | Fonts | None | System font stack only. No font file bundled or fetched |
 | Interface icons | Own work | Inline SVG path data in `src/viewer-core/icon.component.ts` |
-| Application icons | **Third-party mark** | See §3.1 — blocks release |
+| Application icons | Own work, generated | White sheet on `#1e3a5f`, drawn by `tools/icons/generate-icons.mjs`. Placeholder rather than a chosen mark — §3.5 |
+| Favicon | Own work, generated | `public/favicon.ico`, 16/32/48, from the same generator |
 | Sample documents | Own work, generated | See §4.1 |
 | Stock imagery | None | — |
 | CSS frameworks | None | — |
