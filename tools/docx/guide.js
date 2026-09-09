@@ -24,8 +24,8 @@ const children = [
   h1('1.  What you can build against today'),
   ...diagramBoundary(),
   p('So: you can convert and render your customers’ documents through our API today, inside your '
-  + 'own interface, using your own rendering. You cannot yet embed our viewer, and if you do get '
-  + 'it on screen it has no way to know who your user is.'),
+  + 'own interface, using your own rendering. Embedding our viewer is specified but not yet '
+  + 'built — the contract is settled (section 5), the code is not.'),
   p('If that is enough — and for a “preview any file format” feature it often is — section 3 is a '
   + 'complete, working integration. If you need markup round-tripping, section 6 is what you are '
   + 'waiting for.'),
@@ -206,48 +206,65 @@ const children = [
   p('**If you need either, raise it as a commercial requirement, not a bug.** The answer involves '
   + 'a vendor contract and, for RVT, a residency decision that engineering cannot take alone.'),
 
-  h1('5.  Embedding — read before you scope it'),
-  p('Three constraints, all currently blocking.'),
+  h1('5.  Embedding — decided, not yet built'),
+  lead('The contract is settled and specified. An iframe and a versioned postMessage protocol; '
+     + 'the viewer authenticates nobody and authorises nothing. You mint a short-lived URL for '
+     + 'the document, tell the viewer a name to display, and receive what the user did — every '
+     + 'operation that changes anything comes back to you to authorise server-side.'),
+  p('Recorded as ADR 14 (`cde-platform`, `docs/adr/0014-viewer-embed-and-identity-contracts.md`), '
+  + 'with the message-level detail in `docs/viewer-embed-protocol.md`. That document is written '
+  + 'to be built against and is stable enough to design around, though the code does not exist '
+  + 'yet.'),
+  p('Three constraints remain true of the code as it stands today.'),
   table([2600, 7146], [
     { header: true, cells: [{ t: 'Constraint' }, { t: 'Reality today' }] },
     { cells: [{ t: 'Framing', bold: true },
-      { t: 'Content-Security-Policy: frame-ancestors \'none\'. A cross-origin iframe will not render', fill: RED_BG }] },
+      { t: 'Content-Security-Policy: frame-ancestors \'none\'. A cross-origin iframe will not render. Becomes a per-tenant allow-list on the embed route only', fill: RED_BG }] },
     { cells: [{ t: 'Cross-origin XHR', bold: true },
       { t: 'The CORS source registers no origin at all unless a deployment names one in full', fill: RED_BG }] },
     { cells: [{ t: 'Session', bold: true },
       { t: 'A bearer token from our own /api/auth/login, against our own user table. No cookie mode, no silent SSO, no token exchange', fill: RED_BG }] }
   ]),
-  caption('Table 4 — Why an embedded integration cannot be scoped yet.'),
+  caption('Table 4 — What is still true of the code, now that the contract is decided.'),
   p('The only path that works today is **serving our Angular build from your own origin, behind '
   + 'the same web tier that proxies `/api`**. Same-origin needs no CORS entry, no framing '
   + 'relaxation, and no cross-origin token handling. It is also a deployment of our application '
   + 'into your infrastructure, which is probably not what you meant by “integrate”.'),
-  note('**If you only need viewing**, the honest recommendation is to skip the embed entirely: use '
+  note('**If you only need viewing**, the honest recommendation is still to skip the embed: use '
      + 'section 3 to convert, and render the resulting PDF or SVG in your own interface with your '
-     + 'own viewer. That avoids all three constraints and is a complete feature.'),
+     + 'own viewer. That avoids all three constraints and is a complete feature today rather than '
+     + 'a contract to wait for.'),
 
   h2('5.1  What the identity gap actually means'),
-  p('Not “you need to configure SSO”. There is nothing to configure. A markup’s author is a '
-  + 'foreign key into our user table, so **your user must exist as a row in our database before '
-  + 'they can annotate anything.** Any integration today means shadow-provisioning your users into '
-  + 'our system, which is a data-protection conversation before it is an engineering one.'),
+  p('Not “you need to configure SSO”. There is nothing to configure. In the code as it stands, a '
+  + 'markup’s author is a foreign key into our user table, so **your user must exist as a row in '
+  + 'our database before they can annotate anything** — which means shadow-provisioning your users '
+  + 'into our system, a data-protection conversation before it is an engineering one.'),
   ...diagramIdentity(),
-  p('The fix is an opaque issuer-and-subject reference plus a display name you supply, so you stay '
-  + 'the system of record for who your people are. It is not built. If markup attribution matters '
-  + 'to you, say so — it moves the priority.'),
+  p('**That is what the contract removes.** The viewer is told a display name and an opaque '
+  + 'subject id, both untrusted and used only for presentation, and the author is stamped by '
+  + 'whoever persists the markup — you. You stay the system of record for who your people are, '
+  + 'and nothing about your users reaches our database.'),
+  note('You do **not** need to mint a JWT, and you do not need an identity provider we can talk '
+     + 'to. If an earlier version of this guide told you to prepare a signed assertion with a '
+     + 'stable subject claim, disregard it — that was written while the question was open, and '
+     + 'the answer went the other way.'),
 
   h1('6.  What to plan for, not against'),
-  lead('When the contract lands, these are the shapes to expect. None of this is implemented; do '
-     + 'not build against it yet. It is here so your architecture does not paint itself into a '
-     + 'corner.'),
-  bullet('**Embedding** will be an iframe with a per-tenant `frame-ancestors` allow-list, a '
-       + 'published web component, or both. Keep your viewer container swappable.'),
-  bullet('**Identity** will be a signed assertion you issue, exchanged for a short-lived viewer '
-       + 'session. Make sure you can mint a JWT with a stable subject claim per user.'),
-  bullet('**Markups** will come back either as events on a callback you host or as a document you '
-       + 'pull. Have a place to put them that is not the rendered file.'),
-  bullet('**Document identity** — we currently key on our own numeric id. An external identifier '
-       + 'is planned; keep your own id available at the boundary.'),
+  lead('The contract has landed. It is specified, not implemented — do not build against it yet '
+     + '— but it is settled enough to design around, and these are no longer guesses.'),
+  bullet('**Embedding is an iframe** with a per-tenant `frame-ancestors` allow-list. Not a web '
+       + 'component: the viewer renders untrusted documents, and sharing your origin would mean a '
+       + 'document that escapes the PDF renderer runs with your session on your domain.'),
+  bullet('**Identity is three untrusted fields** — a display name, an opaque subject id, and '
+       + 'capability flags that decide which controls render and nothing else. No signed '
+       + 'assertion, no viewer session, no JWT. Sending no identity at all is a supported '
+       + 'read-only deployment.'),
+  bullet('**Markup comes back as events** on the message channel, with the geometry as an opaque '
+       + 'string you store and hand back. There is no author field — you stamp that.'),
+  bullet('**Document identity is yours.** Pass an `externalId` in the handshake and it comes back '
+       + 'on every event, so you never hold a map between your id and ours.'),
+  p('Full message shapes: `docs/viewer-embed-protocol.md`.'),
 
   h1('7.  Obligations you inherit'),
   p('**Accessibility.** WCAG 2.2 AA is a procurement gate in the UK, EU, Australia and the US, and '
@@ -273,12 +290,13 @@ const children = [
   bullet('Do you surface `detail` and `traceId` from problem documents to your support path?'),
   bullet('Have you confirmed your DWG position?'),
   h2('Before you scope an embedded integration'),
-  bullet('Has the embed contract been decided? (Section 5 — currently no)'),
-  bullet('Has the identity contract been decided? (Section 5.1 — currently no)'),
-  bullet('Do you know which of the 17 document operations you need? (Section 6)'),
-  note('If the last three are all “no”, the buildable integration is section 3 and nothing else. '
-     + 'That is a real feature and it works — it is just smaller than “embed the viewer”, and '
-     + 'worth scoping as what it is.')
+  bullet('Have you read the embed protocol? (`docs/viewer-embed-protocol.md`)'),
+  bullet('Can you mint a short-lived URL for a document, and serve a page that frames us?'),
+  bullet('Do you have somewhere to store markup that is not the rendered file?'),
+  bullet('Do you know which of the 17 document operations you need to implement as callbacks?'),
+  note('The embed is specified but not built, so the integration you can ship **today** is still '
+     + 'section 3 and nothing else. That is a real feature and it works — it is just smaller than '
+     + '“embed the viewer”, and worth scoping as what it is.')
 ];
 
 const doc = makeDoc([section(children, 'Viewer product — Integration Guide   ·   page ')]);

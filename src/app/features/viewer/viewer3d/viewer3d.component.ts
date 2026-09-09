@@ -98,7 +98,7 @@ import { IfcTreeComponent, IfcNode } from "../../../../viewer-core/ifc-tree.comp
 
         <!-- IFC Model Tree Sidebar -->
         <app-ifc-tree
-          [documentId]="docId()"
+          [nodes]="modelTree()"
           [stats]="ifcStats()"
           (elementSelected)="onElementSelected($event)"
           (elementVisibilityChanged)="onVisibilityChanged($event)"
@@ -132,6 +132,10 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
   private animId: number | null = null;
 
   docId = signal(0);
+  // Fetched here rather than by the tree component: viewer-core does no I/O
+  // (ADR 14), because a host embedding the viewer supplies this and there is
+  // no same-origin /api for the component to reach.
+  modelTree = signal<IfcNode[] | undefined>(undefined);
   ifcStats = signal<{ schema: string; elementCount: number } | undefined>(
     undefined,
   );
@@ -152,6 +156,13 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get("id"));
     this.docId.set(id);
+    this.service.getModelTree(id).subscribe({
+      next: nodes => this.modelTree.set(nodes),
+      // A model with no tree endpoint is not an error the user can act on —
+      // the component derives a synthetic tree from the element counts, which
+      // is §1A.4's accessible route to the model either way.
+      error: () => this.modelTree.set([]),
+    });
     this.loadModel(id);
   }
 

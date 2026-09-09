@@ -68,6 +68,7 @@ describe('viewer-core boundary', () => {
    */
   const PERMITTED_OUTSIDE = '../testing/';
 
+
   function importLines(source: string): string[] {
     return source.split('\n').filter(line => line.startsWith('import'));
   }
@@ -100,6 +101,44 @@ describe('viewer-core boundary', () => {
     expect(filesWhere(line =>
       /from\s+['"]\.\.\//.test(line) && !line.includes(PERMITTED_OUTSIDE),
     )).toEqual([]);
+  });
+
+  /**
+   * Network access, in any of the forms it actually takes.
+   *
+   * <p>The assertions above forbid imports from the *application*. That is not
+   * the same property as "does no I/O", and the gap was real rather than
+   * theoretical: `ifc-tree.component.ts` sat in this package injecting
+   * Angular's HTTP client and fetching a model tree, and every assertion here
+   * passed — the HTTP client is a framework import like any other.
+   *
+   * <p>The README's first claim is "it knows no backend exists". This is that
+   * claim, asserted. Under ADR 14 it is a property of the product rather than
+   * a tidy arrangement of this repository: a host embeds the viewer
+   * cross-origin, so there is no same-origin API for anything here to reach,
+   * and a fetch added later would not fail here — it would fail at a
+   * customer's site.
+   */
+  const NETWORK: ReadonlyArray<{ pattern: RegExp; what: string }> = [
+    { pattern: /@angular\/common\/http/,               what: "Angular's HTTP client" },
+    { pattern: /\bHttpClient\b/,                       what: 'HttpClient' },
+    { pattern: /\bfetch\s*\(/,                         what: 'fetch()' },
+    { pattern: /\bXMLHttpRequest\b/,                   what: 'XMLHttpRequest' },
+    { pattern: /\bnavigator\.sendBeacon\b/,           what: 'sendBeacon' },
+    { pattern: /\bnew\s+(?:WebSocket|EventSource)\b/, what: 'a socket' },
+    // Quoted or interpolated only, so prose in a comment does not trip it.
+    // The doc comment above names the path this caught and must not fail its
+    // own rule.
+    { pattern: /['"`]\/api\//,                         what: 'an /api path' },
+  ];
+
+  it.each(NETWORK)('fetches nothing — no $what anywhere in the package', ({ pattern }) => {
+    const offenders = Object.entries(SOURCES)
+      .filter(([, source]) => pattern.test(source))
+      .map(([path]) => path)
+      .sort();
+
+    expect(offenders).toEqual([]);
   });
 
   it('lets no production file reach outside at all, helper included', () => {

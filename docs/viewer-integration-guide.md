@@ -244,13 +244,27 @@ engineering cannot take alone.
 
 ---
 
-## 5. Embedding — read before you scope it
+## 5. Embedding — decided, not yet built
 
-Three constraints, all currently blocking:
+**The contract is settled and specified.** How a host mounts the viewer and
+how it learns who the user is were the two open questions; both are answered
+by ADR 14 (`cde-platform`,
+`docs/adr/0014-viewer-embed-and-identity-contracts.md`) and the message-level
+detail is in `docs/viewer-embed-protocol.md`. Read that if you are scoping
+integration work — it is written to be built against, and it is stable enough
+to design around even though the code does not exist yet.
+
+The short version: **an iframe and a versioned `postMessage` protocol.** The
+viewer authenticates nobody and authorises nothing. You mint a short-lived
+URL for the document, tell the viewer a name to display, and receive what the
+user did; every operation that changes anything comes back to you to
+authorise server-side.
+
+Three constraints are still true of the code as it stands today:
 
 | Constraint | Reality today |
 |---|---|
-| **Framing** | `Content-Security-Policy: frame-ancestors 'none'`. A cross-origin `<iframe>` will not render |
+| **Framing** | `Content-Security-Policy: frame-ancestors 'none'`. A cross-origin `<iframe>` will not render. Becomes a per-tenant allow-list on the embed route only — the other routes keep `'none'` |
 | **Cross-origin XHR** | The CORS source registers no origin at all unless a deployment names one in full |
 | **Session** | A bearer token from our own `/api/auth/login`, against our own user table. No cookie mode, no silent SSO, no token exchange |
 
@@ -267,34 +281,49 @@ complete feature.
 
 ### 5.1 What the identity gap actually means
 
-Not "you need to configure SSO". There is nothing to configure. A markup's
-author is a foreign key into our user table, so **your user must exist as a row
-in our database before they can annotate anything.** Any integration today
-means shadow-provisioning your users into our system, which is a data-protection
+Not "you need to configure SSO". There is nothing to configure. In the code as
+it stands, a markup's author is a foreign key into our user table, so **your
+user must exist as a row in our database before they can annotate anything** —
+which means shadow-provisioning your users into our system, a data-protection
 conversation before it is an engineering one.
 
-The fix is an opaque issuer-and-subject reference plus a display name you
-supply, so you stay the system of record for who your people are. It is not
-built. If markup attribution matters to you, say so — it moves the priority.
+**That is what the contract removes.** Under ADR 14 the viewer is told a
+display name and an opaque subject id, both untrusted and used only for
+presentation, and the author is stamped by whoever persists the markup — you.
+You stay the system of record for who your people are, and nothing about your
+users reaches our database.
+
+You do not need to be able to mint a JWT, and you do not need an identity
+provider we can talk to. If a previous version of this guide told you to
+prepare a signed assertion with a stable subject claim, disregard it; that
+was written while the question was open and the answer went the other way.
 
 ---
 
 ## 6. What to plan for, not against
 
-When the contract lands, these are the shapes to expect. **None of this is
-implemented; do not build against it yet.** It is here so your architecture
-does not paint itself into a corner.
+The contract has landed. **It is specified, not implemented — do not build
+against it yet**, but it is settled enough to design around, and these are no
+longer guesses.
 
-- **Embedding** will be an iframe with a per-tenant `frame-ancestors`
-  allow-list, a published web component, or both. Keep your viewer container
-  swappable.
-- **Identity** will be a signed assertion you issue, exchanged for a
-  short-lived viewer session. Make sure you can mint a JWT with a stable subject
-  claim per user.
-- **Markups** will come back either as events on a callback you host or as a
-  document you pull. Have a place to put them that is not the rendered file.
-- **Document identity** — we currently key on our own numeric id. An external
-  identifier is planned; keep your own id available at the boundary.
+- **Embedding is an iframe** with a per-tenant `frame-ancestors` allow-list.
+  Not a web component: the viewer renders untrusted documents, and sharing
+  your origin would mean a document that escapes the PDF renderer runs with
+  your session on your domain. `@cde/viewer-core` remains available if you
+  want to build your own interface from our rendering core, but that is an
+  escape hatch rather than the supported path, and it is not covered by our
+  accessibility conformance claim.
+- **Identity is three untrusted fields** — a display name, an opaque subject
+  id, and capability flags that decide which controls render and nothing else.
+  No signed assertion, no viewer session, no JWT. Sending no identity at all
+  is a supported read-only deployment.
+- **Markup comes back as events** on the message channel, with the geometry as
+  an opaque string you store and hand back. Have a place to put it that is not
+  the rendered file. There is no author field — you stamp that.
+- **Document identity is yours.** Pass `externalId` in the handshake and it
+  comes back on every event, so you never hold a map between your id and ours.
+
+Full message shapes: `docs/viewer-embed-protocol.md`.
 
 ---
 

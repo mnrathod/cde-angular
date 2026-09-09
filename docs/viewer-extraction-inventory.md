@@ -63,17 +63,24 @@ call the platform directly.
 
 ## 2. What it needs from a host — the integration contract
 
-**26 endpoints across 9 services.** Method: every `/api/...` literal in each
-service the viewer imports.
+**35 endpoints across 15 files** — 11 services and 4 components. Method: walk
+imports transitively from every viewer component, viewer service and
+`viewer-core` file; count distinct `/api/...` literals in everything reached.
 
-> An earlier note in this engagement said "seven endpoints". That was wrong —
-> it came from grepping two directories rather than following the imports. The
+> **Corrected 2026-09-09.** This said "26 across 9", which was itself a
+> correction of an earlier "seven". Both were undercounts, for two different
+> reasons — the first from grepping directories instead of following imports,
+> the second from a resolver that turned `role.service` into `role.ts` by
+> replacing the extension rather than appending one, so every `*.service.ts`
+> import silently failed to resolve. ADR 14, "A note on the count", has the
+> detail. The
 > real surface is nearly four times larger, and it is the difference between a
 > weekend and a project.
 
 | Service | Endpoints | Notes |
 |---|---|---|
-| `viewer.service` | `/api/viewer/{id}`, `/api/viewer3d/{id}`, `/api/annotations`, `/api/annotations/document/{id}`, `/api/annotations/document/{id}/xfdf` | 5 — the core read path |
+| `viewer.service` | `/api/viewer/{id}`, `/api/viewer/{id}/pdf`, `/api/viewer/{id}/flatten`, `/api/viewer3d/{id}`, `/api/viewer3d/{id}/tree` | 5 — the core read path |
+| `annotation.service` | `/api/annotations` and six more under it, including replies and `resolve` | 7 — markup, read and write |
 | `signature.service` | `/api/signatures/{id}`, `/api/signatures/{id}/verify`, `/api/signatures/document/{id}`, `/api/signatures/document/{id}/sign` | 4 |
 | `page.service` | `/api/documents/{id}/pages` + `/arrange`, `/extract`, `/insert` | 4 |
 | `document.service` | `/api/documents/{id}`, `/status`, `/project/{id}`, `/upload` | 4 |
@@ -83,7 +90,14 @@ service the viewer imports.
 | `auth.service` | `/api/auth/login`, `/api/auth/register` | 2 — see §3 |
 | `ocr.service` | `/api/documents/{id}/ocr` | 1 |
 
-These fall into three groups, and the grouping is the design:
+Four components reach the API directly rather than through a service:
+`viewer-shell`, `annotation-thread`, `visual-compare`, and — the one that
+matters — `viewer-core/ifc-tree.component.ts`, which calls
+`/api/viewer3d/{id}/tree`. That last one is inside the package the boundary
+test protects; the test forbids *imports* across the boundary and a string
+literal is not an import, which is a gap worth closing.
+
+These fall into four groups, and the grouping is the design:
 
 **Content (5).** Getting the document and its geometry. Under ADR 12 these
 are replaced by the integrator-minted URL — this is the part the new fetch
@@ -208,7 +222,7 @@ logo, which §17.4 does not permit and which blocks release.
 | Viewer components | 23 | files under `features/viewer/`, excluding specs |
 | Viewer services | 8 | files under `core/services/viewer/`, excluding specs |
 | Implementation lines | 7,996 | `wc -l` over both, excluding specs |
-| Platform services imported | 11 | cross-boundary imports from viewer code |
-| Endpoints reached | 26 | `/api/...` literals in those services |
+| Files containing them | 15 | 11 services, 4 components |
+| Endpoints reached | 35 | distinct `/api/...` literals across everything the walk reaches |
 | Services needing no network | 6 of 8 | absence of `HttpClient` |
 | Auth call sites | 3 | `auth.username()` |

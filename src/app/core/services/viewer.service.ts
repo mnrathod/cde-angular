@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ViewerData } from '../models';
+import { IfcNode } from '../../../viewer-core/ifc-tree.component';
 
 @Injectable({ providedIn: 'root' })
 export class ViewerService {
@@ -13,6 +14,18 @@ export class ViewerService {
 
   get3DData(documentId: number): Observable<ViewerData | ArrayBuffer> {
     return this.http.get<ViewerData>(`/api/viewer3d/${documentId}`);
+  }
+
+  /**
+   * The model hierarchy for the IFC tree.
+   *
+   * <p>Lives here rather than in the component that renders it. `IfcTreeComponent`
+   * is in `viewer-core`, which does no I/O — ADR 14 makes that a property of
+   * the product rather than of this repository, because a host embedding the
+   * viewer supplies the data and there is no `/api` for the component to call.
+   */
+  getModelTree(documentId: number): Observable<IfcNode[]> {
+    return this.http.get<IfcNode[]>(`/api/viewer3d/${documentId}/tree`);
   }
 
   getAnnotations(documentId: number) {

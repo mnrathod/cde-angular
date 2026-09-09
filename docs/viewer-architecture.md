@@ -288,7 +288,7 @@ response headers. What the **viewer product** must own itself once distributed:
 |---|---|---|
 | SSRF policy on the ingress | Platform `fetch/` package | Travels with the product — it is the product's own attack surface |
 | Upload magic-byte + AV | Platform | Travels |
-| Content Security Policy | Platform response headers | Must become per-deployment, because embedding requires relaxing `frame-ancestors` |
+| Content Security Policy | Platform response headers | `frame-ancestors` becomes a per-tenant allow-list **on the embed route only**; every other route keeps `'none'` (ADR 14) |
 | Tenant isolation | Platform RLS | **Does not travel.** The host owns tenancy; the viewer must not assume it |
 | Audit | Platform hash chain | Host's concern; the viewer emits events, it does not store them |
 
@@ -334,13 +334,18 @@ Stated plainly, because the gap between "the viewer works" and "a CDE can
 integrate it" is larger than a demo suggests.
 
 **No embed surface.** No `postMessage`, no custom elements, no
-`@angular/elements`. The CSP sets `frame-ancestors 'none'` and the CORS source
+`@angular/elements`. The contract is now decided — ADR 14, an iframe and a
+versioned `postMessage` protocol, specified in `viewer-embed-protocol.md` —
+but none of it is built. The CSP sets `frame-ancestors 'none'` and the CORS source
 registers no origin unless a deployment names one, so cross-origin framing and
 cross-origin XHR are both closed. The only honest answer today is "serve our
 build from your own origin", which is a deployment, not an integration.
 
-**No identity contract.** Authentication is our own JWT from `/api/auth/login`
-against our own user table — no OIDC, no SAML, no API key, no token exchange.
+**No identity contract in the code.** Decided in ADR 14 — the viewer
+authenticates nobody and authorises nothing, and is given a display name, an
+opaque subject id and capability flags that are UX only. Today, though,
+authentication is our own JWT from `/api/auth/login` against our own user
+table — no OIDC, no SAML, no API key, no token exchange.
 Worse, `Annotation.author` is a `@ManyToOne User`, a foreign key into our own
 table, so **a host's user cannot author a markup without first existing as a
 row in our database.**
@@ -348,12 +353,15 @@ row in our database.**
 **No external document identity.** `Document` has no `externalId`, so a host
 must store our numeric id against its own record.
 
-**36 endpoints across 13 services**, re-derived by following the imports from
-every viewer component. (`viewer-extraction-inventory.md` §2 says 26 across 9;
-that number is stale and the file is the older count, not a different scope.)
-Five of those are content, and are what the ingress replaces. Seventeen are
-document operations awaiting ADR 12 step 4. The rest are identity and
-collaboration.
+**35 endpoints across 15 files** — 11 services and 4 components — measured by
+walking imports transitively from every viewer component, viewer service and
+`viewer-core` file. This said "36 across 13", which was close; the inventory
+said 26 across 9, which was not. ADR 14, "A note on the count", records why
+three different walks gave three different answers.
+
+Seven are content and are what the ingress replaces. Seven are markup, read
+and write. Nineteen are document operations, and ADR 14 replaces "decide them
+one at a time" with a rule. Two are identity and leave with the viewer.
 
 **Not a publishable package.** `viewer-core` has no `package.json` or
 `ng-package.json` — it is a directory, not a library.
@@ -364,5 +372,6 @@ first distribution without it is a breach rather than an untidiness.
 
 **No DWG position.** ADR 13, above.
 
-Of these, the embed contract and the identity contract are **decisions nobody
-has taken**, not work nobody has done — and everything else queues behind them.
+Of these, the embed contract and the identity contract **were decisions nobody
+had taken**, and everything else queued behind them. Both were taken on
+2026-09-09 as ADR 14, so what remains is work rather than a decision.

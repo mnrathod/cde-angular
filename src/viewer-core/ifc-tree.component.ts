@@ -1,10 +1,9 @@
 import {
-  Component, inject, signal, Input, OnChanges, SimpleChanges,
+  Component, signal, Input, OnChanges, SimpleChanges,
   Output, EventEmitter, ChangeDetectionStrategy
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 
 export interface IfcNode {
   id:         string;
@@ -139,37 +138,62 @@ const IFC_ICONS: Record<string, string> = {
   `
 })
 export class IfcTreeComponent implements OnChanges {
-  @Input() documentId?: number;
+  /**
+   * The model hierarchy, supplied by the host.
+   *
+   * <p>This component used to fetch the model tree itself, over HTTP, inside
+   * the package whose README says it knows no backend exists. The boundary
+   * test did not catch it: it forbids imports from the *application*, and the
+   * Angular HTTP client is a framework import. The spec now asserts the
+   * absence of network access directly, which is the property that was
+   * actually being claimed.
+   *
+   * <p>Undefined means "not loaded yet"; an empty array means "loaded, and the
+   * model has no tree", which falls back to {@link stats}. The two are
+   * different and a caller that conflates them gets a spinner forever.
+   */
+  @Input() nodes?: IfcNode[];
   @Input() stats?: { schema: string; elementCount: number };
   @Output() elementSelected  = new EventEmitter<IfcNode>();
   @Output() elementVisibilityChanged = new EventEmitter<{ node: IfcNode; visible: boolean }>();
-
-  private http = inject(HttpClient);
 
   treeNodes     = signal<IfcNode[]>([]);
   filteredNodes = signal<IfcNode[]>([]);
   selectedNode  = signal<IfcNode | null>(null);
   searchQuery   = '';
 
+  /** Whether a caller binds {@link nodes} at all, as opposed to only stats. */
+  private nodesBound = false;
+
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['documentId'] && this.documentId) {
-      this.loadTree();
+    if (changes['nodes']) {
+      this.nodesBound = true;
+
+      // Undefined is a load in flight. Deriving a synthetic tree here would
+      // show a plausible, wrong hierarchy and then replace it — worse than an
+      // empty panel, because the reader cannot tell it changed.
+      if (this.nodes === undefined) return;
+
+      if (this.nodes.length) {
+        this.treeNodes.set(this.nodes);
+        this.filteredNodes.set(this.nodes);
+        return;
+      }
+
+      // An empty array is an answer, not an absence: the model has no
+      // readable hierarchy. §1A.4 makes this tree the accessible route to a
+      // model that is otherwise a WebGL canvas, so falling back to what the
+      // element counts imply beats showing nothing.
+      this.buildSyntheticTree();
+      return;
     }
-    if (changes['stats'] && this.stats) {
+
+    // A caller that supplies only stats and never binds nodes still gets a
+    // tree — that was the behaviour before the fetch moved out, and it is the
+    // path a host takes when it has no hierarchy to give us.
+    if (changes['stats'] && !this.nodesBound && this.stats) {
       this.buildSyntheticTree();
     }
-  }
-
-  private loadTree() {
-    // Try to load model tree from backend
-    this.http.get<IfcNode[]>(`/api/viewer3d/${this.documentId}/tree`)
-      .subscribe({
-        next: nodes => {
-          this.treeNodes.set(nodes);
-          this.filteredNodes.set(nodes);
-        },
-        error: () => this.buildSyntheticTree()
-      });
   }
 
   private buildSyntheticTree() {
