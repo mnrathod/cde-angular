@@ -130,7 +130,7 @@ export function buildPdf({ pages, title, language = 'en-AU', widthPt, heightPt }
   // that produced different bytes every run would make "regenerate and diff"
   // impossible to use as a check.
   objects[infoRef - 1] =
-    `<< /Title ${pdfString(title)} /Producer ${pdfString('cde-angular demo sample generator')} ` +
+    `<< /Title ${pdfString(title)} /Producer ${pdfString('CDE Platform demo sample generator')} ` +
     `/CreationDate ${pdfString('D:20260101000000Z')} >>`;
 
   pages.forEach((lines, index) => {

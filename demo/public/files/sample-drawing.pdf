@@ -13,7 +13,7 @@ endobj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
 endobj
 5 0 obj
-<< /Title (Sample drawing set \(synthetic\)) /Producer (cde-angular demo sample generator) /CreationDate (D:20260101000000Z) >>
+<< /Title (Sample drawing set \(synthetic\)) /Producer (CDE Platform demo sample generator) /CreationDate (D:20260101000000Z) >>
 endobj
 6 0 obj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 1191 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 7 0 R >>
@@ -221,14 +221,14 @@ xref
 0000000148 00000 n 
 0000000245 00000 n 
 0000000347 00000 n 
-0000000490 00000 n 
-0000000627 00000 n 
-0000002286 00000 n 
-0000002423 00000 n 
-0000003722 00000 n 
-0000003861 00000 n 
+0000000491 00000 n 
+0000000628 00000 n 
+0000002287 00000 n 
+0000002424 00000 n 
+0000003723 00000 n 
+0000003862 00000 n 
 trailer
 << /Size 12 /Root 1 0 R /Info 5 0 R >>
 startxref
-5471
+5472
 %%EOF

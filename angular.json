@@ -6,7 +6,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "cde-angular": {
+    "cde-web": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -91,10 +91,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "cde-angular:build:production"
+              "buildTarget": "cde-web:build:production"
             },
             "development": {
-              "buildTarget": "cde-angular:build:development"
+              "buildTarget": "cde-web:build:development"
             }
           },
           "defaultConfiguration": "development",

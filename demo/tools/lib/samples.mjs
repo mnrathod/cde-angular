@@ -288,7 +288,7 @@ export function modelIfc() {
     'HEADER;',
     "FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');",
     "FILE_NAME('sample-model.ifc','2026-01-01T00:00:00'," +
-      "('Synthetic sample'),('No real party'),'cde-angular demo sample generator','','');",
+      "('Synthetic sample'),('No real party'),'CDE Platform demo sample generator','','');",
     "FILE_SCHEMA(('IFC4'));",
     'ENDSEC;',
     'DATA;',

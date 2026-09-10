@@ -139,6 +139,7 @@ trademark clearance, and §17.4 requires that before public launch.
 | What ships | A white sheet with a folded corner on the theme colour `#1e3a5f`, drawn by `tools/icons/generate-icons.mjs`. Neutral and generic on purpose |
 | Provenance | Entirely generated. Polygon geometry in the generator, rasterised by our own code; no font, no icon set, no traced or copied artwork |
 | Name in the manifest | `"CDE Platform"` / `"CDE"`, with `<title>CDE Platform</title>`. **Descriptive terms, not a coined mark** — "common data environment" is the industry's own vocabulary, so this asserts no trademark and infringes none. It replaces the scaffold name `cde-angular`, which leaked the repository name onto users' home screens |
+| Internal identifiers | The npm package and Angular project are `cde-web`, renamed from the scaffold `cde-angular`. Neither is user-facing, but `cde-angular` named the *framework*, and §3.2 says a name must not lie — that one would the day the framework changed. `cde-web` says the role instead, and avoids colliding with the `cde-platform` backend repository. The repository directory keeps its name, because the backend's `Jenkinsfile` locates it by path |
 | What is still needed | A product name and mark, cleared and registered in every jurisdiction of sale, before public launch (§17.4). Until then this is deliberately unremarkable so that nobody mistakes it for the answer |
 
 `node tools/icons/generate-icons.mjs --check` fails if the committed files

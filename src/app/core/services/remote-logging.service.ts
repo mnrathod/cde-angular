@@ -58,7 +58,7 @@ export class RemoteLoggingService {
       timestamp: new Date().toISOString(),
       release:   this.getAppVersion(),
       tags: {
-        platform: 'cde-angular',
+        platform: 'cde-web',
         ...event.tags
       }
     };
