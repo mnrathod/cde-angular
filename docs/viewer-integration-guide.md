@@ -4,10 +4,11 @@ For an engineer at a common data environment — Asite, Procore, Dalux, or your
 own — who has to make this viewer open your customers' documents.
 
 **Read section 1 before planning anything.** All four exchanges an integration
-needs are now built, and you can run a working host application from our
-repository today. **One response header on the viewer deployment still refuses
-the frame**, so the embed does not yet work against a stock install. This guide
-says which parts you can build on now and which you cannot, rather than
+needs are now built, you can run a working host application from this repository
+today, and the viewer deployment now has a `frame-ancestors` allow-list to put
+your origins on. **What is still missing is a tier that serves the embed
+document at all**, so the embed does not yet work against a stock install. This
+guide says which parts you can build on now and which you cannot, rather than
 describing an interface you would then fail to find.
 
 Companion: `viewer-architecture.md` for how the thing works internally.
@@ -22,7 +23,7 @@ Companion: `viewer-architecture.md` for how the thing works internally.
 | 2 | Tell the viewer who is looking | you → viewer | **Built** — `host.init.identity`, three untrusted fields. §5.5 |
 | 3 | Hand over a document | you → viewer | **Built** — `host.init.document`, or the conversion API. §3 |
 | 4 | Get back what was drawn | viewer → you | **Built** — markup events, lifecycle events and one operation pair. §5.3, §5.4 |
-| — | Framing permitted by the deployment | — | **Blocked** — a stock install sends `frame-ancestors 'none'`. §5.2 |
+| — | A tier that serves the embed document | — | **Missing** — the allow-list exists; nothing answers `/embed`. §5.2 |
 
 Two things are true at once, and conflating them will cost you a sprint.
 
@@ -32,12 +33,14 @@ no build step — that frames the viewer, drives the handshake, stores markup, a
 refuses an operation. You can clone it, run it, and read it as the thing you are
 about to write. §5.1 tells you how.
 
-**The deployment is not.** A stock viewer deployment sends
-`Content-Security-Policy: frame-ancestors 'none'` on every route, so the browser
-refuses the frame before your first message is sent. Until that becomes a
-per-tenant allow-list on the embed route, the embed works against a development
-deployment and not against an installed one. Ask before you schedule anything
-around it.
+**The deployment is not, yet.** The `frame-ancestors` allow-list now exists —
+`cde.web.embed-parent-origins` names the origins permitted to frame the embed
+route, and it is closed until someone sets it. What is still missing is a tier
+that serves the embed document at all: the backend image carries no frontend,
+and the Kubernetes manifests route everything to the backend. So the embed runs
+against a development deployment and not yet against an installed one. Ask where
+your deployment will serve `/embed` from before you schedule anything around
+it.
 
 **The conversion API has no such caveat.** §3 is a complete, working integration
 you can ship against today, inside your own interface, with your own
@@ -66,8 +69,8 @@ briefly, converts it, and discards it.
    │                    │   sends one                               │
    └────────────────────┘                      └────────────────────┘
 
-   ...but the deployment still answers every route with
-   frame-ancestors 'none', so the frame itself is refused.  §5.2
+   ...frame-ancestors is an allow-list now, closed until your
+   origins are named — but nothing serves /embed yet.  §5.2
 ```
 
 **We never hold your credentials** and never learn which storage platform your
@@ -324,26 +327,32 @@ the handshake is visible as it happens. Worth trying in this order:
 
 ### 5.2 The one thing your viewer deployment must change
 
-> **A stock deployment sends `Content-Security-Policy: frame-ancestors 'none'`
-> on every route, plus `X-Frame-Options: SAMEORIGIN`.** Your iframe will be
-> refused by the browser before any of this protocol runs, and the failure looks
-> like a blank frame rather than an error. This is known, it is the single
-> blocker between the protocol and a working integration, and it is not
-> something you can configure from your side.
+> **A deployment that has not been told about you refuses your iframe, and the
+> failure looks like a blank frame rather than an error.** `frame-ancestors` is
+> `'none'` until your origins are named, deliberately: opening the embed is a
+> configuration act and never a default. This is not something you can set from
+> your side.
 
-What it has to become: `frame-ancestors` stays `'none'` on every route **except**
-the embed route, where it names your origins, from tenant configuration, and is
-never a wildcard.
+The setting is `cde.web.embed-parent-origins` — a list of exact origins,
+`'none'` when empty, and validated at startup. Wildcards, the `null` origin, CSP
+keywords and anything carrying a path are all refused by name, because **a
+`frame-ancestors` source a browser cannot parse is not a closed door**: the
+browser drops what it cannot read and applies the rest, so a typo widens the
+policy rather than breaking visibly. Give your deployment contact the exact
+origins you will frame from, including scheme and any non-default port.
 
-Note that this header is the **authorisation** decision about who may frame the
-viewer. The `parentOrigin` you configure in the handshake is only addressing —
-it says where the viewer should post, not who is permitted to frame it. A
-deployment that relaxed only the second would be framable by anyone who sent the
-right message.
+This header is the **authorisation** decision about who may frame the viewer.
+The `parentOrigin` you configure in the handshake is only addressing — it says
+where the viewer should post, not who is permitted to frame it. A deployment
+that relaxed only the second would be framable by anyone who sent the right
+message.
 
-Ask your viewer deployment contact two questions before you scope the work:
-whether the embed route's `frame-ancestors` allow-list exists yet, and which of
-your origins are on it.
+> **The remaining gap is not the header.** The setting governs what the
+> *backend* answers. Where a deployment serves the Angular build from a separate
+> web tier, that tier serves the `/embed` document and must carry the same
+> value — and as the manifests stand, nothing serves `/embed` at all. So ask your
+> deployment contact two questions, not one: which of your origins are on the
+> allow-list, and **what will serve the embed document.**
 
 ### 5.3 The minimum integration
 
@@ -485,7 +494,8 @@ discovered.
 
 ### Still open
 
-- **`frame-ancestors` on the embed route** — §5.2. The blocker.
+- **A tier that serves the embed document** — §5.2. The allow-list is done;
+  nothing answers `/embed` yet.
 - **Non-PDF formats in an embedded frame** — §4. Wiring, not design.
 - **Collaboration in an embed** — §5.5. Genuinely unsolved.
 - **Accessibility evidence** — §7, before you rely on ours.
@@ -541,9 +551,10 @@ Before you scope an embedded integration:
 
 - [ ] Have you run the demo host and watched a handshake? (`demo/README.md`)
 - [ ] Have you read the embed protocol? (`docs/viewer-embed-protocol.md`)
-- [ ] **Have you confirmed the embed route's `frame-ancestors` allow-list exists
-      on the deployment you will integrate with, and that your origins are on
-      it?** (§5.2)
+- [ ] **Have you given your deployment contact the exact origins you will frame
+      from, and confirmed they are on `cde.web.embed-parent-origins`?** (§5.2)
+- [ ] **Have you confirmed what will serve the `/embed` document on that
+      deployment?** (§5.2)
 - [ ] Can you mint a short-lived URL for a document, and serve a page that
       frames us?
 - [ ] Does your storage allow the viewer's origin to read that URL from the

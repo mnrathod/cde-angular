@@ -11,8 +11,9 @@ const children = [
     'For an engineer at a common data environment — Asite, Procore, Dalux, or your own — who has '
   + 'to make this viewer open your customers’ documents.',
     ['**Read section 1 before planning anything.** All four exchanges an integration needs are now '
-   + 'built, and you can run a working host application from our repository today. **One response '
-   + 'header on the viewer deployment still refuses the frame**, so the embed does not yet work '
+   + 'built, you can run a working host application from our repository today, and the viewer '
+   + 'deployment now has a `frame-ancestors` allow-list to put your origins on. **What is still '
+   + 'missing is a tier that serves the embed document at all**, so the embed does not yet work '
    + 'against a stock install. This guide says which parts you can build on now and which you '
    + 'cannot, rather than describing an interface you would then fail to find.']),
 
@@ -30,11 +31,13 @@ const children = [
   + 'ships a host application — plain HTML and JavaScript, no framework, no build step — that '
   + 'frames the viewer, drives the handshake, stores markup, and refuses an operation. You can '
   + 'clone it, run it, and read it as the thing you are about to write. Section 5 tells you how.'),
-  p('**The deployment is not.** A stock viewer deployment sends '
-  + '`Content-Security-Policy: frame-ancestors \'none\'` on every route, so the browser refuses '
-  + 'the frame before your first message is sent. Until that becomes a per-tenant allow-list on '
-  + 'the embed route, the embed works against a development deployment and not against an '
-  + 'installed one. Ask before you schedule anything around it.'),
+  p('**The deployment is not, yet.** The `frame-ancestors` allow-list now exists — '
+  + '`cde.web.embed-parent-origins` names the origins permitted to frame the embed route, and it '
+  + 'is closed until someone sets it. What is still missing is a tier that serves the embed '
+  + 'document at all: the backend image carries no frontend, and the Kubernetes manifests route '
+  + 'everything to the backend. So the embed runs against a development deployment and not yet '
+  + 'against an installed one. Ask where your deployment will serve `/embed` from before you '
+  + 'schedule anything around it.'),
   p('**The conversion API has no such caveat.** Section 3 is a complete, working integration you '
   + 'can ship against today, inside your own interface, with your own rendering — and for a '
   + '“preview any file format” feature that is often the whole requirement.'),
@@ -259,19 +262,25 @@ const children = [
   + 'Sign: the control renders and the operation is **refused**, and both of those are correct.'),
 
   h2('5.2  The one thing your viewer deployment must change'),
-  note('**A stock deployment sends `Content-Security-Policy: frame-ancestors \'none\'` on every '
-     + 'route, plus `X-Frame-Options: SAMEORIGIN`.** Your iframe will be refused by the browser '
-     + 'before any of this protocol runs, and the failure looks like a blank frame rather than an '
-     + 'error. This is known, it is the single blocker between the protocol and a working '
-     + 'integration, and it is not something you can configure from your side.'),
-  p('What it has to become: `frame-ancestors` stays `\'none\'` on every route **except** the embed '
-  + 'route, where it names your origins, from tenant configuration, and is never a wildcard. '
-  + 'Note that this header is the **authorisation** decision about who may frame the viewer. The '
+  note('**A deployment that has not been told about you refuses your iframe, and the failure '
+     + 'looks like a blank frame rather than an error.** `frame-ancestors` is `\'none\'` until '
+     + 'your origins are named, deliberately: opening the embed is a configuration act and never '
+     + 'a default. This is not something you can set from your side.'),
+  p('The setting is `cde.web.embed-parent-origins` — a list of exact origins, `\'none\'` when '
+  + 'empty, and validated at startup. Wildcards, the `null` origin, CSP keywords and anything '
+  + 'carrying a path are all refused by name, because **a `frame-ancestors` source a browser '
+  + 'cannot parse is not a closed door**: the browser drops what it cannot read and applies the '
+  + 'rest, so a typo widens the policy rather than breaking visibly. Give your deployment contact '
+  + 'the exact origins you will frame from, including scheme and any non-default port.'),
+  p('This header is the **authorisation** decision about who may frame the viewer. The '
   + '`parentOrigin` you configure in the handshake is only addressing — it says where the viewer '
   + 'should post, not who is permitted to frame it. A deployment that relaxed only the second '
   + 'would be framable by anyone who sent the right message.'),
-  p('Ask your viewer deployment contact two questions before you scope the work: whether the '
-  + 'embed route’s `frame-ancestors` allow-list exists yet, and which of your origins are on it.'),
+  note('**The remaining gap is not the header.** The setting governs what the *backend* answers. '
+     + 'Where a deployment serves the Angular build from a separate web tier, that tier serves '
+     + 'the `/embed` document and must carry the same value — and as the manifests stand, nothing '
+     + 'serves `/embed` at all. So ask your deployment contact two questions, not one: which of '
+     + 'your origins are on the allow-list, and **what will serve the embed document.**'),
 
   h2('5.3  The minimum integration'),
   p('Four steps, and none of them involve a token.'),
@@ -387,7 +396,8 @@ const children = [
        + 'needs v2, announced with at least six months’ notice and both versions running over the '
        + 'overlap.'),
   h2('Still open'),
-  bullet('**`frame-ancestors` on the embed route** — section 5.2. The blocker.'),
+  bullet('**A tier that serves the embed document** — section 5.2. The allow-list is done; '
+       + 'nothing answers `/embed` yet.'),
   bullet('**Non-PDF formats in an embedded frame** — section 4. Wiring, not design.'),
   bullet('**Collaboration in an embed** — section 5.5. Genuinely unsolved.'),
   bullet('**Accessibility evidence.** See section 7 before you rely on ours.'),
@@ -428,8 +438,9 @@ const children = [
   h2('Before you scope an embedded integration'),
   bullet('Have you run the demo host and watched a handshake? (`demo/README.md`)'),
   bullet('Have you read the embed protocol? (`docs/viewer-embed-protocol.md`)'),
-  bullet('**Have you confirmed the embed route’s `frame-ancestors` allow-list exists on the '
-       + 'deployment you will integrate with, and that your origins are on it?**'),
+  bullet('**Have you given your deployment contact the exact origins you will frame from, and '
+       + 'confirmed they are on `cde.web.embed-parent-origins`?**'),
+  bullet('**Have you confirmed what will serve the `/embed` document on that deployment?**'),
   bullet('Can you mint a short-lived URL for a document, and serve a page that frames us?'),
   bullet('Does your storage allow the viewer’s origin to read that URL from the browser?'),
   bullet('Do you check `event.origin` on every message, not once at setup?'),

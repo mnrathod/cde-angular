@@ -8,10 +8,11 @@
 - **Status:** the rendering core is built and boundary-enforced, and so — since
   this document was last issued — is the integration surface: the
   `cde.viewer.v1` embed protocol is implemented on both sides and tested
-  against an independent host. **It cannot yet be framed in a real
-  deployment**, because the platform still sends `frame-ancestors 'none'` on
-  every route. §13 says exactly what is left; read it before quoting anything
-  here to a customer.
+  against an independent host, and the backend now carries the
+  `frame-ancestors` allow-list that used to refuse every frame. **It still
+  cannot be demonstrated end to end**: nothing in the deployment serves the
+  embed document. §13 says exactly what is left; read it before quoting
+  anything here to a customer.
 
 ---
 
@@ -424,7 +425,7 @@ response headers. What the **viewer product** must own itself once distributed:
 |---|---|---|
 | SSRF policy on the ingress | Platform `fetch/` package | Travels with the product — it is the product's own attack surface |
 | Upload magic-byte + AV | Platform | Travels |
-| Content Security Policy | Platform response headers — **still `frame-ancestors 'none'` globally** | Must become a per-tenant allow-list **on the embed route only**; every other route keeps `'none'` (ADR 14). **Not done — this is what blocks the embed** |
+| Content Security Policy | Platform response headers; `frame-ancestors` is an allow-list on the embed route, `'none'` everywhere else | Travels with the product. Deployment-level today; per-tenant needs a discriminator the request cannot forge |
 | Tenant isolation | Platform RLS | **Does not travel.** The host owns tenancy; the viewer must not assume it |
 | Audit | Platform hash chain | Host's concern; the viewer emits events, it does not store them |
 
@@ -432,27 +433,47 @@ The last two rows matter most in the long run: a distributed viewer that assumes
 it owns tenancy would be wrong in a way that is expensive to unwind. **The third
 row is what matters this week.**
 
-### 10.1 `frame-ancestors` is the whole blocker
+### 10.1 `frame-ancestors`, and what it did and did not unblock
 
-`SecurityConfig` sets `Content-Security-Policy: … frame-ancestors 'none'` on
-every route and `X-Frame-Options: SAMEORIGIN` beneath it, and
-`SecurityHeadersTest` asserts both. Nothing in `src/main` reads a per-tenant
-embed origin; the only origin configuration that exists is for CORS. So a
-customer framing the viewer gets a browser-level refusal before `viewer.ready`
-is ever posted.
+**Done.** `cde.web.embed-parent-origins` names the host origins permitted to
+frame the `/embed` route. Every other route keeps `'none'`, and a test fails if
+a relaxation lands globally rather than on that route. `X-Frame-Options` is now
+written per route rather than globally — it has no allow-list form, so on the
+embed route it could only say `SAMEORIGIN` and a browser honouring it would
+refuse the frame however the CSP reads.
 
-ADR 14 named this in its consequences and it has not been done. The shape it
-has to take is already decided: `frame-ancestors` stays `'none'` everywhere
-**except** the embed route, where it names the integrator's origins from tenant
-configuration and is **never** a wildcard. The test has to change with it — from
-asserting `'none'` everywhere to asserting `'none'` everywhere except that
-route, and asserting that route is never `*`.
+**Closed by default.** An empty list yields `frame-ancestors 'none'` — the same
+policy, byte for byte, that every other route gets. Adding the route does not on
+its own make anything framable, which is what made the change safe to merge
+before anyone had decided which customers may embed.
 
 **This is a security change, not a configuration change.** `frame-ancestors` is
 the authorisation decision about who may frame the viewer; `parentOrigin` in the
 handshake is only addressing — it says where to post, not who is allowed.
 Confusing the two would produce a viewer that any site could frame as long as it
 sent the right message.
+
+Values are validated at startup, because **a `frame-ancestors` source a browser
+cannot parse is not a closed door** — the browser drops the unparseable source
+and applies what is left, so a typo silently widens the policy instead of
+breaking visibly. Wildcards, the `null` origin, CSP keywords offered as origins,
+anything carrying a path, and non-http schemes are all refused by name.
+
+**Deployment-level, not per-tenant, and that limit is deliberate.** The embed
+route carries no credential by design, so there is no authenticated principal to
+derive a tenant from; deriving one from a query parameter or a header would let
+a caller nominate its own allow-list, which is a wildcard with extra steps. For
+the viewer as ADR 12 sells it — a product a customer installs — one deployment
+is one customer, and that is the boundary this draws. Narrowing further needs a
+discriminator the request cannot forge.
+
+**What this did not unblock: nothing serves the embed document.** The backend
+image carries no frontend and `k8s/ingress.yaml` routes everything to the
+backend, so there is no tier answering `/embed` at all. Where a deployment does
+put the Angular build behind a separate web tier, that tier serves the document
+and must carry the same header — the backend's copy governs only what the
+backend answers. Configuring the allow-list is necessary and is not on its own
+sufficient.
 
 ---
 
@@ -515,9 +536,11 @@ Stated plainly, and shorter than it was. The gap between "the viewer works" and
 "a CDE can integrate it" used to be a set of undecided contracts; it is now a
 set of unfinished jobs, in rough order of what blocks what.
 
-**The embed cannot be framed.** §10.1. The protocol is built on both sides and
-the deployment refuses the frame. This is the one item that makes every other
-item academic, and it is also the smallest.
+**Nothing serves the embed document.** §10.1. The allow-list exists and is
+closed until configured; what is missing is a tier that answers `/embed` at all.
+This is now a deployment-architecture question — whether the Angular build ships
+inside the backend image or behind its own web tier — rather than a header
+nobody had written.
 
 **The embed opens PDF and nothing else.** §4.3. The conversion service exists;
 the embed path does not call it.

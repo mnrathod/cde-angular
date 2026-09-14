@@ -177,16 +177,17 @@ function diagramBoundary() {
 
       { cells: [
         { t: '' },
-        { t: ['✗  BLOCKED IN DEPLOYMENT',
-              'the platform still sends frame-ancestors \'none\''],
+        { t: ['⚠  NOT YET DEPLOYABLE',
+              'the allow-list exists; nothing serves the embed document'],
           fill: RED_BG, color: RED, align: AlignmentType.CENTER, bold: true },
         { t: '' } ] }
     ]),
     caption('Figure 1 — All four exchanges now have code on both sides, checked against each '
-          + 'other by a demo host written in plain JavaScript. None of it renders in a customer’s '
-          + 'browser yet: the platform sends `frame-ancestors \'none\'` on every route, so the '
-          + 'frame is refused before a single message is sent. That is one response header, not '
-          + 'one of the four exchanges.')
+          + 'other by a demo host written in plain JavaScript. The `frame-ancestors` allow-list '
+          + 'the backend refused to have now exists — `cde.web.embed-parent-origins`, closed '
+          + 'until a deployment names a host. What is still missing is a tier that serves the '
+          + '`/embed` document at all: the backend image carries no frontend, and the Kubernetes '
+          + 'manifests route everything to the backend.')
   ];
 }
 
