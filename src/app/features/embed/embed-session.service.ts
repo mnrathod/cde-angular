@@ -27,7 +27,20 @@ export type SessionPhase = 'awaiting-host' | 'loading' | 'ready' | 'failed';
 /** Media types the browser renders on its own, with no conversion service. */
 const DIRECTLY_RENDERABLE = new Set(['application/pdf']);
 
-@Injectable({ providedIn: 'root' })
+/*
+ * Provided by EmbedViewerComponent, not in root.
+ *
+ * It has to be: this injects ViewerStateService, which is deliberately not a
+ * root service — one instance per viewer, so two viewers on a page do not
+ * share a zoom level and a page number. A root singleton cannot see a
+ * component's provider, so `providedIn: 'root'` here made the embed route
+ * unresolvable.
+ *
+ * It is also the right scope on its own terms. This holds one host
+ * conversation — its phase, its document, its capabilities — and a singleton
+ * holding that would carry the previous document's state into the next one.
+ */
+@Injectable()
 export class EmbedSession {
 
   private readonly channel = inject(HostChannel);

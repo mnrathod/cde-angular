@@ -21,7 +21,7 @@ const MONO = 'Consolas';
 
 const USABLE = 9746;           // A4 minus 0.75in margins, in DXA
 
-// ── inline markup: **bold** and `code` ─────────────────────────────────
+// ── inline markup: **bold**, *italic* and `code` ───────────────────────
 // Split a string on `code` spans. Used on its own for plain text and again
 // INSIDE a bold token — a code span nested in bold is common ("**`x` is the
 // product.**") and matching only the outer token emitted its backticks
@@ -39,6 +39,12 @@ function splitCode(s) {
   return parts;
 }
 
+// Single-asterisk emphasis, matched only where it is not part of a `**` pair.
+// Without this the asterisks were emitted verbatim — "what the *backend*
+// answers" reached a customer-facing PDF with the punctuation showing, which
+// no XML check catches and only a rendered page reveals.
+const ITALIC = /(?<!\*)\*(?!\*)([^*]+)\*(?!\*)/g;
+
 // `opts.bold` forces bold across every emitted run — used by table headers and
 // emphasised cells. It must be applied HERE rather than by rewrapping the
 // returned TextRuns: spreading a TextRun instance ({...run}) yields its
@@ -50,20 +56,35 @@ function runs(text, opts = {}) {
   const color = opts.color || INK;
   const force = opts.bold === true;
   const emit = (out, piece, bold) => out.push(new TextRun({
-    text: piece.text, bold: bold || force, color,
+    text: piece.text, bold: bold || force, italics: piece.italic === true, color,
     font: piece.code ? MONO : BODY,
     size: piece.code ? size - 2 : size
   }));
+
+  // Italic is resolved inside each code-split piece, so `*` inside a code
+  // span stays literal — a CSS selector or a glob in backticks must not
+  // silently become emphasis.
+  const withItalic = (segment, out, bold) => splitCode(segment).forEach((piece) => {
+    if (piece.code) return emit(out, piece, bold);
+    let last = 0, m;
+    ITALIC.lastIndex = 0;
+    while ((m = ITALIC.exec(piece.text)) !== null) {
+      if (m.index > last) emit(out, { text: piece.text.slice(last, m.index) }, bold);
+      emit(out, { text: m[1], italic: true }, bold);
+      last = m.index + m[0].length;
+    }
+    if (last < piece.text.length) emit(out, { text: piece.text.slice(last) }, bold);
+  });
 
   const out = [];
   const re = /\*\*[^*]+\*\*/g;
   let last = 0, m;
   while ((m = re.exec(text)) !== null) {
-    if (m.index > last) splitCode(text.slice(last, m.index)).forEach(pc => emit(out, pc, false));
-    splitCode(m[0].slice(2, -2)).forEach(pc => emit(out, pc, true));
+    if (m.index > last) withItalic(text.slice(last, m.index), out, false);
+    withItalic(m[0].slice(2, -2), out, true);
     last = m.index + m[0].length;
   }
-  if (last < text.length) splitCode(text.slice(last)).forEach(pc => emit(out, pc, false));
+  if (last < text.length) withItalic(text.slice(last), out, false);
   return out.length ? out : [new TextRun({ text: '', font: BODY, size, color })];
 }
 

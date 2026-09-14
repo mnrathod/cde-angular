@@ -10,12 +10,13 @@ const children = [
     'Integration Guide',
     'For an engineer at a common data environment — Asite, Procore, Dalux, or your own — who has '
   + 'to make this viewer open your customers’ documents.',
-    ['**Read section 1 before planning anything.** All four exchanges an integration needs are now '
-   + 'built, you can run a working host application from our repository today, and the viewer '
-   + 'deployment now has a `frame-ancestors` allow-list to put your origins on. **What is still '
-   + 'missing is a tier that serves the embed document at all**, so the embed does not yet work '
-   + 'against a stock install. This guide says which parts you can build on now and which you '
-   + 'cannot, rather than describing an interface you would then fail to find.']),
+    ['**Read section 1 before planning anything.** All four exchanges an integration needs are '
+   + 'built, you can run a working host application from our repository today, and a stock '
+   + 'install now serves the embed document and carries the `frame-ancestors` allow-list to put '
+   + 'your origins on. **What has not been exercised end to end is a real document opening '
+   + 'inside a real host frame**, so treat section 4 as the contract and your first integration '
+   + 'as the thing that proves it. This guide says which parts you can build on now and which '
+   + 'are newer than anyone’s production traffic.']),
 
   p('Companion document: **Technical Architecture**, for how the thing works internally.'),
 
@@ -31,13 +32,18 @@ const children = [
   + 'ships a host application — plain HTML and JavaScript, no framework, no build step — that '
   + 'frames the viewer, drives the handshake, stores markup, and refuses an operation. You can '
   + 'clone it, run it, and read it as the thing you are about to write. Section 5 tells you how.'),
-  p('**The deployment is not, yet.** The `frame-ancestors` allow-list now exists — '
-  + '`cde.web.embed-parent-origins` names the origins permitted to frame the embed route, and it '
-  + 'is closed until someone sets it. What is still missing is a tier that serves the embed '
-  + 'document at all: the backend image carries no frontend, and the Kubernetes manifests route '
-  + 'everything to the backend. So the embed runs against a development deployment and not yet '
-  + 'against an installed one. Ask where your deployment will serve `/embed` from before you '
-  + 'schedule anything around it.'),
+  p('**The deployment now exists, and is new.** The image serves the viewer’s pages itself when '
+  + '`cde.web.app.path` points at a staged build, so one container answers both `/embed` and the '
+  + 'API, and emits the `Content-Security-Policy` that governs the document it just served. '
+  + '`cde.web.embed-parent-origins` names the origins permitted to frame that route and is '
+  + 'closed until someone sets it — so ask your deployment contact to add your origin before '
+  + 'you test, because until they do the frame comes up blank with an error only your browser '
+  + 'console will show you.'),
+  p('**What that deployment has and has not been through.** Every page route has been served '
+  + 'from a production build under the real policy and loaded in a browser with no content '
+  + 'blocked. What has not happened is a document opening inside a host’s frame against an '
+  + 'installed deployment — the pieces are each verified and the whole is not. Expect to be the '
+  + 'first to find whatever that turns up, and plan a spike rather than a delivery date.'),
   p('**The conversion API has no such caveat.** Section 3 is a complete, working integration you '
   + 'can ship against today, inside your own interface, with your own rendering — and for a '
   + '“preview any file format” feature that is often the whole requirement.'),
@@ -226,7 +232,7 @@ const children = [
   p('**If you need either, raise it as a commercial requirement, not a bug.** The answer involves '
   + 'a vendor contract and, for RVT, a residency decision that engineering cannot take alone.'),
 
-  h1('5.  Embedding — built, and what your deployment still needs'),
+  h1('5.  Embedding — built, and what your deployment must configure'),
   lead('An iframe and a versioned postMessage protocol. The viewer authenticates nobody and '
      + 'authorises nothing: you mint a short-lived URL for the document, tell it a name to '
      + 'display, and receive what the user did — every operation that changes anything comes back '
@@ -276,11 +282,14 @@ const children = [
   + '`parentOrigin` you configure in the handshake is only addressing — it says where the viewer '
   + 'should post, not who is permitted to frame it. A deployment that relaxed only the second '
   + 'would be framable by anyone who sent the right message.'),
-  note('**The remaining gap is not the header.** The setting governs what the *backend* answers. '
-     + 'Where a deployment serves the Angular build from a separate web tier, that tier serves '
-     + 'the `/embed` document and must carry the same value — and as the manifests stand, nothing '
-     + 'serves `/embed` at all. So ask your deployment contact two questions, not one: which of '
-     + 'your origins are on the allow-list, and **what will serve the embed document.**'),
+  note('**Ask your deployment contact which component serves `/embed`.** The setting governs '
+     + 'what the *backend* answers. A stock install now serves the embed document from the '
+     + 'backend image itself, so one component emits the document and the header together and '
+     + 'there is nothing else to configure. But a deployment that puts the Angular build behind '
+     + 'its own web tier has that tier serving the document, and **it needs the same '
+     + '`frame-ancestors` value** — the backend’s copy governs only what the backend answers. '
+     + 'Two questions, not one: which of your origins are on the allow-list, and what serves the '
+     + 'document.'),
 
   h2('5.3  The minimum integration'),
   p('Four steps, and none of them involve a token.'),
@@ -396,8 +405,8 @@ const children = [
        + 'needs v2, announced with at least six months’ notice and both versions running over the '
        + 'overlap.'),
   h2('Still open'),
-  bullet('**A tier that serves the embed document** — section 5.2. The allow-list is done; '
-       + 'nothing answers `/embed` yet.'),
+  bullet('**Nobody has opened a document in a host frame on an installed deployment** — '
+       + 'section 5.2. Every piece is verified and the whole has not run. Plan a spike.'),
   bullet('**Non-PDF formats in an embedded frame** — section 4. Wiring, not design.'),
   bullet('**Collaboration in an embed** — section 5.5. Genuinely unsolved.'),
   bullet('**Accessibility evidence.** See section 7 before you rely on ours.'),

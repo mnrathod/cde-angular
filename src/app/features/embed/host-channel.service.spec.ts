@@ -85,15 +85,17 @@ describe('HostChannel', () => {
       expect(sent.some((entry) => entry.targetOrigin === '*')).toBe(false);
     });
 
-    it.each(['*', 'null', '', 'not a url', '/relative', 'https://host.example/path'])(
-      'refuses to connect when parentOrigin is %j, rather than falling back to a wildcard',
-      (origin) => {
+    // A loop rather than it.each — see the note at the foot of this file.
+    for (const origin of
+      ['*', 'null', '', 'not a url', '/relative', 'https://host.example/path']) {
+      it(`refuses to connect when parentOrigin is ${JSON.stringify(origin)}, `
+         + 'rather than falling back to a wildcard', () => {
         const { connected, sent, listenerCount } = harness(origin);
         expect(connected).toBe(false);
         expect(sent).toHaveLength(0);
         expect(listenerCount()).toBe(0);
-      },
-    );
+      });
+    }
   });
 
   describe('rule 2 — check the origin on every message', () => {
@@ -138,7 +140,7 @@ describe('HostChannel', () => {
 
   describe('rule 4 — every payload is untrusted', () => {
 
-    it.each([
+    const malformed: Array<[string, unknown]> = [
       ['a foreign protocol', { protocol: 'other.thing.v1', type: 'x', id: '1', payload: {} }],
       ['no protocol at all', { type: 'host.init', id: '1', payload: {} }],
       ['a missing id', { protocol: PROTOCOL, type: 'host.init', payload: {} }],
@@ -146,11 +148,16 @@ describe('HostChannel', () => {
       ['an array payload', { protocol: PROTOCOL, type: 'host.init', id: '1', payload: [] }],
       ['a bare string', 'host.init'],
       ['null', null],
-    ])('drops %s', (_label, data) => {
-      const { deliver, received } = harness();
-      deliver(data);
-      expect(received).toHaveLength(0);
-    });
+    ];
+
+    // A loop rather than it.each — see the note at the foot of this file.
+    for (const [label, data] of malformed) {
+      it(`drops ${label}`, () => {
+        const { deliver, received } = harness();
+        deliver(data);
+        expect(received).toHaveLength(0);
+      });
+    }
 
     it('ignores a foreign protocol silently, without reporting it as an error', () => {
       // §4: other frames on the page use postMessage for their own purposes.
@@ -233,3 +240,14 @@ describe('HostChannel', () => {
     });
   });
 });
+
+/*
+ * Why the loops above, and not `it.each`.
+ *
+ * zone.js's Vitest patch does not wrap the `.each` variants, so calling one
+ * throws while the module is still being evaluated. That takes the whole file
+ * with it: Vitest reports the suite as failed to load and runs none of it, and
+ * the summary line still reads "N passed" for every other file. Every rule in
+ * here — the origin checks, the payload checks, all of it — was silently not
+ * running, which is the worst state a security spec can be in.
+ */

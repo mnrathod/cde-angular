@@ -11,10 +11,12 @@ const children = [
     'The document viewer as a product a third-party common data environment embeds.',
     ['**Status.** The rendering core is built and boundary-enforced, and so — since this document '
    + 'was last issued — is the integration surface: the `cde.viewer.v1` embed protocol is '
-   + 'implemented on both sides and tested against an independent host, and the backend now '
-   + 'carries the `frame-ancestors` allow-list that used to refuse every frame. **It still cannot '
-   + 'be demonstrated end to end**: nothing in the deployment serves the embed document. Section '
-   + '13 states exactly what is left — read it before quoting anything here to a customer.']),
+   + 'implemented on both sides and tested against an independent host, the backend carries the '
+   + '`frame-ancestors` allow-list that used to refuse every frame, and **the image now serves '
+   + 'the embed document itself**, which is what closed the gap this document reported last '
+   + 'time. What has not happened is a document opening inside a host’s frame against an '
+   + 'installed deployment. Section 13 states exactly what is left — read it before quoting '
+   + 'anything here to a customer.']),
 
   p('**Scope.** The viewer as described by ADR 12 (`cde-platform`, '
   + '`docs/adr/0012-viewer-as-a-standalone-product.md`).'),
@@ -358,12 +360,32 @@ const children = [
   + 'allow-list, which is a wildcard with extra steps. For the viewer as ADR 12 sells it — a '
   + 'product a customer installs — one deployment is one customer, and that is the boundary this '
   + 'draws. Narrowing further needs a discriminator the request cannot forge.'),
-  note('**What this did not unblock: nothing serves the embed document.** The backend image '
-     + 'carries no frontend and `k8s/ingress.yaml` routes everything to the backend, so there is '
-     + 'no tier answering `/embed` at all. Where a deployment does put the Angular build behind a '
-     + 'separate web tier, that tier serves the document and must carry the same header — the '
-     + 'backend’s copy governs only what the backend answers. Configuring the allow-list is '
-     + 'necessary and is not on its own sufficient.'),
+  p('Where a deployment puts the Angular build behind a separate web tier, that tier serves the '
+  + 'document and must carry the same header — the backend’s copy governs only what the backend '
+  + 'answers. The supported way to avoid that split is 10.2.'),
+
+  h2('10.2  Serving the embed document from the image'),
+  p('The allow-list was necessary and not sufficient: until recently nothing in the deployment '
+  + 'served `/embed` at all, because the image carried no frontend while `k8s/ingress.yaml` '
+  + 'routed every page request to it. ADR 15 closed that. `cde.web.app.path` points the image at '
+  + 'a staged Angular build, and the same component then emits both the document and the policy '
+  + 'that governs it.'),
+  p('**Empty by default.** An image with nothing staged serves no pages and answers page routes '
+  + 'with 404 — the behaviour before ADR 15, and the right one where a web tier serves the '
+  + 'build. The bundle is staged into the backend’s build context before the image is built, '
+  + 'because the Angular sources live in a sibling repository a Docker context cannot reach.'),
+  note('**The document cannot be a static file.** §5.4 forbids `style-src \'unsafe-inline\'`, and '
+     + 'a production build carries inlined critical CSS, module scripts and a small script that '
+     + 'promotes the deferred stylesheet — all of which need a nonce matching the header on the '
+     + 'same response. So the document is rendered per request, with `Cache-Control: no-store`, '
+     + 'and the build stamps a placeholder the server substitutes. Splitting the document from '
+     + 'its header across two components is what this design exists to avoid.'),
+  p('**Verified in a browser, which found what reasoning had not.** Serving a real production '
+  + 'build under the composed policy showed the first version refusing the stylesheet-promoting '
+  + 'script — so the main stylesheet never applied and the page looked broken rather than '
+  + 'unstyled — and showed `/embed` failing dependency injection before it rendered anything. '
+  + 'Both are fixed; every page route now loads with nothing blocked. A document opening inside '
+  + 'a host frame on an installed deployment remains untested.'),
 
   h1('11.  Performance'),
   p('§7.1 applies unchanged: every interactive request under a second, bulk work async with a job '
@@ -413,10 +435,16 @@ const children = [
   lead('Stated plainly, and shorter than it was. The gap between “the viewer works” and “a CDE can '
      + 'integrate it” used to be a set of undecided contracts; it is now a set of unfinished jobs, '
      + 'in rough order of what blocks what.'),
-  p('**Nothing serves the embed document.** Section 10.1. The allow-list exists and is closed '
-  + 'until configured; what is missing is a tier that answers `/embed` at all. This is now a '
-  + 'deployment-architecture question — whether the Angular build ships inside the backend image '
-  + 'or behind its own web tier — rather than a header nobody had written.'),
+  p('**No document has opened in a host frame on an installed deployment.** Section 10.2. The '
+  + 'pieces are each verified — the protocol against an independent host, the allow-list against '
+  + 'its own tests, the served document against a real browser — and the whole has never run. '
+  + 'This is the next thing to do and the thing most likely to surface something nobody '
+  + 'predicted.'),
+  p('**The library and the application are built from one repository.** The image serves the '
+  + 'Angular build staged into the backend’s context, which works and means the frontend is '
+  + 'versioned with the backend that carries it. A customer wanting the viewer without the '
+  + 'platform still has no artefact of their own; that waits on `viewer-core` being published, '
+  + 'below.'),
   p('**The embed opens PDF and nothing else.** Section 4.3. The conversion service exists; the '
   + 'embed path does not call it.'),
   p('**Collaboration has no identity in an embed.** Live cursors and presence ride a STOMP socket '

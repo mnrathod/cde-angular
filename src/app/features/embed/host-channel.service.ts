@@ -42,7 +42,13 @@ export interface ChannelConfiguration {
 
 export type HostMessageListener = (message: Envelope) => void;
 
-@Injectable({ providedIn: 'root' })
+/*
+ * Provided by EmbedViewerComponent, alongside EmbedSession, which is its only
+ * consumer. Not in root: this holds the configured parent origin and the
+ * window it posts to, so a singleton surviving a re-entry into the route would
+ * hand the new session the previous host's origin.
+ */
+@Injectable()
 export class HostChannel {
 
   private configuration: ChannelConfiguration | null = null;

@@ -132,14 +132,23 @@ describe('viewer-core boundary', () => {
     { pattern: /['"`]\/api\//,                         what: 'an /api path' },
   ];
 
-  it.each(NETWORK)('fetches nothing — no $what anywhere in the package', ({ pattern }) => {
-    const offenders = Object.entries(SOURCES)
-      .filter(([, source]) => pattern.test(source))
-      .map(([path]) => path)
-      .sort();
+  // A loop rather than it.each: zone.js's Vitest patch does not wrap the
+  // `.each` variants, so calling one throws while the module is still being
+  // evaluated. That failure takes the whole file with it — Vitest reports the
+  // suite as failed to load and runs none of it, while the summary line still
+  // reads "N passed" for everything else. A boundary check that never
+  // executes is worse than one that does not exist, because the file being
+  // present is what stops anyone writing it again.
+  for (const { pattern, what } of NETWORK) {
+    it(`fetches nothing — no ${what} anywhere in the package`, () => {
+      const offenders = Object.entries(SOURCES)
+        .filter(([, source]) => pattern.test(source))
+        .map(([path]) => path)
+        .sort();
 
-    expect(offenders).toEqual([]);
-  });
+      expect(offenders).toEqual([]);
+    });
+  }
 
   it('lets no production file reach outside at all, helper included', () => {
     // The exemption above is for specs. Nothing that ships may use it —

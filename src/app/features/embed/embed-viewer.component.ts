@@ -16,6 +16,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { ViewerStateService } from '../../../viewer-core/viewer-state.service';
 import { EmbedSession } from './embed-session.service';
+import { HostChannel } from './host-channel.service';
 import { EmbedPageComponent } from './embed-page.component';
 import { ProblemDetail } from './embed-protocol';
 
@@ -23,6 +24,15 @@ import { ProblemDetail } from './embed-protocol';
   selector: 'app-embed-viewer',
   standalone: true,
   imports: [CommonModule, EmbedPageComponent],
+  // One set per framed viewer, matching ViewerShellComponent. ViewerStateService
+  // is not a root service by design — two viewers on a page must not share a
+  // zoom level or a page number — and EmbedSession and HostChannel hold one
+  // host conversation each, so all three belong to this component's lifetime.
+  //
+  // Without this the route threw NG0201 on load and rendered nothing. The unit
+  // tests did not catch it: they build their own injector listing every
+  // service, which exercises the code and not the wiring.
+  providers: [ViewerStateService, HostChannel, EmbedSession],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="shell">
