@@ -3,9 +3,12 @@
 For an engineer at a common data environment — Asite, Procore, Dalux, or your
 own — who has to make this viewer open your customers' documents.
 
-**Read section 1 before planning anything.** One of the four exchanges an
-integration needs is built. The other three are not, and this guide says so
-rather than describing an interface you would then fail to find.
+**Read section 1 before planning anything.** All four exchanges an integration
+needs are now built, and you can run a working host application from our
+repository today. **One response header on the viewer deployment still refuses
+the frame**, so the embed does not yet work against a stock install. This guide
+says which parts you can build on now and which you cannot, rather than
+describing an interface you would then fail to find.
 
 Companion: `viewer-architecture.md` for how the thing works internally.
 
@@ -15,18 +18,31 @@ Companion: `viewer-architecture.md` for how the thing works internally.
 
 | # | Exchange | Direction | Status |
 |---|---|---|---|
-| 1 | Mount the viewer in your interface | you → viewer | **Not built** — no embed surface |
-| 2 | Tell the viewer who is looking | you → viewer | **Not built** — no token exchange |
-| 3 | Hand over a document | you → viewer | **Built.** §3 |
-| 4 | Get the markups back | viewer → you | **Not built** — 17 operations undecided |
+| 1 | Mount the viewer in your interface | you → viewer | **Built** — iframe + `cde.viewer.v1`. §5 |
+| 2 | Tell the viewer who is looking | you → viewer | **Built** — `host.init.identity`, three untrusted fields. §5.4 |
+| 3 | Hand over a document | you → viewer | **Built** — `host.init.document`, or the conversion API. §3 |
+| 4 | Get back what was drawn | viewer → you | **Built** — three markup events and one operation pair. §5.3 |
+| — | Framing permitted by the deployment | — | **Blocked** — a stock install sends `frame-ancestors 'none'`. §5.2 |
 
-So: you can convert and render your customers' documents through our API today,
-inside your own interface, using your own rendering. You cannot yet embed our
-viewer, and if you do get it on screen it has no way to know who your user is.
+Two things are true at once, and conflating them will cost you a sprint.
 
-If that is enough — and for a "preview any file format" feature it often
-is — §3 is a complete, working integration. If you need markup round-tripping,
-§6 is what you are waiting for.
+**The protocol is real.** `cde.viewer.v1` is implemented on both sides, and this
+repository ships a host application — plain HTML and JavaScript, no framework,
+no build step — that frames the viewer, drives the handshake, stores markup, and
+refuses an operation. You can clone it, run it, and read it as the thing you are
+about to write. §5.1 tells you how.
+
+**The deployment is not.** A stock viewer deployment sends
+`Content-Security-Policy: frame-ancestors 'none'` on every route, so the browser
+refuses the frame before your first message is sent. Until that becomes a
+per-tenant allow-list on the embed route, the embed works against a development
+deployment and not against an installed one. Ask before you schedule anything
+around it.
+
+**The conversion API has no such caveat.** §3 is a complete, working integration
+you can ship against today, inside your own interface, with your own
+rendering — and for a "preview any file format" feature that is often the whole
+requirement.
 
 ---
 
@@ -41,11 +57,17 @@ briefly, converts it, and discards it.
    │ your storage       │   3. signed link     │ conversion         │
    │ SharePoint/S3/Blob │ ===================▶ │ pipeline           │
    ├────────────────────┤                      ├────────────────────┤
-   │ your IdP           │   2. identity     ✗  │ (no way in yet)    │
+   │ your IdP           │   2. identity     ✓  │ host.init.identity │
    ├────────────────────┤                      ├────────────────────┤
-   │ your interface     │   1. mount        ✗  │ (no embed surface) │
-   │                    │ ◀ 4. markups      ✗  │                    │
+   │ your interface     │   1. mount        ✓  │ /embed + iframe    │
+   │                    │ ◀ 4. markup       ✓  │ markup events      │
+   ├────────────────────┤                      ├────────────────────┤
+   │ your markup store  │   you stamp the author, the viewer never  │
+   │                    │   sends one                               │
    └────────────────────┘                      └────────────────────┘
+
+   ...but the deployment still answers every route with
+   frame-ancestors 'none', so the frame itself is refused.  §5.2
 ```
 
 **We never hold your credentials** and never learn which storage platform your
@@ -199,18 +221,29 @@ support — it is the only thing that ties your failure to our logs.
 | DXF | **Supported** | `ezdxf` → SVG (viewer) or PDF (export) | Text is real and searchable in both |
 | Office (docx, xlsx, pptx) | **Supported** | LibreOffice → PDF | |
 | IFC | **Supported** | Geometry + hierarchy tree | Tree is the primary interface, not a fallback |
-| DWG | **Hosted only** | → DXF, then as above | Works in our hosted service. **Not shippable on-premises** — see below |
+| DWG | **Needs ODA** | ODA → DXF, then as above | The image ships no DWG reader. The operator supplies an ODA File Converter — see below |
 | DWF | **Not supported** | — | No route exists. Autodesk's Design Web Format is not read by any component of the pipeline |
 | RVT / RFA | **Not supported** | Detected and refused | Recognised by OLE2 magic bytes and rejected with `REVIT_BINARY`. It is identified only so the error is clean |
 
-> **DWG has no clean licensing path for a distributed product.** The two
-> converters have opposite problems: LibreDWG is GPL-3.0 and ships in our image
-> (so distribution owes corresponding source we do not currently provide), and
-> the ODA File Converter cannot be redistributed at all. In our hosted service
-> DWG works. For an on-premises install, **assume DWG is unavailable unless
-> your contract says otherwise** and you have obtained an ODA licence yourself.
-> Tracked as ADR 13, referred to counsel, unresolved. Do not plan a DWG
-> workflow on the assumption this resolves in your favour.
+> **DWG now requires an ODA File Converter that the operator supplies.** This
+> changed, and in your favour if you were reading the previous edition. That
+> edition said DWG worked in our hosted service and was unshippable
+> on-premises, because the image bundled LibreDWG (GPL-3.0) and distributing it
+> owed recipients corresponding source we did not provide. **LibreDWG has been
+> removed.** Nothing encumbered is distributed, and the same rule now applies
+> everywhere: mount an ODA installation, point `ODA_PATH` at it, and DWG
+> works — hosted or on-premises, no distinction. Without one, the deployment
+> has no DWG reader at all. ODA is licensed by you or your operator directly
+> from the Open Design Alliance; check `odaRunnable` rather than
+> `odaInstalled` in the status response, because a mount missing its libraries
+> or its execute bit reports as present and is useless.
+
+> **Only PDF opens inside an embedded frame today.** Everything in this table is
+> supported through the conversion API in §3. The embed reaches the
+> browser-rendered path only, so an embedded viewer asked for a `.docx` or an
+> `.ifc` returns a 415 naming the format and saying the conversion service is
+> what is missing. If your embedded use case is not PDF-first, raise it — the
+> work is wiring, not design.
 
 ### 4.1  Why RVT and DWF are absent, and what it would take
 
@@ -226,7 +259,7 @@ supporting it is commercial:
 |---|---|
 | Autodesk Platform Services (formerly Forge) | A cloud API. **It sends the model to Autodesk**, which collides directly with the data-residency and sovereignty position — for a Defence or IRAP-scoped tenant it is not merely a cost question, it is prohibited |
 | Revit itself, plus an export plugin | Windows hosts, a licence per seat, and a rendering farm that is not the product's architecture |
-| A commercial SDK (ODA BimRv or equivalent) | A vendor relationship and a per-deployment fee, with the same redistribution question ADR 13 is already stuck on |
+| A commercial SDK (ODA BimRv or equivalent) | A vendor relationship and a per-deployment fee. ADR 13 settled the same question for DWG by making ODA operator-supplied rather than bundled, so the shape of the answer is known — it is a commercial conversation, not an open one |
 
 The sovereignty collision is the important one. **The cheapest route is the one
 we can least use**, because the tenants most likely to hold Revit models are
@@ -244,67 +277,148 @@ engineering cannot take alone.
 
 ---
 
-## 5. Embedding — decided, not yet built
+## 5. Embedding — built, and what your deployment still needs
 
-**The contract is settled and specified.** How a host mounts the viewer and
-how it learns who the user is were the two open questions; both are answered
-by ADR 14 (`cde-platform`,
-`docs/adr/0014-viewer-embed-and-identity-contracts.md`) and the message-level
-detail is in `docs/viewer-embed-protocol.md`. Read that if you are scoping
-integration work — it is written to be built against, and it is stable enough
-to design around even though the code does not exist yet.
+**An iframe and a versioned `postMessage` protocol.** The viewer authenticates
+nobody and authorises nothing: you mint a short-lived URL for the document, tell
+it a name to display, and receive what the user did — every operation that
+changes anything comes back to you to authorise server-side.
 
-The short version: **an iframe and a versioned `postMessage` protocol.** The
-viewer authenticates nobody and authorises nothing. You mint a short-lived
-URL for the document, tell the viewer a name to display, and receive what the
-user did; every operation that changes anything comes back to you to
-authorise server-side.
+Recorded as ADR 14 (`cde-platform`,
+`docs/adr/0014-viewer-embed-and-identity-contracts.md`), with the message-level
+detail in `docs/viewer-embed-protocol.md`. Both sides are now implemented, and
+the protocol document is the normative one — where it and this guide disagree,
+it wins.
 
-Three constraints are still true of the code as it stands today:
+### 5.1 Run the demo host first
 
-| Constraint | Reality today |
+`demo/` in this repository is a host application that frames the viewer. It is
+not the viewer, and that is the point: **it is the side you are about to
+write**, in plain HTML, CSS and JavaScript with no framework, no build step and
+no dependencies, because your stack is your business.
+
+```bash
+npm start                # the viewer, on :4200
+node demo/server.mjs     # the host,   on :4401
+# then open http://localhost:4401
+
+# viewer somewhere else?
+VIEWER_ORIGIN=https://viewer.example node demo/server.mjs
+```
+
+Two ports deliberately: a different port is a different origin, so the demo
+exercises the real cross-origin path — origin checks on every message, CORS on
+the document fetch, `frame-ancestors` on the viewer. A demo served from one
+origin would pass with every one of those broken.
+
+It ships three generated sample documents and a message log down the side, so
+the handshake is visible as it happens. Worth trying in this order:
+
+| Do this | See this |
 |---|---|
-| **Framing** | `Content-Security-Policy: frame-ancestors 'none'`. A cross-origin `<iframe>` will not render. Becomes a per-tenant allow-list on the embed route only — the other routes keep `'none'` |
-| **Cross-origin XHR** | The CORS source registers no origin at all unless a deployment names one in full |
-| **Session** | A bearer token from our own `/api/auth/login`, against our own user table. No cookie mode, no silent SSO, no token exchange |
+| Open the drawing | `viewer.ready` → `host.init` → `viewer.loaded` in the log |
+| Draw on it | The markup appears in the host's own store |
+| Reload the page and reopen the document | The markup comes back. The viewer forgot; the host remembered |
+| Change the display name, then draw again | The new name is stamped on a markup the viewer never put a name on |
+| Tick `document:sign`, then use Sign | The control renders and the operation is **refused**. Both are correct |
 
-The only path that works today is **serving our Angular build from your own
-origin, behind the same web tier that proxies `/api`**. Same-origin needs no
-CORS entry, no framing relaxation, and no cross-origin token handling. It is
-also a deployment of our application into your infrastructure, which is
-probably not what you meant by "integrate".
+### 5.2 The one thing your viewer deployment must change
 
-**If you only need viewing**, the honest recommendation is to skip the embed
-entirely: use §3 to convert, and render the resulting PDF or SVG in your own
-interface with your own viewer. That avoids all three constraints and is a
-complete feature.
+> **A stock deployment sends `Content-Security-Policy: frame-ancestors 'none'`
+> on every route, plus `X-Frame-Options: SAMEORIGIN`.** Your iframe will be
+> refused by the browser before any of this protocol runs, and the failure looks
+> like a blank frame rather than an error. This is known, it is the single
+> blocker between the protocol and a working integration, and it is not
+> something you can configure from your side.
 
-### 5.1 What the identity gap actually means
+What it has to become: `frame-ancestors` stays `'none'` on every route **except**
+the embed route, where it names your origins, from tenant configuration, and is
+never a wildcard.
 
-Not "you need to configure SSO". There is nothing to configure. In the code as
-it stands, a markup's author is a foreign key into our user table, so **your
-user must exist as a row in our database before they can annotate anything** —
-which means shadow-provisioning your users into our system, a data-protection
-conversation before it is an engineering one.
+Note that this header is the **authorisation** decision about who may frame the
+viewer. The `parentOrigin` you configure in the handshake is only addressing —
+it says where the viewer should post, not who is permitted to frame it. A
+deployment that relaxed only the second would be framable by anyone who sent the
+right message.
 
-**That is what the contract removes.** Under ADR 14 the viewer is told a
-display name and an opaque subject id, both untrusted and used only for
-presentation, and the author is stamped by whoever persists the markup — you.
-You stay the system of record for who your people are, and nothing about your
-users reaches our database.
+Ask your viewer deployment contact two questions before you scope the work:
+whether the embed route's `frame-ancestors` allow-list exists yet, and which of
+your origins are on it.
 
-You do not need to be able to mint a JWT, and you do not need an identity
-provider we can talk to. If a previous version of this guide told you to
-prepare a signed assertion with a stable subject claim, disregard it; that
-was written while the question was open and the answer went the other way.
+### 5.3 The minimum integration
+
+Four steps, and none of them involve a token.
+
+1. **Frame the embed route** and listen for messages, checking `event.origin`
+   against the viewer origin on every single one — not once at setup.
+2. **Wait for `viewer.ready`**, then post `host.init` with the document (a
+   short-lived URL, its media type, a display name, and your own `externalId`)
+   and, if the user may do more than read, an identity block.
+3. **Store what comes back.** `viewer.markupCreated`, `…Updated` and
+   `…Deleted` carry the markup; `shapeData` is an opaque string you store and
+   hand back, never parse. Stamp the author yourself from the session you
+   already hold.
+4. **Answer `viewer.operationRequest`** with `host.operationResult` —
+   `applied`, `refused` or `failed`. One message pair covers all seventeen
+   document operations; they are not seventeen message types.
+
+> **Send no credential in any message, in either direction.** The document URL
+> is a bearer credential with a short life and is the only thing resembling one
+> that crosses the boundary; it is never stored, logged, or echoed back to you.
+> Never post to `'*'`.
+
+One subtlety worth internalising early: **a `refused` must be possible even for
+an operation whose capability you granted in `host.init`.** Capabilities decide
+which controls render; authorisation happens when the operation is requested. If
+the two ever disagree — the user's permission changed thirty seconds ago — the
+`refused` is correct and the rendered button was merely stale.
+
+Three operations never become viewer-side, whatever else changes:
+`document.sign`, `version.create` and `version.restore`. A signature over a copy
+you have since replaced is worse than no signature, and the viewer cannot know
+whether its copy is still current.
+
+One constraint from the previous edition of this guide is unchanged and still
+catches people: **the CORS source registers no origin at all unless the
+deployment names one in full.** For a PDF, the browser fetches your URL
+directly, so your storage must allow the viewer's origin to read it.
+
+### 5.4 Identity: there is nothing to configure
+
+Not "you need to set up SSO". The embed path has no identity system to configure
+at all. Our own `/api/annotations` still keys a markup's author to a row in our
+user table — integrating through *that* API would mean shadow-provisioning your
+users into our database, a data-protection conversation before it is an
+engineering one. The embed never reaches it.
+
+**Three untrusted fields, and that is the whole of it.** You send a display
+name, an opaque subject id, and a list of capabilities. All three are used for
+presentation and for deciding which controls render; none is trusted for
+authorisation, because the browser is not a place authorisation happens. The
+author is stamped by whoever persists the markup — you. Nothing about your users
+reaches our database.
+
+You do **not** need to mint a JWT, and you do not need an identity provider we
+can talk to. If an earlier version of this guide told you to prepare a signed
+assertion with a stable subject claim, disregard it — that was written while the
+question was open, and the answer went the other way. **Sending no identity at
+all is a supported read-only deployment**, not a degraded one.
+
+One consequence to plan around: **live collaboration is not available in an
+embed.** Cursors and presence ride a socket authenticated by a viewer session,
+and an embedded viewer has no session by design. That is the acknowledged cost
+of "the viewer authenticates nobody", and it is unsolved rather than decided
+against.
 
 ---
 
-## 6. What to plan for, not against
+## 6. What is settled, and what is still open
 
-The contract has landed. **It is specified, not implemented — do not build
-against it yet**, but it is settled enough to design around, and these are no
-longer guesses.
+Everything in the first list is decided and implemented — design against it.
+Everything in the second is a real gap we would rather you heard from us than
+discovered.
+
+### Settled
 
 - **Embedding is an iframe** with a per-tenant `frame-ancestors` allow-list.
   Not a web component: the viewer renders untrusted documents, and sharing
@@ -315,15 +429,31 @@ longer guesses.
   accessibility conformance claim.
 - **Identity is three untrusted fields** — a display name, an opaque subject
   id, and capability flags that decide which controls render and nothing else.
-  No signed assertion, no viewer session, no JWT. Sending no identity at all
-  is a supported read-only deployment.
-- **Markup comes back as events** on the message channel, with the geometry as
-  an opaque string you store and hand back. Have a place to put it that is not
-  the rendered file. There is no author field — you stamp that.
+  No signed assertion, no viewer session, no JWT.
+- **Markup comes back as events**, with the geometry as an opaque string you
+  store and hand back. Have a place to put it that is not the rendered file.
+  There is no author field — you stamp that.
 - **Document identity is yours.** Pass `externalId` in the handshake and it
   comes back on every event, so you never hold a map between your id and ours.
+- **One message pair covers all seventeen document operations**, and three of
+  them — sign, create version, restore version — will never move to the viewer.
+- **The protocol version is in every message, and `viewer.ready` tells you
+  which versions the deployment speaks.** Read it and pick; do not assume.
+  Within v1 we may add message types, optional fields, commands and
+  operations — you ignore what you do not recognise, which is why the rule is
+  *validate*, not *reject on unknown field*. Removing anything needs v2,
+  announced with at least six months' notice and both versions running over the
+  overlap.
 
-Full message shapes: `docs/viewer-embed-protocol.md`.
+### Still open
+
+- **`frame-ancestors` on the embed route** — §5.2. The blocker.
+- **Non-PDF formats in an embedded frame** — §4. Wiring, not design.
+- **Collaboration in an embed** — §5.4. Genuinely unsolved.
+- **Accessibility evidence** — §7, before you rely on ours.
+
+Full message shapes: `docs/viewer-embed-protocol.md`. Where this guide and that
+document disagree, that document is the normative one.
 
 ---
 
@@ -335,6 +465,16 @@ you embed our WebGL model view, you inherit the requirement for an equivalent
 accessible route to the same information — we provide the hierarchy tree for
 exactly this reason, and it needs to remain reachable in your integration.
 Exports must be tagged and PDF/UA-conformant.
+
+> **Do not inherit a conformance claim from us, because we are not making one
+> yet.** An accessibility statement, a VPAT 2.5 INT conformance report and a
+> screen-reader matrix all exist in our repository, and all three record the
+> same thing: no criterion has been evaluated by test. Real work has been
+> done — keyboard-reachable controls, a visible focus indicator throughout,
+> `prefers-reduced-motion` honoured, an authentication flow that meets SC 3.3.8
+> by construction — but none of it has been through an audit, and an untested
+> claim is worth nothing in a procurement. If your bid depends on ours, ask for
+> the current state in writing rather than citing this guide.
 
 **Trademarks.** "Works with Microsoft SharePoint" is nominative fair use.
 "Microsoft-approved", their logo, or any implication of partnership is not. The
@@ -361,10 +501,28 @@ Today:
 
 Before you scope an embedded integration:
 
-- [ ] Has the embed contract been decided? (§5 — currently no)
-- [ ] Has the identity contract been decided? (§5.1 — currently no)
-- [ ] Do you know which of the 17 document operations you need? (§6)
+- [ ] Have you run the demo host and watched a handshake? (`demo/README.md`)
+- [ ] Have you read the embed protocol? (`docs/viewer-embed-protocol.md`)
+- [ ] **Have you confirmed the embed route's `frame-ancestors` allow-list exists
+      on the deployment you will integrate with, and that your origins are on
+      it?** (§5.2)
+- [ ] Can you mint a short-lived URL for a document, and serve a page that
+      frames us?
+- [ ] Does your storage allow the viewer's origin to read that URL from the
+      browser?
+- [ ] Do you check `event.origin` on every message, not once at setup?
+- [ ] Do you have somewhere to store markup that is not the rendered file, and
+      do you stamp the author from your own session rather than from the
+      message?
+- [ ] Do you know which of the 17 document operations you need as callbacks,
+      and can you return `refused` as readily as `applied`?
+- [ ] Is your embedded use case PDF-first, or do you need the conversion path
+      wired in? (§4)
 
-If the last three are all "no", the buildable integration is §3 and nothing
-else. That is a real feature and it works — it is just smaller than "embed the
-viewer", and worth scoping as what it is.
+**The integration you can ship against a stock deployment today is still §3.**
+The embed is built and demonstrable, and it needs one header changed on the
+viewer side before it runs anywhere but a development install. Scope it as
+something to plan with us rather than something to build against
+unilaterally — and if all you need is viewing, converting through §3 and
+rendering the result yourself remains a complete feature with none of these
+caveats.

@@ -5,9 +5,13 @@
 - **Companion documents:** `viewer-integration-guide.md` (how a host uses it),
   `viewer-extraction-inventory.md` (what still has to move), and the platform's
   own `docs/architecture.md` (the service the viewer is currently a feature of).
-- **Status:** the rendering core is built and boundary-enforced. The
-  integration surface is not. §12 says exactly what is missing; read it before
-  quoting anything here to a customer.
+- **Status:** the rendering core is built and boundary-enforced, and so — since
+  this document was last issued — is the integration surface: the
+  `cde.viewer.v1` embed protocol is implemented on both sides and tested
+  against an independent host. **It cannot yet be framed in a real
+  deployment**, because the platform still sends `frame-ancestors 'none'` on
+  every route. §13 says exactly what is left; read it before quoting anything
+  here to a customer.
 
 ---
 
@@ -35,7 +39,12 @@ from "the bytes belong to someone else".
   │  Host CDE                                                │
   │  owns documents, users, permissions, audit               │
   └───────────────────────┬──────────────────────────────────┘
-                          │  integration contract  (§12 — not built)
+                          │  cde.viewer.v1  (built — §4; framing blocked §10.1)
+  ┌───────────────────────┴──────────────────────────────────┐
+  │  Embed surface            5 files · 996 lines            │
+  │  postMessage boundary, session, /embed route             │
+  └───────────────────────┬──────────────────────────────────┘
+                          │
   ┌───────────────────────┴──────────────────────────────────┐
   │  Application shell        15 components                  │
   │  routing, panels, HTTP services, session                 │
@@ -48,15 +57,26 @@ from "the bytes belong to someone else".
   └──────────────────────────────────────────────────────────┘
 ```
 
-**`src/viewer-core/` is the product.** 3,196 lines of production TypeScript
-across 12 source files, with 7 spec files beside them. Nothing in it imports
+**`src/viewer-core/` is the product.** 3,220 lines of production TypeScript
+across 15 source files, with 8 spec files beside them. Nothing in it imports
 anything from the application — not a service, not a model, not an environment
 constant. When the separate repository exists, this directory is **copied, not
 untangled**.
 
+It is now shaped as a library rather than a directory: `package.json`,
+`ng-package.json`, `tsconfig.lib.json` and a curated `index.ts`, registered in
+`angular.json` as a second project built by `@angular/build:ng-packagr`. The
+name is `@cde/viewer-core` and the licence field reads `UNLICENSED` —
+deliberately, so an accidental `npm publish` fails rather than quietly shipping
+to a public registry with no licence position. Removing that marker is a
+commercial decision, not a cleanup.
+
 The application shell above it is this platform's own consumer of the viewer.
 It is not part of the product; it is the first integrator, and useful precisely
-because an awkward contract will be awkward for us first.
+because an awkward contract will be awkward for us first. Since the embed
+shipped there is a **second** consumer — `demo/`, a host application in plain
+JavaScript — and it is the more honest of the two, because it is the side an
+integrator actually writes.
 
 ### 2.1 The boundary is asserted, not intended
 
@@ -112,13 +132,92 @@ that can actually run first.
 The 15 components still in the application are not there by accident. Thirteen
 import the platform's HTTP services; two (`viewer.component`, `viewer3d.component`)
 inject `ViewerService`, which calls `/api/viewer/{id}` and the annotation
-endpoints. Where those operations end up — viewer-side work against the fetched
-copy, a callback into the host, or out of the product — is ADR 12's open step 4.
-Moving them before that decision would answer it by accident.
+endpoints.
+
+**ADR 12's open step 4 is now closed.** ADR 14 decided the rule: reads and
+computations are viewer-side, and anything that changes the document is a
+callback into the host. That covers seventeen operations, and three of them —
+`document.sign`, `version.create`, `version.restore` — never become viewer-side
+whatever else changes, because a signature over a copy the host has since
+replaced is worse than no signature. What remains is the work of moving these
+components, not the question of where they go.
 
 ---
 
-## 4. Three rendering pipelines
+## 4. The embed surface
+
+New since the last issue of this document, and the reason its status line
+changed. The contract ADR 14 settled is now code on both sides.
+
+`src/app/features/embed/` — 996 lines of production TypeScript across five
+files, with 525 lines of spec beside them. It is deliberately **not** in
+`viewer-core`: the protocol is how a host talks to a deployment of the viewer,
+so it belongs to the application that is deployed, while `viewer-core` stays
+the part that knows no backend exists.
+
+| File | What it does |
+|---|---|
+| `embed-protocol.ts` | The envelope, the message union, and the validators. No Angular, no DOM — it is the contract as types plus the predicates that enforce them |
+| `host-channel.service.ts` | The postMessage boundary. Every inbound message is checked in a fixed order: origin, then `event.source`, then protocol envelope, then direction |
+| `embed-session.service.ts` | The session state machine — ready, awaiting init, loaded, failed — and the document-open path |
+| `embed-page.component.ts` | The rendering surface and the markup overlay |
+| `embed-viewer.component.ts` | The `/embed` route component. No auth guard, deliberately — the viewer authenticates nobody |
+
+### 4.1 Five rules, and the order they are checked in
+
+§5.13.8 and the protocol's own §3 give five rules that are not negotiable:
+never post to `'*'`, check the origin on every message rather than once, check
+`event.source` as well as the origin, validate in both directions, and never
+put a credential in a message. The first four are enforced in
+`host-channel.service.ts`, in that order, and a message failing any of them is
+dropped with the reason recorded.
+
+**The order is load-bearing, and so is checking `event.source`.** Origin alone
+is not enough: any frame on the host's page — an advertisement, a third-party
+widget — posts from the host's origin. Without the source check a sibling frame
+can drive the viewer, and nothing about the message would look wrong.
+
+### 4.2 Two implementations, checked against each other
+
+`demo/public/host-protocol.js` is an independent implementation of the host
+half — 237 lines of plain JavaScript, no framework, no build step, no
+dependency on anything in this repository. `protocol-conversation.spec.ts` then
+runs the **real** viewer channel against the **real** demo host through two
+fake windows, and asserts the conversation rather than either side's internals.
+
+That is worth more than either side tested against a mock. A mock encodes the
+same assumption the implementation makes, so the two agree by construction; two
+implementations written from the specification disagree wherever the
+specification was ambiguous, which is exactly where an integrator would have
+disagreed with us.
+
+**A green test proves nothing until the thing it guards is broken on purpose.**
+The host-trusts-the-author rule passed its first test while broken, because the
+viewer never sends an author and the test asserted an outcome rather than
+forging the field. The test that works posts a `viewer.markupCreated` carrying
+`author: "Someone Else"` and asserts the host stores the name from its own
+session instead.
+
+Eight Playwright tests drive the demo in a real browser against a stub viewer
+on a third origin. They earn their keep: three defects no unit test could reach
+were found there — a captured `contentWindow` going stale across navigation, an
+author `display` rule beating the user agent's `[hidden] { display: none }` so
+a placeholder swallowed every click, and the page and the server disagreeing
+about the viewer's origin.
+
+### 4.3 What the embed cannot open
+
+**Only PDF renders in an embedded frame today.** `embed-session.service.ts`
+treats `application/pdf` as directly renderable and refuses everything else
+with a 415 `conversion-required` problem naming the format. The conversion
+service in §7 exists and works — the embed path simply does not call it yet.
+Office and IFC are therefore supported by the product and **not** supported
+through the embed, which is a distinction worth stating before a customer
+discovers it.
+
+---
+
+## 5. Three rendering pipelines
 
 **PDF** is rendered in the browser by `pdfjs-dist` 6. Text layer extracted for
 search and redaction; markup drawn as SVG in a layer above the canvas so it
@@ -136,7 +235,7 @@ canvas cannot be made WCAG-conformant on its own, and §1A.4 requires an
 equivalent accessible route to the same information. Building the tree first is
 what makes that true rather than aspirational.
 
-### 4.1 The same drawing, rendered twice, on purpose
+### 5.1 The same drawing, rendered twice, on purpose
 
 A DXF is converted twice, by two different paths, and the reason is not
 obvious enough to leave undocumented.
@@ -164,9 +263,9 @@ lives in the converter's test suite.
 
 ---
 
-## 5. Why conversion is server-side and stays there
+## 6. Why conversion is server-side and stays there
 
-Office documents go through LibreOffice, DWG through LibreDWG or the ODA File
+Office documents go through LibreOffice, DWG through the ODA File
 Converter, OCR through Tesseract, DXF through `ezdxf`. None of these run in a
 browser, and all of them are heavy native parsers on untrusted input — §5.13.10
 requires them in a sandboxed, resource-limited, network-isolated worker with a
@@ -176,33 +275,48 @@ This is the constraint that rules out the otherwise-attractive design where the
 browser fetches straight from the customer's storage and we never see the file:
 **that architecture cannot render a `.docx` at all.**
 
-### 5.1 DWG has no clean path in a distributed product
+### 6.1 DWG — resolved by removing the encumbered binary
 
-Two converters, opposite problems:
+**Changed since the last issue.** Two tools can turn binary DWG into DXF, and
+they had opposite licence problems:
 
 | | LibreDWG `dwg2dxf` | ODA File Converter |
 |---|---|---|
 | Licence | GPL-3.0 | Proprietary |
-| In the image | Yes | No |
-| Problem | We ship it and owe every recipient corresponding source, which we do not provide | We cannot ship it, so a customer install has no DWG unless they obtain one themselves |
+| In the image | **No longer — removed** | No — the operator supplies it |
+| The problem it had | We shipped it and owed every recipient corresponding source we did not provide, so any distribution of the image was a breach | We cannot ship it, so a customer install has no DWG unless they obtain one themselves |
 
-Running our own SaaS conceals this — the image never leaves us. The moment the
-product is installed by a customer, both problems are real on every install.
-Recorded as ADR 13 (`cde-platform`, `docs/adr/0013-dwg-conversion-in-a-distributed-product.md`),
-referred to counsel, unresolved.
+**ADR 13 was resolved on 2026-09-08 by deleting the problem rather than
+answering it.** LibreDWG is gone from the converter image, so nothing
+encumbered is distributed and the licence finding closes by deletion. The image
+now contains **no DWG reader at all**; DWG requires an operator-supplied ODA
+File Converter, mounted into the container and pointed at by `ODA_PATH`.
+
+That is a smaller product and a defensible one. It also costs nothing in
+fidelity — ODA is the reference implementation, and the pipeline was designed
+around it before LibreDWG was added as a fallback. Every other format is
+unaffected: DXF renders through `ezdxf` with no external tool, and Office, PDF
+and IFC never touched LibreDWG. The counsel questions become live again only if
+bundled DWG is ever wanted.
 
 A supplied ODA is fully supported: discovered from a directory or a binary,
 launched inside a virtual framebuffer (it is a Qt application and opens a
 display even converting from the command line), probed once at startup, and
-reported as `odaRunnable` distinctly from `odaInstalled`.
+reported as `odaRunnable` distinctly from `odaInstalled` — a mount missing its
+libraries or its execute bit is present and useless.
+
+`libredwgInstalled` remains in the status response, always `false`, marked
+deprecated with a sunset of 2027-04-01. §3.4 forbids removing a field inside an
+API version without at least six months' notice, and a client branching on it
+reads the truth — the tool is not installed.
 
 ---
 
-## 6. Document ingress
+## 7. Document ingress
 
-The one integration exchange that is built. The host mints a short-lived URL
-with its own credentials and posts it; the viewer fetches once, converts, and
-discards.
+The server-side half of exchange 3, and the one an integrator can use without
+embedding anything. The host mints a short-lived URL with its own credentials
+and posts it; the viewer fetches once, converts, and discards.
 
 ```
   host mints signed link ──▶ POST /api/conversions { sourceUrl }
@@ -237,17 +351,23 @@ design rather than a slogan.
 **The source URL is never stored.** It is a bearer credential with a short life;
 persisting it would turn the job table into a credential store.
 
-### 6.1 The gap under this
+### 7.1 The gap under this, narrowed but not closed
 
-The viewer's own front end has never called `/api/conversions`. It still reads
-`/api/viewer/{id}` and `/api/documents/*`, which assume the platform owns the
-document. The product has two halves that do not meet: an ingress for the
-host's storage with no interface on it, and an interface that only opens
-documents we already hold.
+The two halves now meet for one format. The embed opens a PDF by fetching the
+host's URL directly from the browser — no server of ours is involved, which is
+the best possible answer for the one format that needs no conversion.
+
+**For every other format the halves still do not meet.** `/api/conversions`
+works and the embed does not call it, so an embedded viewer asked for a `.docx`
+or an `.ifc` returns a 415 `conversion-required` rather than converting it. The
+application's own front end likewise still reads `/api/viewer/{id}` and
+`/api/documents/*`, which assume the platform owns the document. Wiring the
+embed to the conversion service is the single change that turns "PDF only" into
+the format list in §6.
 
 ---
 
-## 7. State
+## 8. State
 
 Angular signals throughout, with `ViewerStateService` as the single store. No
 NgRx, no observable soup: the viewer's state is small, synchronous and
@@ -262,7 +382,7 @@ untouched original.
 
 ---
 
-## 8. Accessibility architecture
+## 9. Accessibility architecture
 
 Not a layer applied afterwards. Three decisions are structural:
 
@@ -278,7 +398,7 @@ Not a layer applied afterwards. Three decisions are structural:
 
 ---
 
-## 9. Security posture
+## 10. Security posture
 
 Most of §5 is inherited from the platform and documented there — RLS tenant
 isolation, the hash-chained audit trail, PBKDF2 password storage, the §5.4
@@ -288,16 +408,39 @@ response headers. What the **viewer product** must own itself once distributed:
 |---|---|---|
 | SSRF policy on the ingress | Platform `fetch/` package | Travels with the product — it is the product's own attack surface |
 | Upload magic-byte + AV | Platform | Travels |
-| Content Security Policy | Platform response headers | `frame-ancestors` becomes a per-tenant allow-list **on the embed route only**; every other route keeps `'none'` (ADR 14) |
+| Content Security Policy | Platform response headers — **still `frame-ancestors 'none'` globally** | Must become a per-tenant allow-list **on the embed route only**; every other route keeps `'none'` (ADR 14). **Not done — this is what blocks the embed** |
 | Tenant isolation | Platform RLS | **Does not travel.** The host owns tenancy; the viewer must not assume it |
 | Audit | Platform hash chain | Host's concern; the viewer emits events, it does not store them |
 
-The row that matters most is the last two. A distributed viewer that assumes it
-owns tenancy would be wrong in a way that is expensive to unwind.
+The last two rows matter most in the long run: a distributed viewer that assumes
+it owns tenancy would be wrong in a way that is expensive to unwind. **The third
+row is what matters this week.**
+
+### 10.1 `frame-ancestors` is the whole blocker
+
+`SecurityConfig` sets `Content-Security-Policy: … frame-ancestors 'none'` on
+every route and `X-Frame-Options: SAMEORIGIN` beneath it, and
+`SecurityHeadersTest` asserts both. Nothing in `src/main` reads a per-tenant
+embed origin; the only origin configuration that exists is for CORS. So a
+customer framing the viewer gets a browser-level refusal before `viewer.ready`
+is ever posted.
+
+ADR 14 named this in its consequences and it has not been done. The shape it
+has to take is already decided: `frame-ancestors` stays `'none'` everywhere
+**except** the embed route, where it names the integrator's origins from tenant
+configuration and is **never** a wildcard. The test has to change with it — from
+asserting `'none'` everywhere to asserting `'none'` everywhere except that
+route, and asserting that route is never `*`.
+
+**This is a security change, not a configuration change.** `frame-ancestors` is
+the authorisation decision about who may frame the viewer; `parentOrigin` in the
+handshake is only addressing — it says where to post, not who is allowed.
+Confusing the two would produce a viewer that any site could frame as long as it
+sent the right message.
 
 ---
 
-## 10. Performance
+## 11. Performance
 
 §7.1 applies unchanged: every interactive request under a second, bulk work
 async with a job id returned in under a second. Conversion is bulk by
@@ -314,7 +457,7 @@ over user content is absolute.
 
 ---
 
-## 11. Build and verification
+## 12. Build and verification
 
 Angular 22 with TypeScript strict **and** `noUncheckedIndexedAccess`. Third-party
 JavaScript is bundled, never loaded from a CDN — §5.12 A08, and it is also what
@@ -323,55 +466,111 @@ makes air-gapped deployment possible.
 A note on the current environment, because it affects what any statement about
 test results is worth: `ng test` and `ng build` require Node ≥ 22.22.3, and the
 development container runs 22.22.2. Specs that need Angular TestBed cannot run
-there at all; `tsc --noEmit` and Vitest-only specs can. Any claim of "tests
-pass" in this repository should say which of those two it means.
+there at all, and neither can `ng build viewer-core`; `tsc --noEmit`, bare
+Vitest and Playwright can. **The `/embed` route has therefore been typechecked
+and unit-tested but never rendered by Angular in a browser** — the demo's
+end-to-end tests run against a stub viewer, not the real one. Any claim of
+"tests pass" in this repository should say which of those it means.
+
+### 12.1 Gates
+
+Each of these fails loudly rather than warning, and each exists because the
+thing it checks is otherwise invisible in a diff.
+
+| Gate | What it asserts |
+|---|---|
+| `check:no-remote-code` | Nothing in `src/` or `demo/` loads executable code from a CDN. Two roots, each with its own minimum file count, so a wrong path fails instead of passing vacuously |
+| `check:attribution` | `THIRD-PARTY-NOTICES.txt` regenerates to exactly what is committed. It regenerates and asks git, rather than checking the file exists — the backend learned that distinction the hard way, with a shipped attribution naming a version it no longer had |
+| `check:icons` | The application icons and favicon match their generator byte for byte, and the mark stays inside the maskable safe zone |
+| `check:samples` | The demo's three sample documents match their generator byte for byte |
+| `test:demo` | Eight Playwright tests drive the demo host in a real browser |
+
+**Four of these five are not run by CI.** The platform's `Jenkinsfile` runs
+`npm ci`, `tsc --noEmit`, `check:no-remote-code`, `ng build` and `ng test`
+against this repository, and nothing else. `check:attribution`, `check:icons`,
+`check:samples` and `test:demo` exist, pass, and guard nothing until a pipeline
+stage calls them. A gate nothing runs is documentation.
 
 ---
 
-## 12. What this architecture does not yet have
+## 13. What this architecture does not yet have
 
-Stated plainly, because the gap between "the viewer works" and "a CDE can
-integrate it" is larger than a demo suggests.
+Stated plainly, and shorter than it was. The gap between "the viewer works" and
+"a CDE can integrate it" used to be a set of undecided contracts; it is now a
+set of unfinished jobs, in rough order of what blocks what.
 
-**No embed surface.** No `postMessage`, no custom elements, no
-`@angular/elements`. The contract is now decided — ADR 14, an iframe and a
-versioned `postMessage` protocol, specified in `viewer-embed-protocol.md` —
-but none of it is built. The CSP sets `frame-ancestors 'none'` and the CORS source
-registers no origin unless a deployment names one, so cross-origin framing and
-cross-origin XHR are both closed. The only honest answer today is "serve our
-build from your own origin", which is a deployment, not an integration.
+**The embed cannot be framed.** §10.1. The protocol is built on both sides and
+the deployment refuses the frame. This is the one item that makes every other
+item academic, and it is also the smallest.
 
-**No identity contract in the code.** Decided in ADR 14 — the viewer
-authenticates nobody and authorises nothing, and is given a display name, an
-opaque subject id and capability flags that are UX only. Today, though,
-authentication is our own JWT from `/api/auth/login` against our own user
-table — no OIDC, no SAML, no API key, no token exchange.
-Worse, `Annotation.author` is a `@ManyToOne User`, a foreign key into our own
-table, so **a host's user cannot author a markup without first existing as a
-row in our database.**
+**The embed opens PDF and nothing else.** §4.3. The conversion service exists;
+the embed path does not call it.
 
-**No external document identity.** `Document` has no `externalId`, so a host
-must store our numeric id against its own record.
+**Collaboration has no identity in an embed.** Live cursors and presence ride a
+STOMP socket authenticated by the page session, and an embedded viewer has no
+session. ADR 14 accepted this as the loose end that "no identity" leaves; it is
+unsolved rather than decided.
 
-**35 endpoints across 15 files** — 11 services and 4 components — measured by
+**No external document identity on our own `Document`.** The protocol carries
+`externalId` end to end, so an embedding host never needs one — but the
+platform's own `Document` entity still has no such column, so anything
+integrating through `/api/documents` keeps a map between its id and our numeric
+one. `Annotation.author` likewise remains a `@ManyToOne User`, which is correct
+for this platform's own users and is the reason the embed path never touches it.
+
+**35 endpoints across 15 files** — 11 services and 4 components — derived by
 walking imports transitively from every viewer component, viewer service and
-`viewer-core` file. This said "36 across 13", which was close; the inventory
-said 26 across 9, which was not. ADR 14, "A note on the count", records why
-three different walks gave three different answers.
+`viewer-core` file. Two groups drive the design: **five are content**, exactly
+what the ingress replaces, and **seventeen are document operations**, which
+ADR 14 assigned to the host. The remainder is markup, identity and
+collaboration.
 
-Seven are content and are what the ingress replaces. Seven are markup, read
-and write. Nineteen are document operations, and ADR 14 replaces "decide them
-one at a time" with a rule. Two are identity and leave with the viewer.
+That total has been wrong twice, in the same direction — "seven", then "26
+across 9", both undercounts. The first came from grepping directories instead
+of following imports; the second from a resolver that turned `role.service`
+into `role.ts` by replacing the extension rather than appending one, so every
+`*.service.ts` import silently failed to resolve and its endpoints were never
+counted. **A count that resolves imports must fail loudly when one does not
+resolve**, or it reports the surface it could see as the surface that exists.
 
-**Not a publishable package.** `viewer-core` has no `package.json` or
-`ng-package.json` — it is a directory, not a library.
+**And the partition is not settled.** `viewer-extraction-inventory.md` §2 gives
+a total of 35 across 11 services and 4 components, but its own table lists ten
+services, and its group sizes — content 5, document operations 17, markup 7,
+identity 2 — sum to 31. Two of those three figures must be wrong. The groups
+quoted above are the ones the inventory states unambiguously and that a design
+decision actually turns on; the breakdown needs re-deriving before it goes in
+front of a customer.
 
-**No attribution file.** No `LICENSE`, `NOTICE` or `THIRD-PARTY-NOTICES.txt` at
-this repository's root. §17.2 makes shipping that file a licence obligation, so
-first distribution without it is a breach rather than an untidiness.
+**A library in shape, never built here.** `viewer-core` has its manifest, its
+ng-packagr configuration and its own `angular.json` project, so
+`ng build viewer-core` is a real target — it has simply never run in this
+container, for the Node reason in §12. The `UNLICENSED` marker is still
+deliberate and still means no publish decision has been taken.
 
-**No DWG position.** ADR 13, above.
+**Accessibility evidence.** The artefacts exist in
+`cde-platform/docs/accessibility/` — an accessibility statement, a VPAT 2.5 INT
+conformance report, and a screen-reader matrix — and all three say the same
+thing about themselves: the statement is a draft not fit to publish, every
+criterion in the ACR reads Not Evaluated or Does Not Support, and no
+screen-reader pass has been run. **What is missing is not the document; it is
+the evidence the document is supposed to cite.** No axe, no Lighthouse budget,
+no manual keyboard pass, and no gate in the pipeline to produce any of it.
 
-Of these, the embed contract and the identity contract **were decisions nobody
-had taken**, and everything else queued behind them. Both were taken on
-2026-09-09 as ADR 14, so what remains is work rather than a decision.
+The embed makes this worse rather than inheriting it. Focus crossing a frame
+boundary, printing from inside a frame, and 200% zoom in a host-sized frame are
+all new surfaces that need testing afresh, and some of them will be worse than
+the standalone viewer. §1A is explicit that without a current conformance report
+the public-sector buyers this product targets cannot be bid to at all — and an
+independent audit has the longest lead time of anything on this list.
+
+**Brand and copyright.** The application mark is our own work and deliberately
+generic; the product has no name or logo that has been through trademark
+clearance, and `LICENSE` and `NOTICE` still carry a placeholder where the
+copyright holder's legal entity goes. An obviously unset placeholder is the
+right state until the entity is decided — a plausible-looking wrong name is a
+false statement of ownership that survives into every distribution.
+
+The shape of this list has changed since the last issue. The embed and identity
+contracts were **decisions nobody had taken**; they are taken, specified and
+implemented. What remains is work nobody has done — and the first item is one
+response header.

@@ -10,9 +10,11 @@ const children = [
     'Integration Guide',
     'For an engineer at a common data environment — Asite, Procore, Dalux, or your own — who has '
   + 'to make this viewer open your customers’ documents.',
-    ['**Read section 1 before planning anything.** One of the four exchanges an integration needs '
-   + 'is built. The other three are not, and this guide says so rather than describing an '
-   + 'interface you would then fail to find.']),
+    ['**Read section 1 before planning anything.** All four exchanges an integration needs are now '
+   + 'built, and you can run a working host application from our repository today. **One response '
+   + 'header on the viewer deployment still refuses the frame**, so the embed does not yet work '
+   + 'against a stock install. This guide says which parts you can build on now and which you '
+   + 'cannot, rather than describing an interface you would then fail to find.']),
 
   p('Companion document: **Technical Architecture**, for how the thing works internally.'),
 
@@ -23,12 +25,19 @@ const children = [
 
   h1('1.  What you can build against today'),
   ...diagramBoundary(),
-  p('So: you can convert and render your customers’ documents through our API today, inside your '
-  + 'own interface, using your own rendering. Embedding our viewer is specified but not yet '
-  + 'built — the contract is settled (section 5), the code is not.'),
-  p('If that is enough — and for a “preview any file format” feature it often is — section 3 is a '
-  + 'complete, working integration. If you need markup round-tripping, section 6 is what you are '
-  + 'waiting for.'),
+  p('Two things are true at once, and conflating them will cost you a sprint.'),
+  p('**The protocol is real.** `cde.viewer.v1` is implemented on both sides, and our repository '
+  + 'ships a host application — plain HTML and JavaScript, no framework, no build step — that '
+  + 'frames the viewer, drives the handshake, stores markup, and refuses an operation. You can '
+  + 'clone it, run it, and read it as the thing you are about to write. Section 5 tells you how.'),
+  p('**The deployment is not.** A stock viewer deployment sends '
+  + '`Content-Security-Policy: frame-ancestors \'none\'` on every route, so the browser refuses '
+  + 'the frame before your first message is sent. Until that becomes a per-tenant allow-list on '
+  + 'the embed route, the embed works against a development deployment and not against an '
+  + 'installed one. Ask before you schedule anything around it.'),
+  p('**The conversion API has no such caveat.** Section 3 is a complete, working integration you '
+  + 'can ship against today, inside your own interface, with your own rendering — and for a '
+  + '“preview any file format” feature that is often the whole requirement.'),
 
   h1('2.  The shape of it'),
   p('Your CDE keeps its documents and its users. The viewer borrows a document briefly, converts '
@@ -160,9 +169,9 @@ const children = [
     { cells: [{ t: 'IFC' }, { t: 'Supported', color: TEAL, bold: true },
               { t: 'Geometry + hierarchy tree' },
               { t: 'Tree is the primary interface, not a fallback' }] },
-    { cells: [{ t: 'DWG', bold: true }, { t: 'Hosted only', color: RED, bold: true, fill: RED_BG },
-              { t: '→ DXF, then as above', fill: RED_BG },
-              { t: 'Works in our hosted service. NOT shippable on-premises — see below', fill: RED_BG }] },
+    { cells: [{ t: 'DWG', bold: true }, { t: 'Needs ODA', color: RED, bold: true, fill: RED_BG },
+              { t: 'ODA → DXF, then as above', fill: RED_BG },
+              { t: 'The image ships no DWG reader. The operator supplies an ODA File Converter — see below', fill: RED_BG }] },
     { cells: [{ t: 'DWF', bold: true }, { t: 'Not supported', color: RED, bold: true, fill: RED_BG },
               { t: '—', fill: RED_BG },
               { t: 'No route exists. Autodesk’s Design Web Format is not read by any component of the pipeline', fill: RED_BG }] },
@@ -170,15 +179,23 @@ const children = [
               { t: 'Detected and refused', fill: RED_BG },
               { t: 'Recognised by OLE2 magic bytes and rejected with REVIT_BINARY. Identified only so the error is clean', fill: RED_BG }] }
   ]),
-  caption('Table 2 — What the pipeline actually accepts. Four supported, one hosted-only, two not '
-        + 'supported at all.'),
-  note('**DWG has no clean licensing path for a distributed product.** The two converters have '
-     + 'opposite problems: LibreDWG is GPL-3.0 and ships in our image (so distribution owes '
-     + 'corresponding source we do not currently provide), and the ODA File Converter cannot be '
-     + 'redistributed at all. In our hosted service DWG works. For an on-premises install, '
-     + '**assume DWG is unavailable unless your contract says otherwise** and you have obtained '
-     + 'an ODA licence yourself. Tracked as ADR 13, referred to counsel, unresolved. Do not plan a '
-     + 'DWG workflow on the assumption this resolves in your favour.'),
+  caption('Table 2 — What the pipeline actually accepts. Four supported outright, one conditional, '
+        + 'two not supported at all.'),
+  note('**DWG now requires an ODA File Converter that the operator supplies.** This changed, and '
+     + 'in your favour if you were reading the previous edition. That edition said DWG worked in '
+     + 'our hosted service and was unshippable on-premises, because the image bundled LibreDWG '
+     + '(GPL-3.0) and distributing it owed recipients corresponding source we did not provide. '
+     + '**LibreDWG has been removed.** Nothing encumbered is distributed, and the same rule now '
+     + 'applies everywhere: mount an ODA installation, point `ODA_PATH` at it, and DWG works — '
+     + 'hosted or on-premises, no distinction. Without one, the deployment has no DWG reader at '
+     + 'all. ODA is licensed by you or your operator directly from the Open Design Alliance; check '
+     + '`odaRunnable` rather than `odaInstalled` in the status response, because a mount missing '
+     + 'its libraries or its execute bit reports as present and is useless.'),
+  note('**Only PDF opens inside an embedded frame today.** Everything in this table is supported '
+     + 'through the conversion API in section 3. The embed reaches the browser-rendered path only, '
+     + 'so an embedded viewer asked for a `.docx` or an `.ifc` returns a 415 naming the format and '
+     + 'saying the conversion service is what is missing. If your embedded use case is not '
+     + 'PDF-first, raise it — the work is wiring, not design.'),
 
   h2('4.1  Why RVT and DWF are absent, and what it would take'),
   p('These two are named separately because they are the ones most often assumed, and because the '
@@ -193,7 +210,7 @@ const children = [
     { cells: [{ t: 'Revit itself, plus an export plugin' },
       { t: 'Windows hosts, a licence per seat, and a rendering farm that is not the product’s architecture' }] },
     { cells: [{ t: 'A commercial SDK (ODA BimRv or equivalent)' },
-      { t: 'A vendor relationship and a per-deployment fee, with the same redistribution question ADR 13 is already stuck on' }] }
+      { t: 'A vendor relationship and a per-deployment fee. ADR 13 settled the same question for DWG by making ODA operator-supplied rather than bundled, so the shape of the answer is known — it is a commercial conversation, not an open one' }] }
   ]),
   caption('Table 3 — The three routes to RVT, and why none is free.'),
   note('The sovereignty collision is the important one. **The cheapest route is the one we can '
@@ -206,65 +223,135 @@ const children = [
   p('**If you need either, raise it as a commercial requirement, not a bug.** The answer involves '
   + 'a vendor contract and, for RVT, a residency decision that engineering cannot take alone.'),
 
-  h1('5.  Embedding — decided, not yet built'),
-  lead('The contract is settled and specified. An iframe and a versioned postMessage protocol; '
-     + 'the viewer authenticates nobody and authorises nothing. You mint a short-lived URL for '
-     + 'the document, tell the viewer a name to display, and receive what the user did — every '
-     + 'operation that changes anything comes back to you to authorise server-side.'),
+  h1('5.  Embedding — built, and what your deployment still needs'),
+  lead('An iframe and a versioned postMessage protocol. The viewer authenticates nobody and '
+     + 'authorises nothing: you mint a short-lived URL for the document, tell it a name to '
+     + 'display, and receive what the user did — every operation that changes anything comes back '
+     + 'to you to authorise server-side.'),
   p('Recorded as ADR 14 (`cde-platform`, `docs/adr/0014-viewer-embed-and-identity-contracts.md`), '
-  + 'with the message-level detail in `docs/viewer-embed-protocol.md`. That document is written '
-  + 'to be built against and is stable enough to design around, though the code does not exist '
-  + 'yet.'),
-  p('Three constraints remain true of the code as it stands today.'),
-  table([2600, 7146], [
-    { header: true, cells: [{ t: 'Constraint' }, { t: 'Reality today' }] },
-    { cells: [{ t: 'Framing', bold: true },
-      { t: 'Content-Security-Policy: frame-ancestors \'none\'. A cross-origin iframe will not render. Becomes a per-tenant allow-list on the embed route only', fill: RED_BG }] },
-    { cells: [{ t: 'Cross-origin XHR', bold: true },
-      { t: 'The CORS source registers no origin at all unless a deployment names one in full', fill: RED_BG }] },
-    { cells: [{ t: 'Session', bold: true },
-      { t: 'A bearer token from our own /api/auth/login, against our own user table. No cookie mode, no silent SSO, no token exchange', fill: RED_BG }] }
-  ]),
-  caption('Table 4 — What is still true of the code, now that the contract is decided.'),
-  p('The only path that works today is **serving our Angular build from your own origin, behind '
-  + 'the same web tier that proxies `/api`**. Same-origin needs no CORS entry, no framing '
-  + 'relaxation, and no cross-origin token handling. It is also a deployment of our application '
-  + 'into your infrastructure, which is probably not what you meant by “integrate”.'),
-  note('**If you only need viewing**, the honest recommendation is still to skip the embed: use '
-     + 'section 3 to convert, and render the resulting PDF or SVG in your own interface with your '
-     + 'own viewer. That avoids all three constraints and is a complete feature today rather than '
-     + 'a contract to wait for.'),
+  + 'with the message-level detail in `docs/viewer-embed-protocol.md`. Both sides are now '
+  + 'implemented, and the protocol document is the normative one — where it and this guide '
+  + 'disagree, it wins.'),
 
-  h2('5.1  What the identity gap actually means'),
-  p('Not “you need to configure SSO”. There is nothing to configure. In the code as it stands, a '
-  + 'markup’s author is a foreign key into our user table, so **your user must exist as a row in '
-  + 'our database before they can annotate anything** — which means shadow-provisioning your users '
-  + 'into our system, a data-protection conversation before it is an engineering one.'),
+  h2('5.1  Run the demo host first'),
+  p('`demo/` in the frontend repository is a host application that frames the viewer. It is not '
+  + 'the viewer, and that is the point: **it is the side you are about to write**, in plain HTML, '
+  + 'CSS and JavaScript with no framework, no build step and no dependencies, because your stack '
+  + 'is your business.'),
+  code([
+    'npm start                # the viewer, on :4200',
+    'node demo/server.mjs     # the host,   on :4401',
+    '',
+    '# then open http://localhost:4401',
+    '# viewer somewhere else?',
+    'VIEWER_ORIGIN=https://viewer.example node demo/server.mjs'
+  ]),
+  p('Two ports deliberately: a different port is a different origin, so the demo exercises the '
+  + 'real cross-origin path — origin checks on every message, CORS on the document fetch, '
+  + '`frame-ancestors` on the viewer. A demo served from one origin would pass with every one of '
+  + 'those broken.'),
+  p('It ships three generated sample documents and a message log down the side, so the handshake '
+  + 'is visible as it happens. Worth trying in this order: open the drawing and watch '
+  + '`viewer.ready` → `host.init` → `viewer.loaded`; draw on it and see the markup appear in the '
+  + 'host’s store; reload the page and reopen the document, and watch the markup come back — the '
+  + 'viewer forgot, the host remembered; change the display name and draw again, and see the new '
+  + 'name stamped on a markup the viewer never put a name on. Then tick `document:sign` and use '
+  + 'Sign: the control renders and the operation is **refused**, and both of those are correct.'),
+
+  h2('5.2  The one thing your viewer deployment must change'),
+  note('**A stock deployment sends `Content-Security-Policy: frame-ancestors \'none\'` on every '
+     + 'route, plus `X-Frame-Options: SAMEORIGIN`.** Your iframe will be refused by the browser '
+     + 'before any of this protocol runs, and the failure looks like a blank frame rather than an '
+     + 'error. This is known, it is the single blocker between the protocol and a working '
+     + 'integration, and it is not something you can configure from your side.'),
+  p('What it has to become: `frame-ancestors` stays `\'none\'` on every route **except** the embed '
+  + 'route, where it names your origins, from tenant configuration, and is never a wildcard. '
+  + 'Note that this header is the **authorisation** decision about who may frame the viewer. The '
+  + '`parentOrigin` you configure in the handshake is only addressing — it says where the viewer '
+  + 'should post, not who is permitted to frame it. A deployment that relaxed only the second '
+  + 'would be framable by anyone who sent the right message.'),
+  p('Ask your viewer deployment contact two questions before you scope the work: whether the '
+  + 'embed route’s `frame-ancestors` allow-list exists yet, and which of your origins are on it.'),
+
+  h2('5.3  The minimum integration'),
+  p('Four steps, and none of them involve a token.'),
+  bullet('**Frame the embed route** and listen for messages, checking `event.origin` against the '
+       + 'viewer origin on every single one — not once at setup.'),
+  bullet('**Wait for `viewer.ready`**, then post `host.init` with the document (a short-lived URL, '
+       + 'its media type, a display name, and your own `externalId`) and, if the user may do more '
+       + 'than read, an identity block.'),
+  bullet('**Store what comes back.** `viewer.markupCreated`, `…Updated` and `…Deleted` carry the '
+       + 'markup; `shapeData` is an opaque string you store and hand back, never parse. Stamp the '
+       + 'author yourself from the session you already hold.'),
+  bullet('**Answer `viewer.operationRequest`** with `host.operationResult` — `applied`, `refused` '
+       + 'or `failed`. One message pair covers all seventeen document operations; they are not '
+       + 'seventeen message types.'),
+  note('**Send no credential in any message, in either direction.** The document URL is a bearer '
+     + 'credential with a short life and is the only thing resembling one that crosses the '
+     + 'boundary; it is never stored, logged, or echoed back to you. Never post to `\'*\'`.'),
+  p('One subtlety worth internalising early: **a `refused` must be possible even for an operation '
+  + 'whose capability you granted in `host.init`.** Capabilities decide which controls render; '
+  + 'authorisation happens when the operation is requested. If the two ever disagree — the user’s '
+  + 'permission changed thirty seconds ago — the `refused` is correct and the rendered button was '
+  + 'merely stale.'),
+  p('Three operations never become viewer-side, whatever else changes: `document.sign`, '
+  + '`version.create` and `version.restore`. A signature over a copy you have since replaced is '
+  + 'worse than no signature, and the viewer cannot know whether its copy is still current.'),
+  p('One constraint from the previous edition of this guide is unchanged and still catches people: '
+  + '**the CORS source registers no origin at all unless the deployment names one in full.** For a '
+  + 'PDF, the browser fetches your URL directly, so your storage must allow the viewer’s origin to '
+  + 'read it.'),
+
+  h2('5.4  Identity: there is nothing to configure'),
+  p('Not “you need to set up SSO”. The embed path has no identity system to configure at all. Our '
+  + 'own `/api/annotations` still keys a markup’s author to a row in our user table — integrating '
+  + 'through *that* API would mean shadow-provisioning your users into our database, a '
+  + 'data-protection conversation before it is an engineering one. The embed never reaches it.'),
   ...diagramIdentity(),
-  p('**That is what the contract removes.** The viewer is told a display name and an opaque '
-  + 'subject id, both untrusted and used only for presentation, and the author is stamped by '
-  + 'whoever persists the markup — you. You stay the system of record for who your people are, '
-  + 'and nothing about your users reaches our database.'),
+  p('**Three untrusted fields, and that is the whole of it.** You send a display name, an opaque '
+  + 'subject id, and a list of capabilities. All three are used for presentation and for deciding '
+  + 'which controls render; none is trusted for authorisation, because the browser is not a place '
+  + 'authorisation happens. The author is stamped by whoever persists the markup — you. Nothing '
+  + 'about your users reaches our database.'),
   note('You do **not** need to mint a JWT, and you do not need an identity provider we can talk '
      + 'to. If an earlier version of this guide told you to prepare a signed assertion with a '
      + 'stable subject claim, disregard it — that was written while the question was open, and '
-     + 'the answer went the other way.'),
+     + 'the answer went the other way. **Sending no identity at all is a supported read-only '
+     + 'deployment**, not a degraded one.'),
+  p('One consequence to plan around: **live collaboration is not available in an embed.** Cursors '
+  + 'and presence ride a socket authenticated by a viewer session, and an embedded viewer has no '
+  + 'session by design. That is the acknowledged cost of “the viewer authenticates nobody”, and it '
+  + 'is unsolved rather than decided against.'),
 
-  h1('6.  What to plan for, not against'),
-  lead('The contract has landed. It is specified, not implemented — do not build against it yet '
-     + '— but it is settled enough to design around, and these are no longer guesses.'),
+  h1('6.  What is settled, and what is still open'),
+  lead('Everything in the first list is decided and implemented — design against it. Everything in '
+     + 'the second is a real gap we would rather you heard from us than discovered.'),
+  h2('Settled'),
   bullet('**Embedding is an iframe** with a per-tenant `frame-ancestors` allow-list. Not a web '
        + 'component: the viewer renders untrusted documents, and sharing your origin would mean a '
        + 'document that escapes the PDF renderer runs with your session on your domain.'),
   bullet('**Identity is three untrusted fields** — a display name, an opaque subject id, and '
        + 'capability flags that decide which controls render and nothing else. No signed '
-       + 'assertion, no viewer session, no JWT. Sending no identity at all is a supported '
-       + 'read-only deployment.'),
-  bullet('**Markup comes back as events** on the message channel, with the geometry as an opaque '
-       + 'string you store and hand back. There is no author field — you stamp that.'),
+       + 'assertion, no viewer session, no JWT.'),
+  bullet('**Markup comes back as events**, with the geometry as an opaque string you store and '
+       + 'hand back. There is no author field — you stamp that.'),
   bullet('**Document identity is yours.** Pass an `externalId` in the handshake and it comes back '
        + 'on every event, so you never hold a map between your id and ours.'),
-  p('Full message shapes: `docs/viewer-embed-protocol.md`.'),
+  bullet('**One message pair covers all seventeen document operations**, and three of them — sign, '
+       + 'create version, restore version — will never move to the viewer.'),
+  bullet('**The protocol version is in every message, and `viewer.ready` tells you which versions '
+       + 'the deployment speaks.** Read it and pick; do not assume. Within v1 we may add message '
+       + 'types, optional fields, commands and operations — you ignore what you do not recognise, '
+       + 'which is why the rule is *validate*, not *reject on unknown field*. Removing anything '
+       + 'needs v2, announced with at least six months’ notice and both versions running over the '
+       + 'overlap.'),
+  h2('Still open'),
+  bullet('**`frame-ancestors` on the embed route** — section 5.2. The blocker.'),
+  bullet('**Non-PDF formats in an embedded frame** — section 4. Wiring, not design.'),
+  bullet('**Collaboration in an embed** — section 5.4. Genuinely unsolved.'),
+  bullet('**Accessibility evidence.** See section 7 before you rely on ours.'),
+  p('Full message shapes: `docs/viewer-embed-protocol.md`. Where this guide and that document '
+  + 'disagree, that document is the normative one.'),
 
   h1('7.  Obligations you inherit'),
   p('**Accessibility.** WCAG 2.2 AA is a procurement gate in the UK, EU, Australia and the US, and '
@@ -272,6 +359,14 @@ const children = [
   + 'view, you inherit the requirement for an equivalent accessible route to the same information '
   + '— we provide the hierarchy tree for exactly this reason, and it needs to remain reachable in '
   + 'your integration. Exports must be tagged and PDF/UA-conformant.'),
+  note('**Do not inherit a conformance claim from us, because we are not making one yet.** An '
+     + 'accessibility statement, a VPAT 2.5 INT conformance report and a screen-reader matrix all '
+     + 'exist in our repository, and all three record the same thing: no criterion has been '
+     + 'evaluated by test. Real work has been done — keyboard-reachable controls, a visible focus '
+     + 'indicator throughout, `prefers-reduced-motion` honoured, an authentication flow that meets '
+     + 'SC 3.3.8 by construction — but none of it has been through an audit, and an untested claim '
+     + 'is worth nothing in a procurement. If your bid depends on ours, ask for the current state '
+     + 'in writing rather than citing this guide.'),
   p('**Trademarks.** “Works with Microsoft SharePoint” is nominative fair use. '
   + '“Microsoft-approved”, their logo, or any implication of partnership is not. The same applies '
   + 'to Amazon, Google and Autodesk. Integration documentation is where this goes wrong most '
@@ -290,13 +385,24 @@ const children = [
   bullet('Do you surface `detail` and `traceId` from problem documents to your support path?'),
   bullet('Have you confirmed your DWG position?'),
   h2('Before you scope an embedded integration'),
+  bullet('Have you run the demo host and watched a handshake? (`demo/README.md`)'),
   bullet('Have you read the embed protocol? (`docs/viewer-embed-protocol.md`)'),
+  bullet('**Have you confirmed the embed route’s `frame-ancestors` allow-list exists on the '
+       + 'deployment you will integrate with, and that your origins are on it?**'),
   bullet('Can you mint a short-lived URL for a document, and serve a page that frames us?'),
-  bullet('Do you have somewhere to store markup that is not the rendered file?'),
-  bullet('Do you know which of the 17 document operations you need to implement as callbacks?'),
-  note('The embed is specified but not built, so the integration you can ship **today** is still '
-     + 'section 3 and nothing else. That is a real feature and it works — it is just smaller than '
-     + '“embed the viewer”, and worth scoping as what it is.')
+  bullet('Does your storage allow the viewer’s origin to read that URL from the browser?'),
+  bullet('Do you check `event.origin` on every message, not once at setup?'),
+  bullet('Do you have somewhere to store markup that is not the rendered file, and do you stamp '
+       + 'the author from your own session rather than from the message?'),
+  bullet('Do you know which of the 17 document operations you need to implement as callbacks, and '
+       + 'can you return `refused` as readily as `applied`?'),
+  bullet('Is your embedded use case PDF-first, or do you need the conversion path wired in?'),
+  note('**The integration you can ship against a stock deployment today is still section 3.** The '
+     + 'embed is built and demonstrable, and it needs one header changed on the viewer side before '
+     + 'it runs anywhere but a development install. Scope it as something to plan with us rather '
+     + 'than something to build against unilaterally — and if all you need is viewing, converting '
+     + 'through section 3 and rendering the result yourself remains a complete feature with none '
+     + 'of these caveats.')
 ];
 
 const doc = makeDoc([section(children, 'Viewer product — Integration Guide   ·   page ')]);

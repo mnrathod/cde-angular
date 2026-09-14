@@ -150,32 +150,43 @@ function diagramBoundary() {
         { t: 'VIEWER PRODUCT', align: AlignmentType.CENTER, color: GRAPHITE } ] },
 
       { cells: [
-        { t: ['Their document store', 'SharePoint / S3 / Blob'], fill: TEAL_BG },
-        { t: ['1.  mount the viewer', '✗  NOT BUILT — no embed surface'],
-          fill: RED_BG, color: RED, align: AlignmentType.CENTER },
-        { t: ['viewer-core', '6 components · 6 services'] } ] },
+        { t: ['Their web interface', 'where the viewer appears'], fill: TEAL_BG },
+        { t: ['1.  mount the viewer  →', '✓  BUILT', 'iframe + cde.viewer.v1'],
+          fill: TEAL_BG, color: TEAL, align: AlignmentType.CENTER, bold: true },
+        { t: ['/embed route', 'no session, no auth guard'] } ] },
 
       { cells: [
         { t: ['Their identity provider', 'Entra / Okta / own'], fill: TEAL_BG },
-        { t: ['2.  identify the user', '✗  NOT BUILT — no token exchange'],
-          fill: RED_BG, color: RED, align: AlignmentType.CENTER },
+        { t: ['2.  identify the user  →', '✓  BUILT', 'host.init.identity — 3 untrusted fields'],
+          fill: TEAL_BG, color: TEAL, align: AlignmentType.CENTER, bold: true },
+        { t: ['viewer-core', '15 files · 6 services · 6 components'] } ] },
+
+      { cells: [
+        { t: ['Their document store', 'SharePoint / S3 / Blob'], fill: TEAL_BG },
+        { t: ['3.  hand over the document  →', '✓  BUILT',
+              'host.init.document, or POST /api/conversions'],
+          fill: TEAL_BG, color: TEAL, align: AlignmentType.CENTER, bold: true },
         { t: ['Conversion pipeline', 'fetch → scan → render'] } ] },
 
       { cells: [
-        { t: ['Their web interface', 'where the viewer appears'], fill: TEAL_BG },
-        { t: ['3.  hand over the document  →', '✓  BUILT', 'POST /api/conversions'],
+        { t: ['Their markup store', 'they stamp the author'], fill: TEAL_BG },
+        { t: ['←  4.  return what was drawn', '✓  BUILT',
+              '3 markup events + 1 operation pair'],
           fill: TEAL_BG, color: TEAL, align: AlignmentType.CENTER, bold: true },
-        { t: ['Markup store', 'tied to our user table'] } ] },
+        { t: ['host-channel', 'origin-checked in both directions'] } ] },
 
       { cells: [
-        { t: '', fill: TEAL_BG },
-        { t: ['←  4.  return the markups', '✗  NOT BUILT — 17 operations undecided'],
-          fill: RED_BG, color: RED, align: AlignmentType.CENTER },
+        { t: '' },
+        { t: ['✗  BLOCKED IN DEPLOYMENT',
+              'the platform still sends frame-ancestors \'none\''],
+          fill: RED_BG, color: RED, align: AlignmentType.CENTER, bold: true },
         { t: '' } ] }
     ]),
-    caption('Figure 1 — Three of the four exchanges do not exist. The viewer can already take a '
-          + 'document from anyone’s storage; it cannot yet be mounted, be told who is looking, '
-          + 'or give anything back.')
+    caption('Figure 1 — All four exchanges now have code on both sides, checked against each '
+          + 'other by a demo host written in plain JavaScript. None of it renders in a customer’s '
+          + 'browser yet: the platform sends `frame-ancestors \'none\'` on every route, so the '
+          + 'frame is refused before a single message is sent. That is one response header, not '
+          + 'one of the four exchanges.')
   ];
 }
 
@@ -199,9 +210,10 @@ function diagramIngress() {
       step('7', 'Poll', 'GET /api/conversions/{jobId} — PENDING, RUNNING, then SUCCEEDED / FAILED / CANCELLED (terminal)', TEAL_BG),
       step('8', 'Collect', 'GET /api/conversions/{jobId}/content — streamed', TEAL_BG)
     ]),
-    caption('Figure 2 — The one exchange that is built, end to end. Stages 1, 7 and 8 are yours; '
-          + '2 to 6 are ours. Always send an Idempotency-Key so a timed-out retry returns the same '
-          + 'job rather than converting twice.')
+    caption('Figure 2 — The conversion API, end to end. Stages 1, 7 and 8 are yours; 2 to 6 are '
+          + 'ours. Always send an Idempotency-Key so a timed-out retry returns the same job rather '
+          + 'than converting twice. An embedded viewer opening a PDF skips this path entirely — '
+          + 'the browser fetches your URL directly and no server of ours sees the file.')
   ];
 }
 
@@ -211,33 +223,36 @@ function diagramIdentity() {
   return [
     table(w, [
       { header: true, cells: [
-        { t: 'TODAY', align: AlignmentType.CENTER, color: RED },
-        { t: 'NEEDED', align: AlignmentType.CENTER, color: TEAL } ] },
+        { t: 'THE PLATFORM’S OWN API — unchanged', align: AlignmentType.CENTER, color: RED },
+        { t: 'THE EMBED PATH — built', align: AlignmentType.CENTER, color: TEAL } ] },
       { cells: [
         { t: ['Priya, at Asite', 'host identity'], fill: RED_BG, align: AlignmentType.CENTER },
-        { t: ['Priya, at Asite', 'signed assertion'], fill: TEAL_BG, align: AlignmentType.CENTER } ] },
+        { t: ['Priya, at Asite', 'known only to Asite'], fill: TEAL_BG, align: AlignmentType.CENTER } ] },
       { cells: [
         { t: '↓   blocked', align: AlignmentType.CENTER, color: RED, bold: true },
         { t: '↓', align: AlignmentType.CENTER, color: TEAL, bold: true } ] },
       { cells: [
         { t: ['Annotation.author', '@ManyToOne User'], align: AlignmentType.CENTER },
-        { t: ['Annotation.authorRef', 'opaque value'], align: AlignmentType.CENTER } ] },
+        { t: ['host.init.identity', 'display name · subjectId · capabilities'],
+          align: AlignmentType.CENTER } ] },
       { cells: [
         { t: '↓', align: AlignmentType.CENTER, color: RED, bold: true },
         { t: '↓', align: AlignmentType.CENTER, color: TEAL, bold: true } ] },
       { cells: [
         { t: ['OUR users table', 'she must exist as a row'], fill: RED_BG,
           align: AlignmentType.CENTER, color: RED },
-        { t: ['Issuer + subject', 'no row required'], fill: TEAL_BG,
+        { t: ['Nothing persisted', 'the viewer stamps no author'], fill: TEAL_BG,
           align: AlignmentType.CENTER, color: TEAL } ] },
       { cells: [
-        { t: 'Integration means shadow-provisioning every host user into our database.',
-          align: AlignmentType.CENTER, color: GRAPHITE },
-        { t: 'The host stays the system of record for who its people are.',
-          align: AlignmentType.CENTER, color: GRAPHITE } ] }
+        { t: 'Integrating through this API means shadow-provisioning every host user into our '
+           + 'database.', align: AlignmentType.CENTER, color: GRAPHITE },
+        { t: 'The host stays the system of record, and stamps the author itself when it stores '
+           + 'the markup.', align: AlignmentType.CENTER, color: GRAPHITE } ] }
     ]),
-    caption('Figure 3 — The difference is one field. Annotation.author is a foreign key into our own '
-          + 'user table, so a markup cannot exist without a local user row.')
+    caption('Figure 3 — Both paths exist in the code. `/api/annotations` still keys an author to a '
+          + 'row in our own user table, and always will for this platform’s own users. The embed '
+          + 'path never reaches it: the viewer emits a markup with no author at all, and the host '
+          + 'attributes it from the session it already holds.')
   ];
 }
 
