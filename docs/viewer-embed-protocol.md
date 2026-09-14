@@ -220,15 +220,23 @@ Two consequences worth knowing before you deploy:
 | Type | Payload | Meaning |
 |---|---|---|
 | `viewer.ready` | `{ version }` | Loaded, awaiting `host.init` |
+| `viewer.opened` | `{ externalId, displayName, mediaType }` | A document was accepted and is being opened — see §6.3 |
 | `viewer.loaded` | `{ pageCount, mediaType, renderedBy }` | The document is open |
+| `viewer.unloaded` | `{ reason, externalId }` | A document stopped being shown — see §6.3 |
 | `viewer.error` | `{ problem }` | Could not open it — see §8 |
+| `viewer.markupLoaded` | `{ count, rejected, externalId }` | Your `host.loadMarkup` was rendered — see §6.3 |
 | `viewer.markupCreated` | `{ markup }` | The user drew something |
 | `viewer.markupUpdated` | `{ markup }` | The user changed it |
 | `viewer.markupDeleted` | `{ markupId }` | The user deleted it |
 | `viewer.operationRequest` | `{ operation, arguments }` | The user asked for something only you can do — see §6.1 |
 | `viewer.selectionChanged` | `{ markupId \| null }` | Selection moved |
 | `viewer.viewChanged` | `{ page, zoom, rotation }` | The user navigated. Throttled to 4/s |
+| `viewer.pageRendered` | `{ page, widthPx, heightPx, zoom, externalId }` | A page is on screen. Once per page per document — see §6.3 |
 | `viewer.resized` | `{ contentHeightPx }` | For hosts sizing the frame to content |
+
+**Every one of these is optional to handle.** §9's minimum integration needs
+`viewer.ready` and nothing else; the rest exist so a host can record what
+happened without polling the viewer or inferring it from markup traffic.
 
 ### 6.1 One message pair for every host callback
 
@@ -298,6 +306,75 @@ because you told the viewer who they were; attribute server-side from your own
 record. A display name in the payload would be a claim the browser made about
 its own user, and stamping it server-side from a session you already hold is
 both easier and true.
+
+### 6.3 Lifecycle events, and what each is actually good for
+
+Added after the first integrations asked for them. A host wanting to record
+what a reader did — which documents, which pages, whether the markup it stored
+came back — could previously only infer it, and inference from `viewChanged`
+and markup traffic gets the answer wrong in ways that are not obvious.
+
+These are **additive within v1** (§10): a host built before them keeps working
+and simply never registers a handler.
+
+```
+  host.init ──▶  viewer.opened        the viewer accepted your document
+                 viewer.loaded        …and could render it       ─┐ one
+                 viewer.error         …or could not               ─┘ or the other
+  host.loadMarkup ──▶ viewer.markupLoaded
+                 viewer.pageRendered  once per page, as each paints
+  host.loadDocument ──▶ viewer.unloaded (replaced) ──▶ viewer.opened
+```
+
+**`viewer.opened` fires before the outcome is known**, and before any fetch.
+That is deliberate: a host recording "this person opened the site plan" must
+hear it even when the viewer then cannot render the file. Exactly one of
+`viewer.loaded` or `viewer.error` follows it.
+
+A document the viewer **rejects outright** — a descriptor missing `mediaType`,
+or a `javascript:` URL — produces `viewer.error` with no `viewer.opened` before
+it. There was no document to open, and announcing one would invent a reader
+event that did not happen.
+
+**`viewer.unloaded` carries the id of the document that closed**, not the one
+arriving. `reason` is `replaced` when `host.loadDocument` swapped it, or
+`session-ended` when the viewer was torn down in a way it could still send
+from. It never fires without a matching `viewer.opened` before it.
+
+> **Do not treat `viewer.unloaded` as a guarantee on teardown.** If your page
+> removes the iframe, navigates away, or the tab is closed, nothing can post
+> from a frame that no longer exists. Use it to close a record you are keeping,
+> not as the only place you write one — the same caveat that applies to
+> `beforeunload` in your own page, for the same reason.
+
+**`viewer.markupLoaded` closes the loop on `host.loadMarkup`**, and `rejected`
+is the reason it is worth handling. Markup fails to render two ways — an entry
+that is not a `Markup`, or one whose opaque `shapeData` no longer parses — and
+both are otherwise silent: the markup simply does not appear, with nothing to
+distinguish that from your having sent none. A non-zero `rejected` means your
+store has markup the viewer cannot draw, which is a data problem on your side
+and worth an alert.
+
+`count` is what rendered; `count + rejected` is what you sent. An empty list is
+acknowledged with both zero, because "you have none stored" and "I never heard
+you" are different and only one is worth retrying.
+
+> **A `host.loadMarkup` whose `markup` is not an array is ignored silently and
+> acknowledges nothing.** This is deliberate rather than an oversight:
+> `viewer.error` means *the document could not be opened*, and a host that
+> blanks its frame on `viewer.error` would lose the page over a malformed
+> markup list. If you get no `viewer.markupLoaded`, check you sent an array.
+
+**`viewer.pageRendered` is once per page per document — not once per paint.**
+Zooming re-renders a page and does not re-announce it, and the count resets
+when a new document opens. That is what makes it usable as "pages this person
+actually saw": an undeduplicated stream would over-report by however many times
+the reader changed zoom, and a "pages read" figure built on it would be
+meaningless.
+
+It is a different question from `viewer.viewChanged`, which is throttled and
+reports where the user navigated *to*. Use `viewChanged` to follow a reader
+live; use `pageRendered` to record what was seen.
 
 ## 7. Identity
 

@@ -149,8 +149,8 @@ components, not the question of where they go.
 New since the last issue of this document, and the reason its status line
 changed. The contract ADR 14 settled is now code on both sides.
 
-`src/app/features/embed/` — 996 lines of production TypeScript across five
-files, with 525 lines of spec beside them. It is deliberately **not** in
+`src/app/features/embed/` — 1,128 lines of production TypeScript across six
+files, with 811 lines of spec beside them. It is deliberately **not** in
 `viewer-core`: the protocol is how a host talks to a deployment of the viewer,
 so it belongs to the application that is deployed, while `viewer-core` stays
 the part that knows no backend exists.
@@ -162,6 +162,22 @@ the part that knows no backend exists.
 | `embed-session.service.ts` | The session state machine — ready, awaiting init, loaded, failed — and the document-open path |
 | `embed-page.component.ts` | The rendering surface and the markup overlay |
 | `embed-viewer.component.ts` | The `/embed` route component. No auth guard, deliberately — the viewer authenticates nobody |
+| `markup-wire-format.ts` | Translation between the viewer's `ShapeData` and the protocol's `Markup` — the only part of the session with no session state, so it tests against the two representations directly |
+
+**Fourteen message types run viewer → host and six run host → viewer.** Four of
+the fourteen are lifecycle events — `viewer.opened`, `viewer.unloaded`,
+`viewer.markupLoaded` and `viewer.pageRendered` — added after the first
+integrations asked how to record what a reader did. None is required: a host can
+ignore every one and still open documents and collect markup. Adding them was
+additive within v1, which is the compatibility promise in §10 of the protocol
+doing the job it exists for.
+
+**`viewer.pageRendered` is deduplicated per document, and that is the whole
+point of it.** Zooming repaints a page; it is not a second reading of it. An
+undeduplicated stream would inflate a "pages read" figure by however many times
+the user changed zoom, and a host building that metric would have no way to
+tell. The viewer deduplicates so that every host does not have to, and so that
+the ones that forget are not silently wrong.
 
 ### 4.1 Five rules, and the order they are checked in
 

@@ -283,6 +283,8 @@ const children = [
   bullet('**Store what comes back.** `viewer.markupCreated`, `…Updated` and `…Deleted` carry the '
        + 'markup; `shapeData` is an opaque string you store and hand back, never parse. Stamp the '
        + 'author yourself from the session you already hold.'),
+  bullet('**Listen to as much of the rest as you need, and none of it if you do not.** Section 5.4 '
+       + 'lists the lifecycle events. Every one is optional.'),
   bullet('**Answer `viewer.operationRequest`** with `host.operationResult` — `applied`, `refused` '
        + 'or `failed`. One message pair covers all seventeen document operations; they are not '
        + 'seventeen message types.'),
@@ -302,7 +304,46 @@ const children = [
   + 'PDF, the browser fetches your URL directly, so your storage must allow the viewer’s origin to '
   + 'read it.'),
 
-  h2('5.4  Identity: there is nothing to configure'),
+  h2('5.4  Events you can hook, and what each is honestly for'),
+  p('Fourteen message types run viewer → host. Four exist purely so you can **record** what a '
+  + 'reader did without polling us or inferring it from markup traffic — and the inference is '
+  + 'wrong in ways that are not obvious, which is why they exist.'),
+  table([2500, 2600, 4646], [
+    { header: true, cells: [{ t: 'You want to know' }, { t: 'Listen to' }, { t: 'What to watch out for' }] },
+    { cells: [{ t: 'A document was opened' }, { t: 'viewer.opened' },
+      { t: 'Fires before the viewer knows whether it can render the file, and before any fetch. Exactly one of viewer.loaded or viewer.error follows it' }] },
+    { cells: [{ t: 'It rendered' }, { t: 'viewer.loaded' },
+      { t: 'Carries pageCount, mediaType and what rendered it' }] },
+    { cells: [{ t: 'Your stored markup arrived' }, { t: 'viewer.markupLoaded' },
+      { t: 'Check `rejected`. Non-zero means your store holds markup the viewer cannot draw — a data problem on your side that was previously silent', fill: TEAL_BG }] },
+    { cells: [{ t: 'The user drew, changed or removed something' },
+      { t: 'viewer.markupCreated / …Updated / …Deleted' },
+      { t: 'No author field. You stamp it from the session you already hold (5.5)' }] },
+    { cells: [{ t: 'The user selected a markup' }, { t: 'viewer.selectionChanged' },
+      { t: 'markupId, or null when nothing is selected' }] },
+    { cells: [{ t: 'Which pages were actually read' }, { t: 'viewer.pageRendered' },
+      { t: 'Once per page per document. Zooming repaints a page and does NOT re-announce it, which is what makes a "pages read" count mean anything', fill: TEAL_BG }] },
+    { cells: [{ t: 'Where the user is now' }, { t: 'viewer.viewChanged' },
+      { t: 'Throttled to 4/s. Use this to follow a reader live; use pageRendered to record what was seen' }] },
+    { cells: [{ t: 'A document stopped being shown' }, { t: 'viewer.unloaded' },
+      { t: 'Carries the id of the document that CLOSED, not the one arriving. Not guaranteed on teardown — see below', fill: RED_BG }] }
+  ]),
+  caption('Table 4 — The events worth hooking, and the trap in each.'),
+  note('**Do not treat `viewer.unloaded` as a guarantee.** If your page removes the iframe, '
+     + 'navigates away, or the tab closes, nothing can post from a frame that no longer exists. '
+     + 'Use it to close a record you are already keeping, never as the only place you write one — '
+     + 'the same caveat that applies to `beforeunload` in your own page, for the same reason.'),
+  p('Two more sharp edges worth knowing before you build against these. A document the viewer '
+  + '**rejects outright** — a descriptor missing `mediaType`, say — produces `viewer.error` with '
+  + 'no `viewer.opened` before it, because there was no document to open. And a `host.loadMarkup` '
+  + 'whose `markup` is not an array is **ignored silently and acknowledges nothing**: if you get '
+  + 'no `viewer.markupLoaded`, check you sent an array.'),
+  p('All four were added after the protocol shipped, which is the compatibility promise working as '
+  + 'intended — new message types are additive within v1, so an integration written before them '
+  + 'keeps running and simply never registers a handler. Full payloads: §6.3 of '
+  + '`docs/viewer-embed-protocol.md`.'),
+
+  h2('5.5  Identity: there is nothing to configure'),
   p('Not “you need to set up SSO”. The embed path has no identity system to configure at all. Our '
   + 'own `/api/annotations` still keys a markup’s author to a row in our user table — integrating '
   + 'through *that* API would mean shadow-provisioning your users into our database, a '
@@ -348,7 +389,7 @@ const children = [
   h2('Still open'),
   bullet('**`frame-ancestors` on the embed route** — section 5.2. The blocker.'),
   bullet('**Non-PDF formats in an embedded frame** — section 4. Wiring, not design.'),
-  bullet('**Collaboration in an embed** — section 5.4. Genuinely unsolved.'),
+  bullet('**Collaboration in an embed** — section 5.5. Genuinely unsolved.'),
   bullet('**Accessibility evidence.** See section 7 before you rely on ours.'),
   p('Full message shapes: `docs/viewer-embed-protocol.md`. Where this guide and that document '
   + 'disagree, that document is the normative one.'),

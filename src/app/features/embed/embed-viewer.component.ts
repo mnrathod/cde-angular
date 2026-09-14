@@ -56,7 +56,9 @@ import { ProblemDetail } from './embed-protocol';
         <div class="pages">
           @for (page of pageNumbers(); track page) {
             <app-embed-page [pageNumber]="page" [zoom]="state.zoom()"
-                            (shapeDrawn)="session.markupCreated($event)" />
+                            (shapeDrawn)="session.markupCreated($event)"
+                            (pageRendered)="session.pageRendered(
+                              $event.page, $event.widthPx, $event.heightPx)" />
           }
         </div>
       } @else if (session.phase() === 'failed') {

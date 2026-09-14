@@ -54,6 +54,15 @@ export class EmbedPageComponent implements OnChanges {
   /** Emitted once per completed stroke, so the host hears one message. */
   readonly shapeDrawn = output<ShapeData>();
 
+  /**
+   * Emitted when the canvas has actually been painted, with its final size.
+   *
+   * Fires on every render including zoom changes — deduplicating to one event
+   * per page is the session's job, because this component only knows about its
+   * own page and cannot tell a first view from a re-paint.
+   */
+  readonly pageRendered = output<{ page: number; widthPx: number; heightPx: number }>();
+
   @ViewChild('canvas') private canvasRef?: ElementRef<HTMLCanvasElement>;
   @ViewChild('overlay') private overlayRef?: ElementRef<SVGSVGElement>;
 
@@ -103,6 +112,7 @@ export class EmbedPageComponent implements OnChanges {
     this.widthPx.set(width);
     this.heightPx.set(height);
     this.redrawOverlay();
+    this.pageRendered.emit({ page: this.pageNumber, widthPx: width, heightPx: height });
   }
 
   private redrawOverlay(): void {

@@ -53,15 +53,30 @@ configuration, never a wildcard.
 
 | Do this | See this |
 |---|---|
-| Choose a document | The handshake in the message log: `viewer.ready` → `host.init` → `viewer.loaded` |
+| Choose a document | The handshake in the message log: `viewer.ready` → `host.init` → `viewer.opened` → `viewer.loaded` |
 | Draw on the drawing | A row appears in "Markup the host has stored", authored by the name in the Session panel |
 | Reload the page and reopen the document | The markup comes back. The viewer forgot; the host remembered |
 | Change the display name, then draw again | The new name is stamped. The viewer never sent one |
 | Tick `document:sign`, then use Sign in the viewer | The control renders and the operation is **refused**. Both are correct |
 | Press "Send an empty identity" | The capability-gated controls disappear and the viewer keeps working |
-| Open `sample-specification.docx` | A `viewer.error` naming the conversion service — see below |
+| Open `sample-specification.docx` | `viewer.opened` **then** `viewer.error` — the open is announced before the outcome is known |
+| Open one document, then another | `viewer.unloaded` for the first, with a "host noted" line saying how many pages were seen |
+| Press "Send host.loadMarkup" | `viewer.markupLoaded` acknowledging what rendered, and what could not |
 
-The last one is the honest part. **Only PDF renders in the browser.** Office
+Three of those lines are the lifecycle events (§6.3 of the protocol). None is
+required to make the embed work — a host can ignore every one and still open
+documents and collect markup. They exist so a host can *record* what a reader
+did without polling the viewer or inferring it from markup traffic, and the
+inference is wrong in ways that are not obvious: `viewer.pageRendered` is
+deduplicated per document, so the "pages seen" count the demo prints does not
+go up when the reader zooms.
+
+Lines labelled **"host noted"** are the demo's own bookkeeping rather than
+messages that crossed the boundary. They are styled differently on purpose: the
+log is the artefact you read to learn the protocol, and a line in it claiming
+traffic that never happened would teach a fiction.
+
+The `.docx` line is the honest part. **Only PDF renders in the browser.** Office
 and IFC are converted server-side before the viewer sees pages or geometry
 (§6.7.4, §5.13.10), so an embed with no conversion service reachable cannot
 open them. It says so, with an RFC 9457 problem detail, instead of showing an

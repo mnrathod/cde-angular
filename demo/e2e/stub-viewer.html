@@ -30,9 +30,12 @@
 <p id="doc"></p>
 <button type="button" id="draw">Emit markup</button>
 <button type="button" id="sign">Request document.sign</button>
+<button type="button" id="read-on">Read page 2, then page 1 again</button>
+<button type="button" id="close">Close the document</button>
 
 <script type="module">
   const PROTOCOL = 'cde.viewer.v1';
+  let externalId;
   const parentOrigin = new URLSearchParams(location.search).get('parentOrigin');
 
   let counter = 0;
@@ -50,10 +53,31 @@
     if (!message || message.protocol !== PROTOCOL) return; // §4
 
     if (message.type === 'host.init') {
+      const descriptor = message.payload.document ?? {};
       document.getElementById('state').textContent = 'initialised';
-      document.getElementById('doc').textContent =
-        message.payload.document?.displayName ?? '';
+      document.getElementById('doc').textContent = descriptor.displayName ?? '';
+      externalId = descriptor.externalId;
+      // §6.3: opened before the outcome, loaded after it, page 1 once it paints.
+      send('viewer.opened', {
+        externalId,
+        displayName: descriptor.displayName,
+        mediaType: descriptor.mediaType,
+      });
       send('viewer.loaded', { pageCount: 3, mediaType: 'application/pdf' });
+      send('viewer.pageRendered', { page: 1, widthPx: 800, heightPx: 1130, zoom: 1, externalId });
+    }
+    if (message.type === 'host.loadMarkup') {
+      // An entry whose opaque blob is not JSON is one this viewer cannot draw
+      // — the rejection a host's own storage can introduce (§6.3).
+      const sent = Array.isArray(message.payload.markup) ? message.payload.markup : null;
+      if (sent) {
+        const rejected = sent.filter((entry) => !String(entry.shapeData ?? '').startsWith('{'));
+        send('viewer.markupLoaded', {
+          count: sent.length - rejected.length,
+          rejected: rejected.length,
+          externalId,
+        });
+      }
     }
     if (message.type === 'host.operationResult') {
       document.getElementById('state').textContent = `operation ${message.payload.status}`;
@@ -77,6 +101,18 @@
 
   document.getElementById('sign').addEventListener('click', () => {
     send('viewer.operationRequest', { operation: 'document.sign', arguments: {} });
+  });
+
+  document.getElementById('read-on').addEventListener('click', () => {
+    // Page 2 once, then page 1 again — the host must count two pages seen, not
+    // three. Re-announcing a page the reader already saw is the mistake
+    // deduplication exists to prevent (§6.3).
+    send('viewer.pageRendered', { page: 2, widthPx: 800, heightPx: 1130, zoom: 1, externalId });
+    send('viewer.pageRendered', { page: 1, widthPx: 1600, heightPx: 2260, zoom: 2, externalId });
+  });
+
+  document.getElementById('close').addEventListener('click', () => {
+    send('viewer.unloaded', { reason: 'session-ended', externalId });
   });
 
   if (parentOrigin) send('viewer.ready', { version: { supported: [PROTOCOL] } });

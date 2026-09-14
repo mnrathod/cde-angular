@@ -141,3 +141,36 @@ test('is operable from the keyboard alone', async ({ page }) => {
   // A focus trap shows up as the same element every time.
   expect(reached.size).toBeGreaterThan(8);
 });
+
+test('counts pages the reader actually saw, not pages repainted', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'sample-drawing.pdf' }).click();
+
+  const log = page.locator('#log');
+  await expect(log).toContainText('viewer sent viewer.opened');
+  // Page 1 is announced as soon as it paints, before the reader does anything.
+  await expect(log).toContainText('viewer sent viewer.pageRendered');
+
+  const viewer = page.frameLocator('#viewer-frame');
+  await viewer.getByRole('button', { name: 'Read page 2, then page 1 again' }).click();
+  await viewer.getByRole('button', { name: 'Close the document' }).click();
+
+  // Two pages, from three pageRendered messages: the second page 1 is a
+  // repaint at a different zoom, and counting it would make "pages read"
+  // meaningless (§6.3). This is the assertion the dedupe exists for.
+  await expect(log).toContainText('document session-ended; 2 page(s) seen');
+});
+
+test('surfaces markup its own store holds but the viewer cannot draw', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'sample-drawing.pdf' }).click();
+  await expect(page.locator('#log')).toContainText('viewer.loaded');
+
+  // The stub rejects any shapeData that is not JSON, which is exactly what a
+  // host's storage mangling the opaque blob would produce. Before
+  // viewer.markupLoaded that failure was silent on both sides.
+  await page.frameLocator('#viewer-frame').getByRole('button', { name: 'Emit markup' }).click();
+  await page.getByRole('button', { name: 'Send host.loadMarkup' }).click();
+
+  await expect(page.locator('#log')).toContainText('viewer sent viewer.markupLoaded');
+});

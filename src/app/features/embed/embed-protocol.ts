@@ -17,10 +17,22 @@ export const PROTOCOL = 'cde.viewer.v1';
 export const SUPPORTED_PROTOCOLS = [PROTOCOL] as const;
 
 export type ViewerMessageType =
-  | 'viewer.ready' | 'viewer.loaded' | 'viewer.error'
+  | 'viewer.ready' | 'viewer.opened' | 'viewer.loaded' | 'viewer.unloaded'
+  | 'viewer.error'
+  | 'viewer.markupLoaded'
   | 'viewer.markupCreated' | 'viewer.markupUpdated' | 'viewer.markupDeleted'
   | 'viewer.operationRequest' | 'viewer.selectionChanged'
-  | 'viewer.viewChanged' | 'viewer.resized';
+  | 'viewer.viewChanged' | 'viewer.pageRendered' | 'viewer.resized';
+
+/**
+ * Why a document stopped being shown.
+ *
+ * `replaced` is ordinary — `host.loadDocument` swapped it. `session-ended` is
+ * the viewer being torn down in a way it could still send from; a host that
+ * removes the iframe outright gets neither, because nothing can post from a
+ * frame that no longer exists. §6.3 says so rather than implying a guarantee.
+ */
+export type UnloadReason = 'replaced' | 'session-ended';
 
 export type HostMessageType =
   | 'host.init' | 'host.loadDocument' | 'host.setIdentity'

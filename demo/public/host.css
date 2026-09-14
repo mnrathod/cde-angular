@@ -217,6 +217,11 @@ iframe {
 .log .in .type { color: var(--in); }
 .log .out .type { color: var(--out); }
 .log .detail { color: var(--ink-soft); }
+/* A host note is not traffic. It has no arrow and is indented to the width of
+   one, so the two kinds of line stay distinguishable without relying on the
+   colour difference alone. */
+.log .note { padding-left: calc(1em + 8px); font-style: italic; }
+.log .note .type { color: var(--ink-soft); }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

@@ -12,12 +12,12 @@
  */
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { ViewerStateService } from '../../../viewer-core/viewer-state.service';
-import { MarkupEngineService } from '../../../viewer-core/markup-engine.service';
 import { PdfEngineService } from '../../../viewer-core/pdf-engine.service';
 import type { ShapeData } from '../../../viewer-core/viewer-state.service';
 import { HostChannel, INIT_TIMEOUT_MS } from './host-channel.service';
+import { MarkupWireFormat } from './markup-wire-format';
 import {
-  DocumentDescriptor, Envelope, Identity, Markup, ProblemDetail,
+  DocumentDescriptor, Envelope, Identity, ProblemDetail, UnloadReason,
   isDocumentDescriptor, isFetchableDocumentUrl, isIdentity, isMarkup,
   isOperationStatus, problem,
 } from './embed-protocol';
@@ -32,7 +32,7 @@ export class EmbedSession {
 
   private readonly channel = inject(HostChannel);
   private readonly viewerState = inject(ViewerStateService);
-  private readonly markupEngine = inject(MarkupEngineService);
+  private readonly wireFormat = inject(MarkupWireFormat);
   private readonly pdfEngine = inject(PdfEngineService);
 
   readonly phase = signal<SessionPhase>('awaiting-host');
@@ -47,6 +47,19 @@ export class EmbedSession {
   private initTimer: ReturnType<typeof setTimeout> | null = null;
   private unsubscribe: (() => void) | null = null;
   private readonly pendingOperations = new Map<string, (result: OperationOutcome) => void>();
+
+  /** Set once a document has been announced, so `unloaded` pairs with `opened`. */
+  private documentIsOpen = false;
+
+  /**
+   * Pages already announced as rendered, for the document currently open.
+   *
+   * §6.3: `viewer.pageRendered` is once per page per document, not once per
+   * paint. Re-rendering page 3 because the user zoomed is not a second view of
+   * page 3, and a host counting "pages read" from an undeduplicated stream
+   * would over-report by however many times the user changed zoom.
+   */
+  private readonly renderedPages = new Set<number>();
 
   /**
    * Whether to render a control.
@@ -89,6 +102,10 @@ export class EmbedSession {
   stop(): void {
     if (this.initTimer) clearTimeout(this.initTimer);
     this.initTimer = null;
+    // Before the channel closes, not after — `disconnect()` drops the target
+    // and `send()` on a disconnected channel is a silent no-op, so the order
+    // here is the difference between the host hearing this and not.
+    this.announceUnload('session-ended');
     this.unsubscribe?.();
     this.channel.disconnect();
   }
@@ -148,10 +165,26 @@ export class EmbedSession {
       ));
     }
 
+    // A replacement closes what was open before it announces what is arriving,
+    // so a host keeping per-document state sees the pair in the order it needs
+    // to act on: unloaded(old) then opened(new), never overlapping.
+    this.announceUnload('replaced');
+
     this.documentName.set(candidate.displayName);
     this.externalId = candidate.externalId;
     this.phase.set('loading');
     this.problem.set(null);
+    this.renderedPages.clear();
+    this.documentIsOpen = true;
+
+    // Announced before the fetch, and before any decision about whether this
+    // format is renderable. The host asked for a document and the viewer
+    // accepted the request; whether it can then be shown is the next message.
+    this.channel.send('viewer.opened', {
+      externalId: this.externalId,
+      displayName: candidate.displayName,
+      mediaType: candidate.mediaType,
+    });
 
     if (!DIRECTLY_RENDERABLE.has(candidate.mediaType)) {
       return this.failUnconverted(candidate);
@@ -194,12 +227,34 @@ export class EmbedSession {
     ));
   }
 
+  /**
+   * Render the markup the host has stored, and say how much of it survived.
+   *
+   * The `rejected` count is the point of the acknowledgement. Markup can fail
+   * here two ways — an entry that is not a `Markup`, or one whose `shapeData`
+   * no longer parses — and both were previously silent. A host whose store had
+   * mangled the opaque blob saw markup simply not appear, with nothing to
+   * distinguish that from having sent none.
+   *
+   * A `markup` that is not an array is ignored and acknowledges nothing, which
+   * is the pre-existing behaviour and is documented in §6.3 rather than
+   * reported: `viewer.error` means the document could not be opened, and
+   * widening it to mean "and also this other thing" would blank the page of
+   * every host that treats it that way.
+   */
   private loadMarkup(candidate: unknown): void {
     if (!Array.isArray(candidate)) return;
     const shapes = candidate
       .filter(isMarkup)
-      .flatMap((markup) => this.toShapes(markup));
+      .flatMap((markup) => this.wireFormat.fromWire(markup));
     this.viewerState.shapes.set(shapes);
+
+    const accepted = new Set(shapes.map((shape) => shape.id)).size;
+    this.channel.send('viewer.markupLoaded', {
+      count: accepted,
+      rejected: candidate.length - accepted,
+      externalId: this.externalId,
+    });
   }
 
   private runCommand(payload: Record<string, unknown>): void {
@@ -244,11 +299,11 @@ export class EmbedSession {
   // ── Outbound ──────────────────────────────────────────────────────────────
 
   markupCreated(shape: ShapeData): void {
-    this.channel.send('viewer.markupCreated', { markup: this.toMarkup(shape) });
+    this.channel.send('viewer.markupCreated', { markup: this.wireFormat.toWire(shape, this.externalId) });
   }
 
   markupUpdated(shape: ShapeData): void {
-    this.channel.send('viewer.markupUpdated', { markup: this.toMarkup(shape) });
+    this.channel.send('viewer.markupUpdated', { markup: this.wireFormat.toWire(shape, this.externalId) });
   }
 
   markupDeleted(markupId: string): void {
@@ -269,6 +324,37 @@ export class EmbedSession {
   }
 
   /**
+   * A page finished rendering and is on screen.
+   *
+   * Distinct from `viewChanged`, which is where the user navigated *to* and is
+   * throttled: this fires when pixels exist. A host building a "which pages did
+   * this person actually see" record wants this one, and it is deduplicated per
+   * document so that record counts pages rather than paints.
+   */
+  pageRendered(page: number, widthPx: number, heightPx: number): void {
+    if (this.renderedPages.has(page)) return;
+    this.renderedPages.add(page);
+    this.channel.send('viewer.pageRendered', {
+      page, widthPx, heightPx,
+      zoom: this.viewerState.zoom(),
+      externalId: this.externalId,
+    });
+  }
+
+  /**
+   * Say a document is no longer shown, at most once per document.
+   *
+   * Guarded on `documentIsOpen` because an unload the host never saw an open
+   * for is noise it has to write code to ignore — the session stopping before
+   * `host.init` arrives, or a second call on the same teardown path.
+   */
+  private announceUnload(reason: UnloadReason): void {
+    if (!this.documentIsOpen) return;
+    this.documentIsOpen = false;
+    this.channel.send('viewer.unloaded', { reason, externalId: this.externalId });
+  }
+
+  /**
    * Ask the host to do something only it can do (§6.1).
    *
    * Resolves when the host replies. It may never reply — a host that ignores
@@ -282,38 +368,6 @@ export class EmbedSession {
       operation, arguments: args, externalId: this.externalId,
     });
     return new Promise((resolve) => this.pendingOperations.set(id, resolve));
-  }
-
-  // ── Translation ───────────────────────────────────────────────────────────
-  //
-  // The viewer's ShapeData and the protocol's Markup are deliberately
-  // different shapes. `models.ts` flagged `documentId: number` as a wire
-  // decision to revisit once the integration contract existed; it does now,
-  // and the contract says opaque string ids, an externalId that is the host's,
-  // and **no author** — the host stamps that from its own session (§6.2).
-
-  private toMarkup(shape: ShapeData): Markup {
-    return {
-      markupId: shape.id,
-      externalId: this.externalId,
-      page: shape.pageNumber,
-      type: shape.tool.toUpperCase(),
-      shapeData: this.markupEngine.shapesToJson([shape]),
-      comment: shape.text ?? '',
-      createdAt: shape.createdAt ?? new Date().toISOString(),
-    };
-  }
-
-  private toShapes(markup: Markup): ShapeData[] {
-    // Host-supplied and therefore untrusted, even though we encoded it: it has
-    // been through the host's storage since, and a parse failure must drop one
-    // markup rather than lose the page.
-    try {
-      return this.markupEngine.parseShapesJson(markup.shapeData)
-        .map((shape) => ({ ...shape, id: markup.markupId, pageNumber: markup.page }));
-    } catch {
-      return [];
-    }
   }
 
   private fail(detail: ProblemDetail): void {

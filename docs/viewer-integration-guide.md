@@ -19,9 +19,9 @@ Companion: `viewer-architecture.md` for how the thing works internally.
 | # | Exchange | Direction | Status |
 |---|---|---|---|
 | 1 | Mount the viewer in your interface | you → viewer | **Built** — iframe + `cde.viewer.v1`. §5 |
-| 2 | Tell the viewer who is looking | you → viewer | **Built** — `host.init.identity`, three untrusted fields. §5.4 |
+| 2 | Tell the viewer who is looking | you → viewer | **Built** — `host.init.identity`, three untrusted fields. §5.5 |
 | 3 | Hand over a document | you → viewer | **Built** — `host.init.document`, or the conversion API. §3 |
-| 4 | Get back what was drawn | viewer → you | **Built** — three markup events and one operation pair. §5.3 |
+| 4 | Get back what was drawn | viewer → you | **Built** — markup events, lifecycle events and one operation pair. §5.3, §5.4 |
 | — | Framing permitted by the deployment | — | **Blocked** — a stock install sends `frame-ancestors 'none'`. §5.2 |
 
 Two things are true at once, and conflating them will cost you a sprint.
@@ -358,7 +358,9 @@ Four steps, and none of them involve a token.
    `…Deleted` carry the markup; `shapeData` is an opaque string you store and
    hand back, never parse. Stamp the author yourself from the session you
    already hold.
-4. **Answer `viewer.operationRequest`** with `host.operationResult` —
+4. **Listen to as much of the rest as you need, and none of it if you do not.**
+   §5.4 lists the lifecycle events. Every one is optional.
+5. **Answer `viewer.operationRequest`** with `host.operationResult` —
    `applied`, `refused` or `failed`. One message pair covers all seventeen
    document operations; they are not seventeen message types.
 
@@ -383,7 +385,43 @@ catches people: **the CORS source registers no origin at all unless the
 deployment names one in full.** For a PDF, the browser fetches your URL
 directly, so your storage must allow the viewer's origin to read it.
 
-### 5.4 Identity: there is nothing to configure
+### 5.4 Events you can hook, and what each is honestly for
+
+Fourteen message types run viewer → host. Four exist purely so you can
+**record** what a reader did without polling us or inferring it from markup
+traffic — and the inference is wrong in ways that are not obvious, which is why
+they exist.
+
+| You want to know | Listen to | What to watch out for |
+|---|---|---|
+| A document was opened | `viewer.opened` | Fires before the viewer knows whether it can render the file, and before any fetch. Exactly one of `viewer.loaded` or `viewer.error` follows it |
+| It rendered | `viewer.loaded` | Carries `pageCount`, `mediaType` and what rendered it |
+| Your stored markup arrived | `viewer.markupLoaded` | **Check `rejected`.** Non-zero means your store holds markup the viewer cannot draw — a data problem on your side that was previously silent |
+| The user drew, changed or removed something | `viewer.markupCreated` / `…Updated` / `…Deleted` | No author field. You stamp it from the session you already hold (§5.5) |
+| The user selected a markup | `viewer.selectionChanged` | `markupId`, or `null` when nothing is selected |
+| Which pages were actually read | `viewer.pageRendered` | **Once per page per document.** Zooming repaints a page and does *not* re-announce it, which is what makes a "pages read" count mean anything |
+| Where the user is now | `viewer.viewChanged` | Throttled to 4/s. Use this to follow a reader live; use `pageRendered` to record what was seen |
+| A document stopped being shown | `viewer.unloaded` | Carries the id of the document that **closed**, not the one arriving. Not guaranteed on teardown — see below |
+
+> **Do not treat `viewer.unloaded` as a guarantee.** If your page removes the
+> iframe, navigates away, or the tab closes, nothing can post from a frame that
+> no longer exists. Use it to close a record you are already keeping, never as
+> the only place you write one — the same caveat that applies to
+> `beforeunload` in your own page, for the same reason.
+
+Two more sharp edges worth knowing before you build against these. A document
+the viewer **rejects outright** — a descriptor missing `mediaType`, say —
+produces `viewer.error` with no `viewer.opened` before it, because there was no
+document to open. And a `host.loadMarkup` whose `markup` is not an array is
+**ignored silently and acknowledges nothing**: if you get no
+`viewer.markupLoaded`, check you sent an array.
+
+All four were added after the protocol shipped, which is the compatibility
+promise working as intended — new message types are additive within v1, so an
+integration written before them keeps running and simply never registers a
+handler. Full payloads: §6.3 of `docs/viewer-embed-protocol.md`.
+
+### 5.5 Identity: there is nothing to configure
 
 Not "you need to set up SSO". The embed path has no identity system to configure
 at all. Our own `/api/annotations` still keys a markup's author to a row in our
@@ -449,7 +487,7 @@ discovered.
 
 - **`frame-ancestors` on the embed route** — §5.2. The blocker.
 - **Non-PDF formats in an embedded frame** — §4. Wiring, not design.
-- **Collaboration in an embed** — §5.4. Genuinely unsolved.
+- **Collaboration in an embed** — §5.5. Genuinely unsolved.
 - **Accessibility evidence** — §7, before you rely on ours.
 
 Full message shapes: `docs/viewer-embed-protocol.md`. Where this guide and that

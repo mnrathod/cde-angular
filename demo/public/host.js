@@ -126,12 +126,53 @@ function appendLog({ direction, message }) {
   elements.log.scrollTop = elements.log.scrollHeight;
 }
 
+/**
+ * The host's own observation, not a message that crossed the boundary.
+ *
+ * Kept distinct from appendLog because every line that function writes is
+ * labelled "viewer sent" or "host sent", and a note rendered through it would
+ * claim something was on the wire that never was. The log is the artefact an
+ * integrator reads to learn the protocol; a false line in it teaches a fiction.
+ */
+function appendNote(text) {
+  const line = document.createElement('p');
+  line.className = 'entry note';
+  const label = document.createElement('span');
+  label.className = 'type';
+  label.textContent = 'host noted';
+  const detail = document.createElement('span');
+  detail.className = 'detail';
+  detail.textContent = text;
+  line.append(label, detail);
+  elements.log.append(line);
+  elements.log.scrollTop = elements.log.scrollHeight;
+}
+
+/**
+ * Which pages this reader has actually had on screen, for the open document.
+ *
+ * The point of `viewer.pageRendered` over `viewer.viewChanged`: the viewer
+ * deduplicates per document, so this set only ever grows by pages genuinely
+ * seen, and zooming does not inflate it. A real host would persist this; the
+ * demo reports the total when the document unloads, which is where an
+ * analytics integration would actually write it.
+ */
+const pagesSeen = new Set();
+
 /** A short, human summary. Never the whole payload — logs are read, not parsed. */
 function summarise(message) {
   const payload = message.payload ?? {};
+  if (message.type === 'viewer.opened') return payload.displayName ?? '';
   if (message.type === 'viewer.loaded') return `${payload.pageCount} pages`;
+  if (message.type === 'viewer.unloaded') return payload.reason ?? '';
   if (message.type === 'viewer.error') return payload.problem?.title ?? '';
   if (message.type === 'viewer.viewChanged') return `page ${payload.page}`;
+  if (message.type === 'viewer.pageRendered') return `page ${payload.page}`;
+  if (message.type === 'viewer.markupLoaded') {
+    return payload.rejected
+      ? `${payload.count} rendered, ${payload.rejected} rejected`
+      : `${payload.count} rendered`;
+  }
   if (message.type === 'viewer.operationRequest') return payload.operation ?? '';
   if (message.type === 'host.operationResult') return payload.status ?? '';
   if (message.type === 'host.command') return payload.command ?? '';
@@ -221,8 +262,32 @@ function load(entry) {
     });
   });
 
+  // The lifecycle events. None of these is required to make the embed work —
+  // they exist so a host can record what happened without polling the viewer.
+  host.on('viewer.opened', () => {
+    pagesSeen.clear();
+  });
+
   host.on('viewer.loaded', () => {
     host.send('host.loadMarkup', { markup: store.list(entry.externalId) });
+  });
+
+  host.on('viewer.markupLoaded', (message) => {
+    // The acknowledgement that closes the loop on host.loadMarkup. `rejected`
+    // is what makes it worth having: markup the host stored but the viewer
+    // could not parse would otherwise just not appear, with nothing to say so.
+    const { count, rejected } = message.payload;
+    if (rejected) {
+      appendNote(`${rejected} stored markup(s) rejected by the viewer, ${count} rendered`);
+    }
+  });
+
+  host.on('viewer.pageRendered', (message) => {
+    pagesSeen.add(message.payload.page);
+  });
+
+  host.on('viewer.unloaded', (message) => {
+    appendNote(`document ${message.payload.reason}; ${pagesSeen.size} page(s) seen`);
   });
 
   host.on('viewer.markupCreated', (message) => {
