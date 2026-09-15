@@ -10,6 +10,10 @@
  * costs more than the duplication.
  *
  * If a third page renderer appears, extract then, into `viewer-core`.
+ *
+ * The markup drawing is no longer part of that duplication: three components
+ * drew the same shapes, so it left for `viewer-core/markup-shapes.component`.
+ * What remains here is the canvas and the pointer handling.
  */
 import {
   AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, Input, OnChanges,
@@ -17,13 +21,14 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PdfEngineService } from '../../../viewer-core/pdf-engine.service';
-import { MarkupEngineService, SvgPrimitive } from '../../../viewer-core/markup-engine.service';
+import { MarkupEngineService } from '../../../viewer-core/markup-engine.service';
+import { MarkupShapesComponent } from '../../../viewer-core/markup-shapes.component';
 import { ViewerStateService, ShapeData } from '../../../viewer-core/viewer-state.service';
 
 @Component({
   selector: 'app-embed-page',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MarkupShapesComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="page" [style.width.px]="widthPx()" [style.height.px]="heightPx()">
@@ -36,43 +41,12 @@ import { ViewerStateService, ShapeData } from '../../../viewer-core/viewer-state
            (pointerup)="endStroke()"
            (pointerleave)="endStroke()">
         <!--
-          Bound elements, not [innerHTML].
-
-          Markup reaches this overlay from the host, so a string of SVG built
-          from it and injected would run whatever the host put in it, on the
-          viewer's origin — which is what CLAUDE.md §5.12 bans the binding for.
-          Angular escapes every attribute below, so there is nothing to
-          sanitise and nothing to bypass.
+          Drawn by MarkupShapesComponent, not [innerHTML]. Markup reaches this
+          overlay from the host, so a string of SVG built from it and injected
+          would run whatever the host put in it, on the viewer's origin — which
+          is what CLAUDE.md §5.12 bans the binding for.
         -->
-        @for (primitive of primitives(); track $index) {
-          @switch (primitive.kind) {
-            @case ('rect') {
-              <rect [attr.x]="primitive.x" [attr.y]="primitive.y"
-                    [attr.width]="primitive.width" [attr.height]="primitive.height"
-                    [attr.rx]="primitive.rx"
-                    [attr.stroke]="primitive.stroke" [attr.fill]="primitive.fill"
-                    [attr.stroke-width]="primitive.strokeWidth"/>
-            }
-            @case ('path') {
-              <path [attr.d]="primitive.d"
-                    [attr.stroke]="primitive.stroke" [attr.fill]="primitive.fill"
-                    [attr.stroke-width]="primitive.strokeWidth"
-                    [attr.stroke-dasharray]="primitive.dashArray"/>
-            }
-            @case ('line') {
-              <line [attr.x1]="primitive.x1" [attr.y1]="primitive.y1"
-                    [attr.x2]="primitive.x2" [attr.y2]="primitive.y2"
-                    [attr.stroke]="primitive.stroke"
-                    [attr.stroke-width]="primitive.strokeWidth"
-                    stroke-linecap="round"/>
-            }
-            @case ('polygon') {
-              <polygon [attr.points]="primitive.points"
-                       [attr.stroke]="primitive.stroke" [attr.fill]="primitive.fill"
-                       [attr.stroke-width]="primitive.strokeWidth"/>
-            }
-          }
-        }
+        <svg:g markupShapes [shapes]="drawn()"></svg:g>
       </svg>
     </div>
   `,
@@ -110,8 +84,8 @@ export class EmbedPageComponent implements AfterViewInit, OnChanges {
 
   readonly widthPx = signal(0);
   readonly heightPx = signal(0);
-  /** Every primitive on this page, in paint order. */
-  readonly primitives = signal<SvgPrimitive[]>([]);
+  /** Everything to draw on this page, committed shapes plus the live stroke. */
+  readonly drawn = signal<ShapeData[]>([]);
 
   private inProgress: ShapeData | null = null;
 
@@ -179,7 +153,7 @@ export class EmbedPageComponent implements AfterViewInit, OnChanges {
     const shapes = this.viewerState.shapes()
       .filter((shape) => shape.pageNumber === this.pageNumber);
     const all = this.inProgress ? [...shapes, this.inProgress] : shapes;
-    this.primitives.set(all.flatMap((shape) => this.markupEngine.shapeToPrimitives(shape)));
+    this.drawn.set(all);
   }
 
   beginStroke(event: PointerEvent): void {

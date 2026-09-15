@@ -1,36 +1,14 @@
 import { Injectable } from '@angular/core';
 import { ShapeData, MarkupTool } from './viewer-state.service';
+import { SvgPrimitive, shapeToPrimitives } from './svg-primitives';
+import {
+  PointerPoint, MEASURE_COLOUR, MEASURE_COLOUR_DIM, MEASURE_FILL, CALIBRATION_COLOUR,
+} from './markup-palette';
 
-export interface PointerPoint { x: number; y: number; }
+// Re-exported because every caller already imports it from here.
+export type { PointerPoint };
 
-/** Attributes every drawable primitive carries. */
-interface SvgPrimitiveBase {
-  stroke: string;
-  strokeWidth: number;
-  fill: string;
-  dashArray?: string;
-}
-
-/**
- * One SVG element, as data rather than as markup.
- *
- * A discriminated union so a template can switch on `kind` and bind each
- * attribute — see {@link MarkupEngineService.shapeToPrimitives} for why a
- * string of SVG is not an option where the markup comes from a host.
- */
-export type SvgPrimitive =
-  | (SvgPrimitiveBase & { kind: 'rect'; x: number; y: number;
-                          width: number; height: number; rx: number })
-  | (SvgPrimitiveBase & { kind: 'path'; d: string })
-  | (SvgPrimitiveBase & { kind: 'line'; x1: number; y1: number;
-                          x2: number; y2: number })
-  | (SvgPrimitiveBase & { kind: 'polygon'; points: string });
-
-/** Measurements are drawn in a fixed palette so they stay distinct from markup. */
-const MEASURE_COLOUR      = '#34d399';
-const MEASURE_COLOUR_DIM  = '#6ee7b7';
-const MEASURE_FILL        = 'rgba(52,211,153,0.10)';
-const CALIBRATION_COLOUR  = '#fbbf24';
+export type { SvgPrimitive } from './svg-primitives';
 
 /**
  * MarkupEngineService
@@ -296,80 +274,13 @@ export class MarkupEngineService {
 
   // ── Render a ShapeData to SVG element string ─────────────────
   /**
-   * A shape as drawable SVG primitives, rather than as a string of markup.
+   * A shape as drawable SVG primitives — see `svg-primitives.ts`.
    *
-   * {@link shapeToSvg} returns a string, which a component can only put on the
-   * page through `[innerHTML]` — and that is banned by CLAUDE.md §5.12 without
-   * DOMPurify, for a reason the embed makes concrete: markup arrives there from
-   * the *host* via `host.loadMarkup`, so a string built from it and injected
-   * would run whatever the host put in a colour or a text field, on the
-   * viewer's origin.
-   *
-   * These go onto the page through ordinary attribute bindings instead, which
-   * Angular escapes, so there is nothing to sanitise and nothing to bypass.
-   *
-   * <p>Only the tools an embedded viewer can hold are covered. Anything else
-   * yields an empty list and draws nothing rather than half a shape — and
-   * `embed-markup.spec.ts` asserts every tool the embed's toolbar offers is in
-   * here, so adding a tool without its primitive fails a test instead of
-   * producing an overlay that silently omits it.
+   * Delegated rather than implemented here so this file stays near §3.3's
+   * 400-line limit, which it is already over.
    */
   shapeToPrimitives(shape: ShapeData): SvgPrimitive[] {
-    const stroke = shape.color;
-    const strokeWidth = shape.strokeWidth;
-    const fill = `${shape.color}${Math.round((shape.opacity || 0) * 255)
-      .toString(16).padStart(2, '0')}`;
-
-    switch (shape.tool) {
-      case 'rect':
-        return [{
-          kind: 'rect', stroke, strokeWidth, fill, rx: 2,
-          x: shape.x ?? 0, y: shape.y ?? 0,
-          width: shape.width ?? 0, height: shape.height ?? 0,
-        }];
-
-      case 'cloud': {
-        const points = shape.points ?? [];
-        if (points.length < 2) return [];
-        return [{
-          kind: 'path', stroke, strokeWidth, fill, dashArray: '8 4',
-          d: points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`)
-            .join(' ') + 'Z',
-        }];
-      }
-
-      case 'arrow': {
-        const [x1, y1, x2, y2] =
-          [shape.x1 ?? 0, shape.y1 ?? 0, shape.x2 ?? 0, shape.y2 ?? 0];
-        const deltaX = x2 - x1;
-        const deltaY = y2 - y1;
-        const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY) || 1;
-        const unitX = deltaX / length;
-        const unitY = deltaY / length;
-        const head = strokeWidth * 4;
-        const baseX = x2 - unitX * head;
-        const baseY = y2 - unitY * head;
-        const acrossX = -unitY * head * 0.5;
-        const acrossY = unitX * head * 0.5;
-        return [
-          { kind: 'line', stroke, strokeWidth, fill: 'none', x1, y1, x2, y2 },
-          {
-            kind: 'polygon', stroke, strokeWidth, fill: stroke,
-            points: `${x2},${y2} ${baseX + acrossX},${baseY + acrossY} `
-              + `${baseX - acrossX},${baseY - acrossY}`,
-          },
-        ];
-      }
-
-      case 'line':
-        return [{
-          kind: 'line', stroke, strokeWidth, fill: 'none',
-          x1: shape.x1 ?? 0, y1: shape.y1 ?? 0, x2: shape.x2 ?? 0, y2: shape.y2 ?? 0,
-        }];
-
-      default:
-        return [];
-    }
+    return shapeToPrimitives(shape);
   }
 
   shapeToSvg(s: ShapeData, zoom = 1): string {

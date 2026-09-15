@@ -8,15 +8,15 @@ import { PdfEngineService } from '../../../../viewer-core/pdf-engine.service';
 import { MarkupEngineService, PointerPoint } from '../../../../viewer-core/markup-engine.service';
 import { ViewerStateService, ShapeData, MarkupTool } from '../../../../viewer-core/viewer-state.service';
 import { MeasurementService } from '../../../../viewer-core/measurement.service';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CollaborationService } from '../../../core/services/collaboration.service';
 import { RemoteCursorsComponent } from '../markup/remote-cursors.component';
 import { PageLinksComponent } from '../../../../viewer-core/page-links.component';
+import { MarkupShapesComponent } from '../../../../viewer-core/markup-shapes.component';
 
 @Component({
   selector: 'app-pdf-page',
   standalone: true,
-  imports: [CommonModule, RemoteCursorsComponent, PageLinksComponent],
+  imports: [CommonModule, RemoteCursorsComponent, PageLinksComponent, MarkupShapesComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Outer box takes the rotated footprint so the scroll container
@@ -72,11 +72,7 @@ import { PageLinksComponent } from '../../../../viewer-core/page-links.component
         (touchend)="onPointerUp($event)">
 
         <!-- Saved / persisted shapes -->
-        @for (shape of state.shapes(); track shape.id) {
-          @if (shape.pageNumber === pageNumber) {
-            <g [innerHTML]="renderShape(shape)"></g>
-          }
-        }
+        <g markupShapes [shapes]="shapesOnPage()"></g>
 
         <!-- Committed redaction regions (stored in PDF-point space, converted
              back to this page's current screen pixels — stays correctly
@@ -103,7 +99,7 @@ import { PageLinksComponent } from '../../../../viewer-core/page-links.component
         <!-- In-progress shape being drawn (polygon/polyline rubber-band
              to the cursor between clicks via previewShape()) -->
         @if (activeShape()) {
-          <g [innerHTML]="renderShape(previewShape())"></g>
+          <g markupShapes [shapes]="[previewShape()]"></g>
         }
       </svg>
 
@@ -194,7 +190,6 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   engine  = inject(PdfEngineService);
   markup  = inject(MarkupEngineService);
   measure = inject(MeasurementService);
-  sanitizer = inject(DomSanitizer);
   private collaboration = inject(CollaborationService);
 
   pageWidth  = signal(0);
@@ -281,9 +276,15 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
     this.rendered.set(false);
   }
 
-  renderShape(s: ShapeData): SafeHtml {
-    return this.sanitizer.bypassSecurityTrustHtml(this.markup.shapeToSvg(s));
-  }
+  /**
+   * The shapes belonging to this page.
+   *
+   * Filtered in a computed rather than with an `@if` inside the loop: the
+   * drawing component takes a list, and a per-shape guard in the template
+   * would put an empty group on the page for every shape on every other page.
+   */
+  readonly shapesOnPage = computed(() =>
+    this.state.shapes().filter((shape) => shape.pageNumber === this.pageNumber));
 
   // ── Committed redaction regions for this page, converted from the
   //    canonical PDF-point storage back into this page's current screen

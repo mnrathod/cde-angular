@@ -104,9 +104,13 @@ const children = [
   + '`page-links`, `tool-rail`, and `icon` — the last being the product’s whole icon set as '
   + 'stroke-only 24×24 path data, so one definition sits on a light rail, a dark header and an '
   + 'accent-filled button without variants.'),
-  note('`cad-viewer.component.ts` is 629 lines, over the §3.3 limits of 400 per file and 200 per '
+  note('`cad-viewer.component.ts` is 678 lines, over the §3.3 limits of 400 per file and 200 per '
      + 'component. Recorded rather than hidden: it is known debt, it predates the extraction, and '
-     + 'splitting a canvas component wants a test suite that can actually run first.'),
+     + 'splitting a canvas component wants a test suite that can actually run first. It grew from '
+     + '629 when the §5.12 sanitiser bypasses came out of it — the converted drawing now reaches '
+     + 'the page through an `<img>` and a blob URL, which is more code here and no injected markup '
+     + 'anywhere. The markup drawing went the other way, out to `markup-shapes.component` (121 '
+     + 'lines) on its third caller, so `markup-engine.service` fell from 665 to 576.'),
 
   h2('3.3  What is deliberately not here'),
   p('The 15 components still in the application are not there by accident. Thirteen import the '

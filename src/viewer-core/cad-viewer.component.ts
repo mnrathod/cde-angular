@@ -4,11 +4,11 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MarkupEngineService, PointerPoint } from './markup-engine.service';
 import { ViewerStateService, ShapeData, MarkupTool } from './viewer-state.service';
 import { MeasurementService } from './measurement.service';
 import { DrawingSearchService } from './drawing-search.service';
+import { MarkupShapesComponent } from './markup-shapes.component';
 
 export interface CadLayer {
   name:    string;
@@ -20,7 +20,7 @@ export interface CadLayer {
 @Component({
   selector: 'app-cad-viewer',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MarkupShapesComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-1 overflow-hidden min-h-0">
@@ -38,7 +38,10 @@ export interface CadLayer {
 
         <div #svgWrap [style.transform]="transform()"
              style="transform-origin: top left; transition: transform .1s; position: relative; display: inline-block;">
-          <div [innerHTML]="processedSvg()" class="cad-svg-host"></div>
+          <!-- An <img>, not injected markup — see the class comment. -->
+          @if (drawingUrl(); as url) {
+            <img [src]="url" [alt]="drawingDescription()" class="cad-svg-host">
+          }
 
           <!-- Markup overlay — same coordinate space as the drawing, so
                annotations stay pinned to the drawing itself while panning/zooming -->
@@ -56,13 +59,9 @@ export interface CadLayer {
             (touchend)="onPointerUp($event)">
 
             <!-- Saved / in-progress shapes (CAD/SVG drawings have a single "page") -->
-            @for (shape of state.shapes(); track shape.id) {
-              @if (shape.pageNumber === 1) {
-                <g [innerHTML]="renderShape(shape)"></g>
-              }
-            }
+            <g markupShapes [shapes]="shapesOnDrawing()"></g>
             @if (activeShape()) {
-              <g [innerHTML]="renderShape(previewShape())"></g>
+              <g markupShapes [shapes]="[previewShape()]"></g>
             }
 
             <!--
@@ -145,11 +144,29 @@ export interface CadLayer {
     </div>
   `,
   styles: [`
-    :host ::ng-deep .cad-svg-host svg { display: block; }
-    :host ::ng-deep .cad-svg-host svg [data-layer] { transition: opacity .15s; }
+    /* The drawing is an <img> of an SVG document, so no rule here reaches
+       inside it — that isolation is what makes it safe to render. */
+    .cad-svg-host { display: block; max-width: 100%; }
   `]
 })
 export class CadViewerComponent implements OnChanges {
+  /*
+   * The drawing is rendered through `<img>`, never injected as markup.
+   *
+   * It is our conversion service's rendering of a file a user uploaded, so its
+   * text and its layer names come from that file. Putting it on the page as
+   * markup means trusting every one of those — which is what CLAUDE.md §5.12
+   * bans `bypassSecurityTrustHtml` for, and what this component used to do.
+   *
+   * An SVG loaded through `<img>` is rendered by the browser in a restricted
+   * mode: no scripts, no event handlers, no external references, no reach into
+   * this document. That is a guarantee the browser enforces rather than a
+   * sanitiser we would have to keep correct, and it adds no dependency.
+   * Verified against Chromium; held to by `cad-viewer.isolation.spec.ts`.
+   *
+   * The cost is that no CSS here reaches inside the drawing, so hiding a layer
+   * puts its rule into the SVG itself (see drawingSvg).
+   */
   @Input({ required: true }) svgContent!: string;
   @Input() dxfVersion  = '';
   @Input() entityCount = 0;
@@ -159,17 +176,36 @@ export class CadViewerComponent implements OnChanges {
   @ViewChild('svgWrap') svgWrap!: ElementRef<HTMLDivElement>;
   @ViewChild('markupSvg') markupSvg!: ElementRef<SVGSVGElement>;
 
-  private sanitizer = inject(DomSanitizer);
   state  = inject(ViewerStateService);
   markup = inject(MarkupEngineService);
   measure = inject(MeasurementService);
   private drawingSearch = inject(DrawingSearchService);
 
   layers        = signal<CadLayer[]>([]);
+  /** `svgContent` as a signal; see ngOnChanges. */
+  private readonly content = signal('');
   // Zoom lives on ViewerStateService (shared with the top toolbar's − / + / Fit
   // controls) — NOT a local signal, otherwise the toolbar's zoom buttons
   // silently have no effect on this viewer (the bug this fixes).
   constructor() {
+    /*
+     * Publish the drawing as an object URL, and revoke the previous one.
+     *
+     * Without the cleanup every layer toggle and every document open would
+     * leave a copy of the drawing alive for the life of the tab, which on CAD
+     * files is megabytes at a time.
+     */
+    effect((onCleanup) => {
+      const svg = this.drawingSvg();
+      if (!svg) {
+        this.drawingUrl.set(null);
+        return;
+      }
+      const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+      this.drawingUrl.set(url);
+      onCleanup(() => URL.revokeObjectURL(url));
+    });
+
     // "Fit to window" lives only in the command bar now, so this viewer has to
     // hear about it: zoom alone leaves a drawing that has been scrolled away
     // from still off screen.
@@ -312,30 +348,43 @@ export class CadViewerComponent implements OnChanges {
       : [800, 600];
   });
 
-  processedSvg = computed((): SafeHtml => {
-    if (!this.svgContent) return '';
-    const hiddenLayers = this.layers().filter(l => !l.visible).map(l => l.name);
-    if (!hiddenLayers.length) {
-      return this.sanitizer.bypassSecurityTrustHtml(this.svgContent);
-    }
-    // Hide elements on invisible layers via CSS in the SVG
-    const styleRules = hiddenLayers
-      .map(l => `[data-layer="${CSS.escape(l)}"] { display: none !important; }`)
+  /**
+   * The drawing with hidden layers styled out, as a string.
+   *
+   * The rules go *inside* the SVG rather than in this component's stylesheet,
+   * because an SVG rendered through `<img>` is its own document and no CSS
+   * from this page reaches into it. That isolation is the point; it costs the
+   * hover transition the stylesheet used to apply, and nothing else.
+   */
+  private readonly drawingSvg = computed(() => {
+    const svg = this.content();
+    if (!svg) return '';
+    const hidden = this.layers().filter((layer) => !layer.visible).map((layer) => layer.name);
+    if (!hidden.length) return svg;
+
+    const rules = hidden
+      .map((name) => `[data-layer="${CSS.escape(name)}"] { display: none !important; }`)
       .join(' ');
-    const injected = this.svgContent.replace(
-      '<svg ',
-      `<svg><defs><style>${styleRules}</style></defs><svg `.replace('<svg ><defs>', '<svg ').replace('<svg>', '')
-    );
-    // Simpler: inject a style tag
-    const withStyle = this.svgContent.replace(
-      '</svg>',
-      `<style>${styleRules}</style></svg>`
-    );
-    return this.sanitizer.bypassSecurityTrustHtml(withStyle);
+    return svg.replace('</svg>', `<style>${rules}</style></svg>`);
   });
+
+  /** What a screen reader is told the image is (§1A.4). */
+  readonly drawingDescription = computed(() => {
+    const named = this.layers().map((layer) => layer.name).filter(Boolean);
+    return named.length
+      ? `Drawing, ${named.length} layers: ${named.slice(0, 8).join(', ')}`
+      : 'Drawing';
+  });
+
+  /** The drawing as an object URL, revoked when it is replaced. */
+  readonly drawingUrl = signal<string | null>(null);
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['svgContent'] && this.svgContent) {
+      // Mirrored into a signal because drawingSvg() is computed and an @Input
+      // is not reactive. Set after the parses below would leave one render
+      // against the previous drawing's layers.
+      this.content.set(this.svgContent);
       this.parseLayers();
       this.parseViewBox();
       // Index the drawing's own text so it can be searched. Without this the
@@ -458,9 +507,9 @@ export class CadViewerComponent implements OnChanges {
 
   // ── Markup drawing — mirrors PdfPageComponent's pointer handling,
   //    against this drawing's own viewBox instead of a rendered PDF page ──
-  renderShape(s: ShapeData): SafeHtml {
-    return this.sanitizer.bypassSecurityTrustHtml(this.markup.shapeToSvg(s));
-  }
+  /** A CAD drawing is a single page, so everything on page 1 belongs here. */
+  readonly shapesOnDrawing = computed(() =>
+    this.state.shapes().filter((shape) => shape.pageNumber === 1));
 
   onPointerDown(e: MouseEvent | TouchEvent) {
     if (!this.drawingEnabled()) return;

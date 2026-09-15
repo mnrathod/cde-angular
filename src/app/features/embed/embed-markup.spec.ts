@@ -68,10 +68,13 @@ describe('markup the embed can hold', () => {
     expect(primitives.map((p) => p.kind)).toEqual(['line', 'polygon']);
   });
 
-  it('draws nothing for a tool it does not know, rather than half a shape', () => {
-    // A host may send back markup this viewer never offered. Drawing a partial
-    // shape from geometry meant for another tool is worse than drawing none.
-    expect(markup.shapeToPrimitives(shapeOf('dimension'))).toEqual([]);
+  it('draws markup made with a tool the embed does not offer', () => {
+    // A host stores markup, and it may have been drawn in the full viewer with
+    // a tool this toolbar has no button for. Handing it back should render it,
+    // not silently drop it — the host is the record and the embed is a view of
+    // it. Every tool draws since the renderer was shared with the full viewer;
+    // markup-primitives.spec.ts is what holds that true for all of them.
+    expect(markup.shapeToPrimitives(shapeOf('dimension'))).not.toHaveLength(0);
   });
 
   it('renders host-supplied values as attributes, never as markup', () => {
