@@ -12,12 +12,12 @@
  * If a third page renderer appears, extract then, into `viewer-core`.
  */
 import {
-  ChangeDetectionStrategy, Component, ElementRef, Input, OnChanges,
+  AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, Input, OnChanges,
   SimpleChanges, ViewChild, effect, inject, output, signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PdfEngineService } from '../../../viewer-core/pdf-engine.service';
-import { MarkupEngineService } from '../../../viewer-core/markup-engine.service';
+import { MarkupEngineService, SvgPrimitive } from '../../../viewer-core/markup-engine.service';
 import { ViewerStateService, ShapeData } from '../../../viewer-core/viewer-state.service';
 
 @Component({
@@ -34,8 +34,46 @@ import { ViewerStateService, ShapeData } from '../../../viewer-core/viewer-state
            (pointerdown)="beginStroke($event)"
            (pointermove)="extendStroke($event)"
            (pointerup)="endStroke()"
-           (pointerleave)="endStroke()"
-           [innerHTML]="overlaySvg()"></svg>
+           (pointerleave)="endStroke()">
+        <!--
+          Bound elements, not [innerHTML].
+
+          Markup reaches this overlay from the host, so a string of SVG built
+          from it and injected would run whatever the host put in it, on the
+          viewer's origin — which is what CLAUDE.md §5.12 bans the binding for.
+          Angular escapes every attribute below, so there is nothing to
+          sanitise and nothing to bypass.
+        -->
+        @for (primitive of primitives(); track $index) {
+          @switch (primitive.kind) {
+            @case ('rect') {
+              <rect [attr.x]="primitive.x" [attr.y]="primitive.y"
+                    [attr.width]="primitive.width" [attr.height]="primitive.height"
+                    [attr.rx]="primitive.rx"
+                    [attr.stroke]="primitive.stroke" [attr.fill]="primitive.fill"
+                    [attr.stroke-width]="primitive.strokeWidth"/>
+            }
+            @case ('path') {
+              <path [attr.d]="primitive.d"
+                    [attr.stroke]="primitive.stroke" [attr.fill]="primitive.fill"
+                    [attr.stroke-width]="primitive.strokeWidth"
+                    [attr.stroke-dasharray]="primitive.dashArray"/>
+            }
+            @case ('line') {
+              <line [attr.x1]="primitive.x1" [attr.y1]="primitive.y1"
+                    [attr.x2]="primitive.x2" [attr.y2]="primitive.y2"
+                    [attr.stroke]="primitive.stroke"
+                    [attr.stroke-width]="primitive.strokeWidth"
+                    stroke-linecap="round"/>
+            }
+            @case ('polygon') {
+              <polygon [attr.points]="primitive.points"
+                       [attr.stroke]="primitive.stroke" [attr.fill]="primitive.fill"
+                       [attr.stroke-width]="primitive.strokeWidth"/>
+            }
+          }
+        }
+      </svg>
     </div>
   `,
   styles: [`
@@ -46,7 +84,7 @@ import { ViewerStateService, ShapeData } from '../../../viewer-core/viewer-state
     svg.drawing { cursor: crosshair; }
   `],
 })
-export class EmbedPageComponent implements OnChanges {
+export class EmbedPageComponent implements AfterViewInit, OnChanges {
 
   @Input({ required: true }) pageNumber!: number;
   @Input({ required: true }) zoom!: number;
@@ -72,7 +110,8 @@ export class EmbedPageComponent implements OnChanges {
 
   readonly widthPx = signal(0);
   readonly heightPx = signal(0);
-  readonly overlaySvg = signal('');
+  /** Every primitive on this page, in paint order. */
+  readonly primitives = signal<SvgPrimitive[]>([]);
 
   private inProgress: ShapeData | null = null;
 
@@ -97,7 +136,28 @@ export class EmbedPageComponent implements OnChanges {
     return tool !== 'pan' && tool !== 'select';
   }
 
+  /**
+   * The first render, and it has to be here.
+   *
+   * `@ViewChild('canvas')` is not populated until the view is initialised, so
+   * a render driven by the first `ngOnChanges` hits the `!canvas` guard below
+   * and returns silently. Nothing retries — `pageNumber` and `zoom` do not
+   * change again on their own — so every page stays blank at its default
+   * 300×150, the `.page` box collapses to 0×0, and the markup overlay
+   * collapses with it, which makes the document unopenable *and* unmarkable
+   * while the protocol reports `viewer.loaded` quite happily.
+   *
+   * `PdfPageComponent` in the full viewer carries the same fix and the same
+   * comment. This component was written without it.
+   */
+  ngAfterViewInit(): void {
+    void this.render();
+  }
+
   async ngOnChanges(changes: SimpleChanges): Promise<void> {
+    // Skip the first call: the view is not up yet, and ngAfterViewInit above
+    // does the initial render instead.
+    if (Object.values(changes).some((change) => change.isFirstChange())) return;
     if (changes['pageNumber'] || changes['zoom']) await this.render();
   }
 
@@ -119,7 +179,7 @@ export class EmbedPageComponent implements OnChanges {
     const shapes = this.viewerState.shapes()
       .filter((shape) => shape.pageNumber === this.pageNumber);
     const all = this.inProgress ? [...shapes, this.inProgress] : shapes;
-    this.overlaySvg.set(all.map((shape) => this.markupEngine.shapeToSvg(shape, 1)).join(''));
+    this.primitives.set(all.flatMap((shape) => this.markupEngine.shapeToPrimitives(shape)));
   }
 
   beginStroke(event: PointerEvent): void {

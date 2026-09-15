@@ -47,6 +47,38 @@ default on every route (CLAUDE.md §5.4) and the embed route is the documented
 exception (ADR 14) — in a real deployment it is sourced from tenant
 configuration, never a wildcard.
 
+`npm start` serves the viewer with no such policy at all, so it frames without
+any of this. That is convenient and it is not what a customer runs.
+
+### Running it against a viewer the backend is serving
+
+This is the configuration an integrator actually meets: the platform image
+serves the embed document and emits the policy that governs it (ADR 15). Three
+settings on the backend, and one pointing the demo at it:
+
+```bash
+# the platform, having staged a production build (scripts/stage-browser-app.sh)
+CDE_WEB_APP_PATH=/app/web \
+CDE_WEB_EMBED_PARENT_ORIGINS=http://localhost:4401 \
+CDE_WEB_EMBED_DOCUMENT_ORIGINS=http://localhost:4401 \
+  ...run the image...
+
+# the host, pointed at wherever that is listening
+VIEWER_ORIGIN=http://localhost:8080 node demo/server.mjs
+```
+
+Both embed settings are needed and they do different jobs.
+`embed-parent-origins` is `frame-ancestors`: who may put the viewer in an
+iframe. `embed-document-origins` is `connect-src`: where the viewer may fetch a
+document from. Set only the first and the frame appears with nothing in it,
+because this host serves its samples over plain `http` and the default policy
+permits only `https`. Set only the second and the frame never appears at all.
+
+Run it this way before believing an integration works. Everything the first
+end-to-end run of it turned up — a pdf.js worker that had never loaded, markup
+that never rendered, a service worker serving a stale document — passed every
+unit test in this repository beforehand.
+
 ---
 
 ## What to try

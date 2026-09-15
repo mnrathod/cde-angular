@@ -18,12 +18,31 @@ export class PdfEngineService {
 
   private workerConfigured = false;
 
-  // ── Configure the pdf.js worker from the bundled package (no external
-  //    CDN dependency — pdfjs-dist ships in node_modules/dist already) ───
+  /**
+   * Point pdf.js at the worker we ship, not at a CDN and not at a bare
+   * package specifier.
+   *
+   * This used to read `new URL('pdfjs-dist/legacy/build/pdf.worker.mjs',
+   * import.meta.url)`, which never resolved to anything. A bundler rewrites
+   * `new URL()` into an emitted asset only for a *relative* specifier; a bare
+   * package name falls through untouched, so at runtime it resolved against
+   * the page and asked the server for `/pdfjs-dist/legacy/build/pdf.worker.mjs`
+   * — a 404 on every deployment there has ever been.
+   *
+   * The failure is a slow one to read. pdf.js logs "Setting up fake worker",
+   * falls back to parsing on the main thread, and the fake worker then loads
+   * the same missing URL and gives up — so what a user sees is "the document
+   * could not be opened", pointing at the document rather than at us.
+   *
+   * It is copied to `assets/pdfjs/` by angular.json, next to the wasm, cmaps,
+   * standard_fonts and iccs the loader already fetches from there, and
+   * resolved the same way: against `document.baseURI`, so it survives being
+   * served from a sub-path behind an ingress.
+   */
   async ensureLoaded(): Promise<void> {
     if (this.workerConfigured) return;
     pdfjsLib.GlobalWorkerOptions.workerSrc =
-      new URL('pdfjs-dist/legacy/build/pdf.worker.mjs', import.meta.url).toString();
+      new URL('assets/pdfjs/pdf.worker.mjs', document.baseURI).toString();
     this.workerConfigured = true;
   }
 

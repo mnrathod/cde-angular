@@ -39,11 +39,13 @@ const children = [
   + 'closed until someone sets it — so ask your deployment contact to add your origin before '
   + 'you test, because until they do the frame comes up blank with an error only your browser '
   + 'console will show you.'),
-  p('**What that deployment has and has not been through.** Every page route has been served '
-  + 'from a production build under the real policy and loaded in a browser with no content '
-  + 'blocked. What has not happened is a document opening inside a host’s frame against an '
-  + 'installed deployment — the pieces are each verified and the whole is not. Expect to be the '
-  + 'first to find whatever that turns up, and plan a spike rather than a delivery date.'),
+  p('**What that deployment has been through.** The demo host in our repository has been run '
+  + 'against it end to end: the document opens, pages render, markup is drawn and stored by the '
+  + 'host, the host page is reloaded and the markup comes back and is painted, and the host '
+  + 'drives page and zoom. That run found six defects, all fixed, none of which any unit test in '
+  + 'this repository had caught. What it has *not* been through is a real CDE, a real document '
+  + 'store and real users — so treat section 4 as the contract and budget a spike for your first '
+  + 'integration.'),
   p('**The conversion API has no such caveat.** Section 3 is a complete, working integration you '
   + 'can ship against today, inside your own interface, with your own rendering — and for a '
   + '“preview any file format” feature that is often the whole requirement.'),
@@ -405,8 +407,9 @@ const children = [
        + 'needs v2, announced with at least six months’ notice and both versions running over the '
        + 'overlap.'),
   h2('Still open'),
-  bullet('**Nobody has opened a document in a host frame on an installed deployment** — '
-       + 'section 5.2. Every piece is verified and the whole has not run. Plan a spike.'),
+  bullet('**No real CDE has integrated it yet** — section 5.2. Our own demo host drives the '
+       + 'whole protocol against a served viewer; your storage, your documents and your users '
+       + 'are the parts nobody has exercised.'),
   bullet('**Non-PDF formats in an embedded frame** — section 4. Wiring, not design.'),
   bullet('**Collaboration in an embed** — section 5.5. Genuinely unsolved.'),
   bullet('**Accessibility evidence.** See section 7 before you rely on ours.'),

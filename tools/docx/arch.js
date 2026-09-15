@@ -14,8 +14,8 @@ const children = [
    + 'implemented on both sides and tested against an independent host, the backend carries the '
    + '`frame-ancestors` allow-list that used to refuse every frame, and **the image now serves '
    + 'the embed document itself**, which is what closed the gap this document reported last '
-   + 'time. What has not happened is a document opening inside a host’s frame against an '
-   + 'installed deployment. Section 13 states exactly what is left — read it before quoting '
+   + 'time. The demo host now drives the whole protocol against it end to end. What has '
+   + 'not happened is a real CDE integrating it. Section 13 states exactly what is left — read it before quoting '
    + 'anything here to a customer.']),
 
   p('**Scope.** The viewer as described by ADR 12 (`cde-platform`, '
@@ -380,12 +380,21 @@ const children = [
      + 'same response. So the document is rendered per request, with `Cache-Control: no-store`, '
      + 'and the build stamps a placeholder the server substitutes. Splitting the document from '
      + 'its header across two components is what this design exists to avoid.'),
-  p('**Verified in a browser, which found what reasoning had not.** Serving a real production '
-  + 'build under the composed policy showed the first version refusing the stylesheet-promoting '
-  + 'script — so the main stylesheet never applied and the page looked broken rather than '
-  + 'unstyled — and showed `/embed` failing dependency injection before it rendered anything. '
-  + 'Both are fixed; every page route now loads with nothing blocked. A document opening inside '
-  + 'a host frame on an installed deployment remains untested.'),
+  p('**Verified by running the demo host against it, end to end.** The full journey works: the '
+  + 'document opens, three pages render, markup is drawn and stored by the host, the host page '
+  + 'is reloaded and the markup is handed back and painted, `goToPage` and `setZoom` drive the '
+  + 'viewer, and a capability that was not granted does not render its control. No content '
+  + 'blocked, no console errors.'),
+  note('**That run found six defects that every unit test had passed over.** A policy refusing '
+     + 'the build\u2019s own stylesheet-promoting script, so the main stylesheet never applied. '
+     + '`/embed` failing dependency injection before rendering anything. A pdf.js worker URL that '
+     + 'had never resolved on any deployment. A `connect-src` with no way to name an '
+     + 'integrator\u2019s storage. A service worker serving the entry document from cache, which '
+     + 'defeats a per-request nonce by construction. And markup that never rendered in either '
+     + 'direction, because the overlay bound `[innerHTML]` to SVG and Angular\u2019s sanitiser '
+     + 'strips it \u2014 while every protocol message stayed correct, so the host\u2019s log '
+     + 'looked perfect and the page was blank. **Run the demo against a served viewer before '
+     + 'believing an integration works.**'),
 
   h1('11.  Performance'),
   p('§7.1 applies unchanged: every interactive request under a second, bulk work async with a job '

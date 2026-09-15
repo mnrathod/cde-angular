@@ -32,6 +32,11 @@
                 "input": "public"
               },
               {
+                "glob": "pdf.worker.mjs",
+                "input": "node_modules/pdfjs-dist/legacy/build",
+                "output": "assets/pdfjs"
+              },
+              {
                 "glob": "**/*",
                 "input": "node_modules/pdfjs-dist/wasm",
                 "output": "assets/pdfjs/wasm"
