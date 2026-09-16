@@ -1,10 +1,10 @@
 /**
- * The visibility control, as a user meets it.
+ * The tree row's controls, as a user meets them.
  *
  * Rendered rather than constructed, because what is under test here is the
- * markup: this control does something now, and a control that works only for
- * a mouse is half a feature. §1A treats that as a functional defect at the
- * same severity, so it is asserted here alongside the behaviour.
+ * markup: the visibility control does something now, and a control that works
+ * only for a mouse is half a feature. §1A treats that as a functional defect
+ * at the same severity, so it is asserted here alongside the behaviour.
  *
  * Queried by role and accessible name, never by CSS class (§14) — the point
  * is that assistive technology can find and operate it, which a class
@@ -138,5 +138,51 @@ describe('the visibility toggle', () => {
     visibilityToggles(fixture.nativeElement)[0]!.click();
 
     expect(seen).toEqual([{ type: 'IfcWall', visible: false }]);
+  });
+});
+
+describe('the expand toggle', () => {
+
+  /** The row's other button: the one that is not the visibility toggle. */
+  function expandToggle(element: HTMLElement): HTMLButtonElement {
+    const button = [...element.querySelectorAll('button')]
+      .find((candidate) => !(candidate.getAttribute('aria-label') ?? '').startsWith('Hide '));
+    expect(button, 'no expand toggle rendered').toBeDefined();
+    return button!;
+  }
+
+  function branch(): IfcNode {
+    return {
+      id: 'storey', name: 'Level 00', type: 'IfcBuildingStorey',
+      expanded: false, selected: false, visible: true,
+      children: [{ id: 'walls', name: 'Walls', type: 'IfcWall',
+                   expanded: false, selected: false, visible: true, children: [] }],
+    };
+  }
+
+  it('is at least 24 CSS px square', () => {
+    // Same defect and same cause as its neighbour: it was sized to the ▸
+    // glyph rather than to SC 2.5.8's 24×24 floor, so it looked correct
+    // while being too small to hit.
+    const toggle = expandToggle(renderTree([branch()]).nativeElement);
+
+    expect(toggle.classList.contains('w-6')).toBe(true);
+    expect(toggle.classList.contains('h-6')).toBe(true);
+  });
+
+  it('is typed as a button, so it does not submit anything', () => {
+    const toggle = expandToggle(renderTree([branch()]).nativeElement);
+
+    expect(toggle.getAttribute('type')).toBe('button');
+  });
+
+  it('still expands the node it belongs to', () => {
+    // Growing the target must not break what it was already doing.
+    const nodes = [branch()];
+    const fixture = renderTree(nodes);
+
+    expandToggle(fixture.nativeElement).click();
+
+    expect(nodes[0]!.expanded).toBe(true);
   });
 });

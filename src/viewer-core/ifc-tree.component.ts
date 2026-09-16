@@ -100,9 +100,11 @@ const IFC_ICONS: Record<string, string> = {
             (click)="selectNode(node)"
             (dblclick)="toggleNode(node)">
 
-            <!-- Expand toggle -->
-            <button (click)="toggleNode(node); $event.stopPropagation()"
-              class="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600 flex-shrink-0"
+            <!-- Expand toggle. 24px for the same reason as its neighbour:
+                 the glyph is smaller than the target has to be. -->
+            <button type="button"
+              (click)="toggleNode(node); $event.stopPropagation()"
+              class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 flex-shrink-0"
               [class.invisible]="!node.children?.length">
               {{ node.expanded ? '▾' : '▸' }}
             </button>
@@ -255,8 +257,8 @@ export class IfcTreeComponent implements OnChanges {
    * <p>The box is 24×24 rather than the 16×16 it was, which is SC 2.5.8's
    * floor. Measured in a browser rather than reasoned about: the emoji inside
    * it is still 16px, so the control looked the right size while the target
-   * was not. The expand toggle beside it is still 16×16 and has the same
-   * defect — untouched here because it is a different control.
+   * was not. The expand toggle beside it had the same defect and the same
+   * cause, and was corrected with it.
    *
    * <p>The event is emitted once, for the node that was clicked, while the
    * descendants are marked here. A listener wanting the full set expands it
