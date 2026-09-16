@@ -12,6 +12,11 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { CommonModule } from "@angular/common";
 import { ViewerService } from "../../../core/services/viewer.service";
 import { IfcTreeComponent, IfcNode } from "../../../../viewer-core/ifc-tree.component";
+import {
+  ModelGeometry,
+  ModelGeometryGroup,
+  decodeGeometryContainer,
+} from "../../../../viewer-core/model-geometry";
 
 @Component({
   selector: "app-viewer3d",
@@ -171,25 +176,56 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
     this.viewport?.renderer?.dispose();
   }
 
+  /**
+   * Fetch the geometry, or find out why there is none.
+   *
+   * The geometry route answers with bytes for a model it could extract and
+   * with JSON for anything else, so the content type is the branch. Only the
+   * second case needs the JSON route, which is what names the specific
+   * reason — a Revit binary, an unsupported format, a converter that is not
+   * running. That keeps the common path to one request and one extraction.
+   */
   async loadModel(id: number) {
     await this.loadThreeJs();
     this.loadingMsg.set("Fetching model data...");
 
+    this.service.getModelGeometry(id).subscribe({
+      next: (response) => {
+        const contentType = response.headers.get("content-type") ?? "";
+        if (!contentType.includes("application/octet-stream") || !response.body) {
+          this.explainUnopenableModel(id);
+          return;
+        }
+        try {
+          const geometry = decodeGeometryContainer(response.body);
+          this.loadingMsg.set("Building 3D scene...");
+          setTimeout(() => this.buildIFCScene(geometry), 50);
+        } catch (failure) {
+          this.loading.set(false);
+          this.errorMsg.set(
+            failure instanceof Error ? failure.message : "Model data could not be read",
+          );
+        }
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.errorMsg.set(err.message);
+      },
+    });
+  }
+
+  /** Ask the JSON route why a document produced no geometry, and say so. */
+  private explainUnopenableModel(id: number) {
     this.service.get3DData(id).subscribe({
       next: (data: any) => {
-        if (data?.type === "ifc3d") {
-          this.loadingMsg.set("Building 3D scene...");
-          setTimeout(() => this.buildIFCScene(data), 50);
-        } else if (data?.type === "revit_binary") {
-          this.loading.set(false);
+        this.loading.set(false);
+        if (data?.type === "revit_binary") {
           this.errorMsg.set(
             "Revit binary file — export to IFC first.\nFile → Export → IFC in Revit",
           );
         } else if (data?.success === false) {
-          this.loading.set(false);
           this.errorMsg.set(data.error || "Conversion failed");
         } else {
-          this.loading.set(false);
           this.errorMsg.set("Unsupported 3D format");
         }
       },
@@ -222,7 +258,7 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
     this.threeJs = { ...three, OrbitControls: orbit.OrbitControls };
   }
 
-  buildIFCScene(data: any) {
+  buildIFCScene(data: ModelGeometry) {
     const T = this.threeJs;
     if (!T) return;
     const canvas = this.canvas.nativeElement;
@@ -249,30 +285,35 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
     const grid = new T.GridHelper(100, 20, 0x333344, 0x222233);
     scene.add(grid);
 
-    const gd = data.gltfData;
-    const b64 = (s: string) =>
-      Uint8Array.from(atob(s), (c) => c.charCodeAt(0)).buffer;
+    const gd = data;
     const geo = new T.BufferGeometry();
-    geo.setAttribute(
-      "position",
-      new T.BufferAttribute(new Float32Array(b64(gd.positions)), 3),
-    );
-    geo.setAttribute(
-      "normal",
-      new T.BufferAttribute(new Float32Array(b64(gd.normals)), 3),
-    );
-    geo.setAttribute(
-      "color",
-      new T.BufferAttribute(new Float32Array(b64(gd.colors)), 3),
-    );
-    geo.setIndex(new T.BufferAttribute(new Uint32Array(b64(gd.indices)), 1));
+    geo.setAttribute("position", new T.BufferAttribute(gd.positions, 3));
+    geo.setAttribute("normal", new T.BufferAttribute(gd.normals, 3));
+    geo.setIndex(new T.BufferAttribute(gd.indices, 1));
 
-    const mat = new T.MeshPhongMaterial({
-      vertexColors: true,
-      side: T.DoubleSide,
-      shininess: 30,
+    /*
+     * One group and one material per element type, rather than one material
+     * over a baked per-vertex colour.
+     *
+     * The colour is the same information either way, but it used to be tiled
+     * across every vertex — twelve bytes each to say "this is a wall" — and
+     * once baked in it could not be changed or hidden, which is why the layer
+     * toggles in this component's own UI have never done anything. The group
+     * offsets are index offsets; three.js expects exactly that on indexed
+     * geometry, and vertex offsets there would silently draw the wrong runs.
+     */
+    const materials = gd.groups.map((group: ModelGeometryGroup, index: number) => {
+      geo.addGroup(group.start, group.count, index);
+      return new T.MeshPhongMaterial({
+        color: new T.Color(group.color[0], group.color[1], group.color[2]),
+        side: T.DoubleSide,
+        shininess: 30,
+        transparent: group.opacity < 1,
+        opacity: group.opacity,
+      });
     });
-    const mesh = new T.Mesh(geo, mat);
+
+    const mesh = new T.Mesh(geo, materials);
     scene.add(mesh);
 
     // Fit camera
@@ -349,7 +390,12 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
   toggleWireframe() {
     if (!this.viewport) return;
     this.wireframe.update((w) => !w);
-    this.viewport.mesh.material.wireframe = this.wireframe();
+    // One material per element type now, so this sets all of them. It was a
+    // single material while every vertex carried its own baked colour.
+    const materials = this.viewport.mesh.material;
+    for (const material of Array.isArray(materials) ? materials : [materials]) {
+      material.wireframe = this.wireframe();
+    }
   }
   snapView(view: string) {
     /* set camera position */

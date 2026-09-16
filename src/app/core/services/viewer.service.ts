@@ -17,6 +17,26 @@ export class ViewerService {
   }
 
   /**
+   * A model's geometry as bytes.
+   *
+   * Separate from `get3DData` because the media type differs, and a media
+   * type is part of the published contract even where the body inside it is
+   * documented as opaque (§3.4). The JSON route stays for anything already
+   * calling it; this one exists so the arrays do not have to travel as
+   * base64, which costs four bytes of transfer for every three of payload.
+   *
+   * `observe: 'response'` because the server answers a model it cannot read
+   * with JSON rather than a buffer, and the content type is how the caller
+   * tells a failure from a very short model.
+   */
+  getModelGeometry(documentId: number) {
+    return this.http.get(`/api/viewer3d/${documentId}/geometry`, {
+      responseType: 'arraybuffer',
+      observe: 'response',
+    });
+  }
+
+  /**
    * The model hierarchy for the IFC tree.
    *
    * <p>Lives here rather than in the component that renders it. `IfcTreeComponent`
