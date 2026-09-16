@@ -25,6 +25,15 @@ export interface SignatureRecord {
  */
 export interface SignResult {
   signature:      SignatureRecord;
+  /**
+   * The stamp as the server draws it into the document.
+   *
+   * <p>Not for display here. Angular's sanitiser drops every `<svg>` element
+   * and keeps their bare text, so `[innerHTML]` renders the stamp as one
+   * unstyled run-together line rather than as a stamp — and a sanitiser
+   * bypass is banned (§5.12). `DocumentSignatureComponent` builds its preview
+   * from {@link signature} instead, which is the same information as text.
+   */
   stampSvg:       string;
   /** Version number this signing committed. */
   version:        number;

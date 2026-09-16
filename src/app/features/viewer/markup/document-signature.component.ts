@@ -61,15 +61,40 @@ import { ViewerStateService } from '../../../../viewer-core/viewer-state.service
         </div>
       }
 
-      <!-- Signature stamp preview -->
-      @if (lastStampSvg()) {
-        <div class="border border-green-200 rounded-lg p-3 bg-green-50">
+      <!-- Signature stamp preview. See lastSignature for why it is markup
+           rather than the server's SVG. -->
+      @if (lastSignature(); as stamp) {
+        <section aria-label="Signature just applied"
+                 class="border border-green-200 rounded-lg p-3 bg-green-50">
           <div class="text-xs font-semibold text-green-800 mb-2">✅ Signature Applied</div>
-          <div [innerHTML]="lastStampSvg()" class="inline-block"></div>
+
+          <dl class="inline-block rounded border-2 px-3 py-2 bg-blue-50 not-italic"
+              style="border-color:#1e5fbe;min-width:240px">
+            <div class="text-xs font-bold tracking-wide pb-1 mb-1 border-b"
+                 style="color:#1e5fbe;border-color:#1e5fbe">
+              DIGITALLY SIGNED
+            </div>
+            <div class="flex gap-1 text-xs text-gray-700">
+              <dt class="font-medium">Signed by:</dt><dd>{{ stamp.signerName }}</dd>
+            </div>
+            <div class="flex gap-1 text-xs text-gray-700">
+              <dt class="font-medium">Role:</dt>
+              <dd>{{ stamp.role }}@if (stamp.reason) { · {{ stamp.reason }} }</dd>
+            </div>
+            <div class="flex gap-1 text-xs text-gray-500">
+              <dt class="font-medium">Date:</dt>
+              <dd>{{ stamp.signedAt | date: 'medium' }}</dd>
+            </div>
+            <div class="flex gap-1 text-xs text-gray-400">
+              <dt class="font-medium">Ref:</dt>
+              <dd class="font-mono">{{ reference(stamp) }}</dd>
+            </div>
+          </dl>
+
           <p class="text-xs text-green-700 mt-2">
             This stamp will appear on the document when flattened.
           </p>
-        </div>
+        </section>
       }
 
       <!-- Signatures list -->
@@ -153,7 +178,30 @@ export class DocumentSignatureComponent implements OnInit {
   loading       = signal(true);
   signing       = signal(false);
   showSignForm  = signal(false);
-  lastStampSvg  = signal('');
+  /**
+   * The signature just applied, shown back as a stamp preview.
+   *
+   * <p>This used to hold the server's `stampSvg` and bind it with
+   * `[innerHTML]`. Angular's HTML sanitiser has no `<svg>` in its element
+   * allow-list, so it dropped every element of the stamp and kept only their
+   * text nodes, run together with nothing between them: what a signer saw was
+   * one unstyled line reading `DIGITALLY SIGNEDSigned by: …Role: …`, with the
+   * raw ISO timestamp and no border, spacing or layout. Not an error, and not
+   * blank either — just quietly wrong on every signing, which is why it
+   * survived so long.
+   *
+   * <p>Rebuilding it from the record rather than reaching for a sanitiser
+   * bypass settles three things at once. §5.12 bans the bypass outright. The
+   * stamp is text — a name, a role, a reason, a date — so an image of that
+   * text is unreadable to a screen reader and unselectable by anyone, which
+   * §1A.4 counts as a defect rather than a trade-off. And the reply already
+   * carries every one of those fields as data, so the SVG was a second,
+   * lossier copy of something we had.
+   *
+   * <p>The server still generates the SVG, and still needs to: that copy is
+   * what gets drawn into the PDF, where it is a picture by necessity.
+   */
+  lastSignature = signal<SignatureRecord | null>(null);
   verifyResult  = signal<{valid:boolean;message:string} | null>(null);
 
   signReq: SignRequest = { role: 'Reviewer', reason: '' };
@@ -177,7 +225,7 @@ export class DocumentSignatureComponent implements OnInit {
       next: result => {
         this.signing.set(false);
         this.showSignForm.set(false);
-        this.lastStampSvg.set(result.stampSvg || '');
+        this.lastSignature.set(result.signature);
         // Signing a PDF rewrites it, so the viewer is now a version behind.
         if (result.embedded) {
           this.state.applyVersionCommit(result.version ?? 0,
@@ -197,6 +245,18 @@ export class DocumentSignatureComponent implements OnInit {
       // Refresh to show updated status
       this.loadSignatures();
     });
+  }
+
+  /**
+   * The short reference printed on the stamp.
+   *
+   * <p>Eight characters of the signature id, upper-cased, which is what the
+   * server draws into the embedded stamp. Matching it matters: this preview
+   * and the mark on the document have to be quotable as the same thing when
+   * someone rings up asking about a signature.
+   */
+  reference(signature: SignatureRecord): string {
+    return signature.signatureId.slice(0, 8).toUpperCase();
   }
 
   roleClass(role: string): string {
