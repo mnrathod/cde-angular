@@ -13,6 +13,7 @@ import { DocumentService } from "../../core/services/document.service";
 import { ProjectService } from "../../core/services/project.service";
 import { Document, CompareResult, ChangeItem } from "../../core/models";
 import { problemMessage } from "../../core/handlers/problem-detail";
+import { parseComparisonReport } from "./comparison-report";
 
 @Component({
   selector: "app-compare",
@@ -321,10 +322,43 @@ import { problemMessage } from "../../core/handlers/problem-detail";
                 </div>
               </div>
             } @else if (aiText()) {
-              <div
-                class="p-4 text-sm leading-relaxed text-gray-700"
-                [innerHTML]="aiHtml()"
-              ></div>
+              <!-- Rendered line by line rather than as a string of HTML. See
+                   comparison-report.ts for why. -->
+              <div class="p-4 text-sm leading-relaxed text-gray-700">
+                @for (line of reportLines(); track $index) {
+                  @switch (line.kind) {
+                    @case ("section") {
+                      <h3
+                        class="flex items-center gap-1.5 mt-3 mb-1 pb-1 border-b border-gray-200
+                               text-xs font-semibold uppercase tracking-wide text-accent"
+                      >
+                        <span aria-hidden="true">{{ line.icon }}</span>
+                        {{ line.text }}
+                      </h3>
+                    }
+                    @case ("request") {
+                      <div
+                        class="my-1 py-1.5 px-2.5 rounded-sm text-xs bg-amber-50 border-l-4 border-amber-500"
+                      >
+                        <strong class="text-amber-700">{{ line.reference }}</strong
+                        >@if (line.detail) { — {{ line.detail }} }
+                      </div>
+                    }
+                    @case ("bullet") {
+                      <div class="flex gap-1.5 my-0.5 text-xs">
+                        <span class="text-accent flex-shrink-0" aria-hidden="true">▸</span>
+                        <span>{{ line.text }}</span>
+                      </div>
+                    }
+                    @case ("paragraph") {
+                      <p class="my-0.5 text-xs">{{ line.text }}</p>
+                    }
+                    @default {
+                      <div class="h-1"></div>
+                    }
+                  }
+                }
+              </div>
             } @else {
               <div
                 class="flex flex-col items-center justify-center h-full text-gray-400 p-6 text-center"
@@ -411,8 +445,10 @@ export class CompareComponent implements OnInit {
   showPicker = signal(false);
   pickingSlot = signal(1);
   aiText = signal("");
-  aiHtml = signal("");
   aiLoading = signal(false);
+
+  /** The report as lines to render; empty until one has been generated. */
+  reportLines = computed(() => parseComparisonReport(this.aiText()));
   docs = this.docService.documents;
 
   groupedChanges = computed(() => {
@@ -477,7 +513,6 @@ export class CompareComponent implements OnInit {
     if (!result) return;
     this.aiLoading.set(true);
     this.aiText.set("");
-    this.aiHtml.set("");
 
     // Facts, not a prompt. The prompt, the model and the token ceiling are the
     // server's to decide: this used to assemble the whole thing here and POST
@@ -487,7 +522,6 @@ export class CompareComponent implements OnInit {
     this.compareService.getComparisonReport(result).subscribe({
       next: (response) => {
         this.aiText.set(response.report);
-        this.aiHtml.set(this.formatReport(response.report));
         this.aiLoading.set(false);
       },
       error: (err: unknown) => {
@@ -500,68 +534,6 @@ export class CompareComponent implements OnInit {
         this.aiLoading.set(false);
       },
     });
-  }
-
-  /**
-   * Escapes text before it is placed into markup.
-   *
-   * <p>formatReport builds an HTML string, and the text it builds it from is a
-   * model's output — which the data-handling rules require be treated as
-   * untrusted input, never interpolated into HTML. Angular's binding sanitiser
-   * is the second layer and would strip an injected script; this is the first,
-   * and it is the one that means a prompt-injected reply is rendered as the
-   * text it is rather than relying on the sanitiser to notice.
-   */
-  private escape(text: string): string {
-    return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
-  formatReport(text: string): string {
-    const sectionRe =
-      /^(\d+\.\s+)(REVISION SUMMARY|KEY CHANGES IDENTIFIED|IMPACTED DISCIPLINES|REVIEW COMMENTS|SUGGESTED RFIs)/i;
-    const rfiRe = /^(RFI-\d+:)/i;
-    const icons: Record<string, string> = {
-      "REVISION SUMMARY": "📋",
-      "KEY CHANGES IDENTIFIED": "🔍",
-      "IMPACTED DISCIPLINES": "🏗",
-      "REVIEW COMMENTS": "✍️",
-      "SUGGESTED RFIs": "❓",
-    };
-    return text
-      .split("\n")
-      .map((line) => {
-        const t = line.trim();
-        if (!t) return '<div style="height:5px"></div>';
-        if (sectionRe.test(t)) {
-          const key =
-            Object.keys(icons).find((k) => t.toUpperCase().includes(k)) || "";
-          return `<div style="display:flex;align-items:center;gap:6px;margin:12px 0 5px;padding-bottom:4px;border-bottom:1px solid #dde1e7">
-          <span>${icons[key] || "•"}</span>
-          <strong style="font-size:.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:.4px">${this.escape(t)}</strong>
-        </div>`;
-        }
-        if (rfiRe.test(t)) {
-          const d = t.indexOf("—");
-          const ref = d > 0 ? t.slice(0, d).trim() : t;
-          const rest = d > 0 ? t.slice(d + 1).trim() : "";
-          return `<div style="background:#fffbeb;border-left:3px solid #f59e0b;border-radius:3px;padding:6px 10px;margin:3px 0;font-size:.79rem">
-          <strong style="color:#b45309">${this.escape(ref)}</strong>${rest ? " — " + this.escape(rest) : ""}
-        </div>`;
-        }
-        if (/^[•\-\*]\s+/.test(t) || /^\d+\.\s+[a-z]/i.test(t)) {
-          return `<div style="display:flex;gap:6px;margin:2px 0;font-size:.79rem">
-          <span style="color:var(--accent);flex-shrink:0">▸</span>
-          <span>${this.escape(t.replace(/^[•\-\*]\s+/, "").replace(/^\d+\.\s+/, ""))}</span>
-        </div>`;
-        }
-        return `<p style="margin:3px 0;font-size:.79rem">${this.escape(t)}</p>`;
-      })
-      .join("");
   }
 
   openVisualCompare() {
