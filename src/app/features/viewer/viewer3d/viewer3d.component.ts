@@ -20,6 +20,7 @@ import {
 import {
   elementTypesIn,
   materialSlotsForTypes,
+  treeFromGeometryGroups,
 } from "../../../../viewer-core/model-visibility";
 
 @Component({
@@ -108,7 +109,6 @@ import {
         <!-- IFC Model Tree Sidebar -->
         <app-ifc-tree
           [nodes]="modelTree()"
-          [stats]="ifcStats()"
           (elementSelected)="onElementSelected($event)"
           (elementVisibilityChanged)="onVisibilityChanged($event)"
         >
@@ -153,18 +153,15 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
   // (ADR 14), because a host embedding the viewer supplies this and there is
   // no same-origin /api for the component to reach.
   modelTree = signal<IfcNode[] | undefined>(undefined);
-  ifcStats = signal<{ schema: string; elementCount: number } | undefined>(
-    undefined,
-  );
 
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get("id"));
     this.docId.set(id);
     this.service.getModelTree(id).subscribe({
       next: nodes => this.modelTree.set(nodes),
-      // A model with no tree endpoint is not an error the user can act on —
-      // the component derives a synthetic tree from the element counts, which
-      // is §1A.4's accessible route to the model either way.
+      // A model with no tree endpoint is not an error the user can act on.
+      // The empty array is the signal that buildIFCScene should derive the
+      // tree from the geometry's groups instead — see treeFromGeometryGroups.
       error: () => this.modelTree.set([]),
     });
     this.loadModel(id);
@@ -347,7 +344,14 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
     };
     this.loading.set(false);
 
-    this.ifcStats.set({ schema: gd.schema, elementCount: gd.elementCount });
+    // A model with no hierarchy of its own still needs the tree, because §1A.4
+    // makes it the accessible route to a canvas some readers cannot use. The
+    // groups are what the extractor genuinely found, so the fallback is
+    // derived from them rather than invented — see treeFromGeometryGroups.
+    if (this.modelTree()?.length === 0) {
+      this.modelTree.set(treeFromGeometryGroups(gd.groups, gd.schema));
+    }
+
     this.stats.set([
       { label: "Elements", value: gd.elementCount.toLocaleString() },
       { label: "Triangles", value: gd.triangleCount.toLocaleString() },

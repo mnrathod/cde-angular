@@ -34,6 +34,18 @@ export interface ModelGeometryGroup {
   readonly start: number;
   /** Length of the run, again in indices. */
   readonly count: number;
+  /**
+   * How many elements of this type the model holds.
+   *
+   * <p>Not to be confused with {@link count}, which is an index count — a
+   * single wall is hundreds of indices. This is what the model tree shows as
+   * a quantity, and it is counted by the extractor rather than derived here.
+   *
+   * <p>Zero for a container written before the extractor carried it, which is
+   * why the tree treats zero as "unknown" and shows no badge rather than
+   * claiming there are none.
+   */
+  readonly elementCount: number;
   /** Linear RGB, each channel 0–1. */
   readonly color: readonly [number, number, number];
   /** 1 is opaque. Carried per type because e.g. glazing is not. */
@@ -117,5 +129,20 @@ export function decodeGeometryContainer(buffer: ArrayBuffer): ModelGeometry {
   offset += vertexFloats * 4;
   const indices = new Uint32Array(buffer, offset, indexCount);
 
-  return { ...header, positions, normals, indices };
+  return { ...header, groups: header.groups.map(withElementCount),
+           positions, normals, indices };
+}
+
+/**
+ * Fills in a group's element count when the writer did not send one.
+ *
+ * <p>The header is otherwise spread straight into the result, which would
+ * leave `elementCount` undefined for a container written before the extractor
+ * counted elements — while the declared type says `number`. A type that lies
+ * is worse than a missing field, because the reader of it stops checking. Zero
+ * is the honest value: the tree reads it as "not known" and shows no quantity,
+ * rather than claiming the model contains none.
+ */
+function withElementCount(group: ModelGeometryGroup): ModelGeometryGroup {
+  return { ...group, elementCount: group.elementCount ?? 0 };
 }

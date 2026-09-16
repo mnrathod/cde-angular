@@ -9,10 +9,14 @@ import { describe, expect, it } from 'vitest';
 
 import { IfcNode } from './ifc-tree.component';
 import { ModelGeometryGroup } from './model-geometry';
-import { elementTypesIn, materialSlotsForTypes } from './model-visibility';
+import {
+  elementTypesIn,
+  materialSlotsForTypes,
+  treeFromGeometryGroups,
+} from './model-visibility';
 
-function group(type: string): ModelGeometryGroup {
-  return { type, start: 0, count: 3, color: [1, 1, 1], opacity: 1 };
+function group(type: string, elementCount = 1): ModelGeometryGroup {
+  return { type, start: 0, count: 3, color: [1, 1, 1], opacity: 1, elementCount };
 }
 
 function node(type: string, children: IfcNode[] = []): IfcNode {
@@ -93,5 +97,77 @@ describe('the material slots those types are drawn by', () => {
     const tree = node('IfcBuilding', [node('IfcWall'), node('IfcWindow')]);
 
     expect(materialSlotsForTypes(groups, elementTypesIn(tree))).toEqual([0, 2]);
+  });
+});
+
+/**
+ * The hierarchy shown for a model that has none of its own.
+ *
+ * <p>This replaced a fabrication: ten fixed IFC types with a
+ * `Math.random()` quantity each, shown to a reader as the contents of their
+ * own building. §1A.4 makes this tree the accessible equivalent of a WebGL
+ * canvas, so the fallback route is precisely the one that has to be true —
+ * the people depending on it are the ones least able to check it against the
+ * picture.
+ *
+ * <p>So these assert that nothing appears that the geometry did not carry.
+ */
+describe('the tree derived from a model with no hierarchy', () => {
+
+  it('names only the types the model actually contains', () => {
+    // The old fallback listed IfcStair, IfcDoor and seven others regardless.
+    const [root] = treeFromGeometryGroups([group('IfcWall'), group('IfcSlab')], 'IFC4');
+
+    expect(root!.children.map((child) => child.type)).toEqual(['IfcSlab', 'IfcWall']);
+  });
+
+  it('reports the counted quantity, not an invented one', () => {
+    const [root] = treeFromGeometryGroups([group('IfcWall', 42)]);
+
+    expect(root!.children[0]!.count).toBe(42);
+  });
+
+  it('is stable across calls, because nothing in it is random', () => {
+    // The fabricated tree changed its quantities on every reload, so two
+    // readers of the same model never saw the same numbers.
+    const groups = [group('IfcWall', 7), group('IfcWindow', 3)];
+
+    expect(treeFromGeometryGroups(groups, 'IFC4'))
+      .toEqual(treeFromGeometryGroups(groups, 'IFC4'));
+  });
+
+  it('shows no quantity at all when the container carried none', () => {
+    // Zero means "the writer predates the count", not "there are none of
+    // these" — and the model plainly holds some, or there would be no group.
+    const [root] = treeFromGeometryGroups([group('IfcWall', 0)]);
+
+    expect(root!.children[0]!.count).toBeUndefined();
+  });
+
+  it('says which schema the model is in', () => {
+    const [root] = treeFromGeometryGroups([group('IfcWall')], 'IFC4X3');
+
+    expect(root!.name).toContain('IFC4X3');
+  });
+
+  it('gives nothing for a model with no groups', () => {
+    // An empty panel is the honest answer; the old code produced a full
+    // building here.
+    expect(treeFromGeometryGroups([], 'IFC4')).toEqual([]);
+  });
+
+  it('opens at the root, so the types are visible without a click', () => {
+    const [root] = treeFromGeometryGroups([group('IfcWall')], 'IFC4');
+
+    expect(root!.expanded).toBe(true);
+  });
+
+  it('resolves back to the material slots that drew it', () => {
+    // The derived tree has to work with the visibility toggles, which is the
+    // whole reason for deriving it from the groups rather than from stats.
+    const groups = [group('IfcWall'), group('IfcSlab'), group('IfcWindow')];
+    const [root] = treeFromGeometryGroups(groups, 'IFC4');
+
+    expect(materialSlotsForTypes(groups, elementTypesIn(root!))).toEqual([0, 1, 2]);
   });
 });

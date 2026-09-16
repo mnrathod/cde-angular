@@ -158,12 +158,17 @@ export class IfcTreeComponent implements OnChanges {
    * absence of network access directly, which is the property that was
    * actually being claimed.
    *
-   * <p>Undefined means "not loaded yet"; an empty array means "loaded, and the
-   * model has no tree", which falls back to {@link stats}. The two are
+   * <p>Undefined means "not loaded yet" and shows the empty state; an empty
+   * array means "loaded, and the model has no hierarchy". The two are
    * different and a caller that conflates them gets a spinner forever.
+   *
+   * <p>This component used to answer the empty case itself, by inventing a
+   * tree: ten fixed IFC types, each given a quantity from `Math.random()`. It
+   * no longer invents anything. Deriving a fallback needs the geometry, which
+   * only the host has, so `treeFromGeometryGroups` builds one from the types
+   * the extractor actually found and the host binds the result here.
    */
   @Input() nodes?: IfcNode[];
-  @Input() stats?: { schema: string; elementCount: number };
   @Output() elementSelected  = new EventEmitter<IfcNode>();
   @Output() elementVisibilityChanged = new EventEmitter<{ node: IfcNode; visible: boolean }>();
 
@@ -172,60 +177,16 @@ export class IfcTreeComponent implements OnChanges {
   selectedNode  = signal<IfcNode | null>(null);
   searchQuery   = '';
 
-  /** Whether a caller binds {@link nodes} at all, as opposed to only stats. */
-  private nodesBound = false;
-
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['nodes']) {
-      this.nodesBound = true;
+    if (!changes['nodes']) return;
 
-      // Undefined is a load in flight. Deriving a synthetic tree here would
-      // show a plausible, wrong hierarchy and then replace it — worse than an
-      // empty panel, because the reader cannot tell it changed.
-      if (this.nodes === undefined) return;
-
-      if (this.nodes.length) {
-        this.treeNodes.set(this.nodes);
-        this.filteredNodes.set(this.nodes);
-        return;
-      }
-
-      // An empty array is an answer, not an absence: the model has no
-      // readable hierarchy. §1A.4 makes this tree the accessible route to a
-      // model that is otherwise a WebGL canvas, so falling back to what the
-      // element counts imply beats showing nothing.
-      this.buildSyntheticTree();
-      return;
-    }
-
-    // A caller that supplies only stats and never binds nodes still gets a
-    // tree — that was the behaviour before the fetch moved out, and it is the
-    // path a host takes when it has no hierarchy to give us.
-    if (changes['stats'] && !this.nodesBound && this.stats) {
-      this.buildSyntheticTree();
-    }
-  }
-
-  private buildSyntheticTree() {
-    // Build a synthetic tree from stats when no tree endpoint available
-    if (!this.stats) return;
-
-    const types = [
-      'IfcWall','IfcSlab','IfcColumn','IfcBeam','IfcDoor',
-      'IfcWindow','IfcStair','IfcRoof','IfcFurnishingElement','IfcSpace'
-    ];
-
-    const root: IfcNode = {
-      id: 'root', name: 'Building Model', type: 'IfcBuilding',
-      expanded: true, selected: false, visible: true,
-      children: types.map(t => ({
-        id: t, name: t.replace('Ifc', ''), type: t,
-        expanded: false, selected: false, visible: true,
-        children: [], count: Math.floor(Math.random() * 20) + 1
-      }))
-    };
-    this.treeNodes.set([root]);
-    this.filteredNodes.set([root]);
+    // Undefined is a load in flight, and renders the empty state. Filling it
+    // with a guess here would show a plausible, wrong hierarchy and then
+    // replace it — worse than an empty panel, because the reader cannot tell
+    // it changed.
+    const nodes = this.nodes ?? [];
+    this.treeNodes.set(nodes);
+    this.filteredNodes.set(nodes);
   }
 
   selectNode(node: IfcNode) {

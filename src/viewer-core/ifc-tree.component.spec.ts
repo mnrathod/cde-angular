@@ -43,28 +43,30 @@ describe('IfcTreeComponent', () => {
   });
 
   it('shows nothing while no tree has arrived, rather than an empty model', () => {
-    // Undefined is "still loading". Deriving a synthetic tree here would show
-    // a plausible, wrong hierarchy for a moment and then replace it.
+    // Undefined is "still loading". Filling it with a guess here would show a
+    // plausible, wrong hierarchy for a moment and then replace it.
     const tree = new IfcTreeComponent();
-    tree.stats = { schema: 'IFC4', elementCount: 120 };
 
     tree.ngOnChanges(changed({ nodes: undefined }));
 
     expect(tree.treeNodes()).toEqual([]);
   });
 
-  it('falls back to the element counts when the tree arrives empty', () => {
-    // An empty array is an answer: the model has no readable hierarchy. §1A.4
-    // makes this the accessible route to the model, so an empty panel beside
-    // the canvas is not a neutral outcome — it is the only route, missing.
+  it('invents nothing when the tree arrives empty', () => {
+    // It used to answer this case itself, with ten fixed IFC types and a
+    // Math.random() quantity each. §1A.4 makes this tree the accessible
+    // equivalent of a canvas some readers cannot see, which makes it the worst
+    // place in the product to show made-up data.
+    //
+    // The fallback now lives in treeFromGeometryGroups, which needs the
+    // geometry — something only the host has — so an empty array stays empty
+    // here and the host binds a derived tree when it has one.
     const tree = new IfcTreeComponent();
-    tree.stats = { schema: 'IFC4', elementCount: 120 };
     tree.nodes = [];
 
     tree.ngOnChanges(changed({ nodes: [] }));
 
-    expect(tree.treeNodes().length).toBeGreaterThan(0);
-    expect(tree.treeNodes()[0]?.type).toBe('IfcBuilding');
+    expect(tree.treeNodes()).toEqual([]);
   });
 
   it('needs no injector, because it fetches nothing', () => {

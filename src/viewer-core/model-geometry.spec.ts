@@ -189,3 +189,50 @@ describe('alignment', () => {
     });
   }
 });
+
+/**
+ * How a group's element count survives a container that predates it.
+ *
+ * <p>`elementCount` was added to the group table after the format shipped, and
+ * the decoder spreads the header straight into its result. Without a default
+ * the field would be `undefined` while the type says `number` — and the model
+ * tree reads it to decide whether to show a quantity, so the lie would surface
+ * as `×undefined` beside an element type rather than as a type error anyone
+ * would catch.
+ */
+describe('a group written before element counts existed', () => {
+
+  /** The group table as the first version of the writer emitted it. */
+  const withoutCounts = [
+    { type: 'IfcWall', start: 0, count: 3, color: [0.85, 0.82, 0.78], opacity: 1.0 },
+  ];
+
+  function decodeWith(groups: unknown[]) {
+    return decodeGeometryContainer(containerWith(
+      { success: true, type: 'ifc3d', groups, vertexCount: 1, triangleCount: 1,
+        elementCount: 1, schema: 'IFC4', bounds: { min: [0, 0, 0], max: [1, 1, 1] } },
+      { positions: [1, 2, 3], normals: [0, 0, 1], indices: [0, 0, 0] }));
+  }
+
+  it('reads as zero rather than undefined', () => {
+    const [group] = decodeWith(withoutCounts).groups;
+
+    expect(group!.elementCount).toBe(0);
+  });
+
+  it('leaves everything else on the group untouched', () => {
+    const [group] = decodeWith(withoutCounts).groups;
+
+    expect(group!.type).toBe('IfcWall');
+    expect(group!.start).toBe(0);
+    expect(group!.count).toBe(3);
+    expect(group!.opacity).toBe(1);
+  });
+
+  it('keeps a count the writer did send', () => {
+    const [group] = decodeWith(
+      [{ ...withoutCounts[0], elementCount: 31 }]).groups;
+
+    expect(group!.elementCount).toBe(31);
+  });
+});
