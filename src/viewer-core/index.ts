@@ -31,6 +31,7 @@ export * from './outline.service';
 export * from './drawing-search.service';
 export * from './pdf-engine.service';
 export * from './model-geometry';
+export * from './model-visibility';
 
 export * from './icon.component';
 export * from './tool-catalog';

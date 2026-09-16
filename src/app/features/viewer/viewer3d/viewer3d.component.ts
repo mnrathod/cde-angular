@@ -17,6 +17,10 @@ import {
   ModelGeometryGroup,
   decodeGeometryContainer,
 } from "../../../../viewer-core/model-geometry";
+import {
+  elementTypesIn,
+  materialSlotsForTypes,
+} from "../../../../viewer-core/model-visibility";
 
 @Component({
   selector: "app-viewer3d",
@@ -127,7 +131,15 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
   errorMsg = signal("");
   wireframe = signal(false);
   stats = signal<{ label: string; value: string }[]>([]);
-  layers = signal<{ name: string; color: string; visible: boolean }[]>([]);
+
+  /**
+   * The group table of the model on screen, in material-slot order.
+   *
+   * Held because the visibility handler needs to map an element type back to
+   * the material drawing it, and the event that asks for it carries a tree
+   * node rather than anything about the geometry.
+   */
+  private modelGroups: readonly ModelGeometryGroup[] = [];
 
   /** The rendered viewport: renderer, scene, camera, controls and mesh. */
   private viewport: any = null;
@@ -144,19 +156,6 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
   ifcStats = signal<{ schema: string; elementCount: number } | undefined>(
     undefined,
   );
-
-  readonly IFC_COLORS: Record<string, [number, number, number]> = {
-    IfcWall: [0.85, 0.82, 0.78],
-    IfcWallStandardCase: [0.85, 0.82, 0.78],
-    IfcSlab: [0.75, 0.75, 0.75],
-    IfcRoof: [0.62, 0.45, 0.35],
-    IfcColumn: [0.8, 0.75, 0.7],
-    IfcBeam: [0.7, 0.65, 0.6],
-    IfcDoor: [0.65, 0.45, 0.25],
-    IfcWindow: [0.55, 0.75, 0.9],
-    IfcStair: [0.8, 0.78, 0.75],
-    IfcFurnishingElement: [0.6, 0.5, 0.4],
-  };
 
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get("id"));
@@ -302,6 +301,11 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
      * offsets are index offsets; three.js expects exactly that on indexed
      * geometry, and vertex offsets there would silently draw the wrong runs.
      */
+    // Kept in material-slot order: a group's position here is the
+    // materialIndex passed to addGroup below, and the visibility handler
+    // resolves a tree node to those same slots.
+    this.modelGroups = gd.groups;
+
     const materials = gd.groups.map((group: ModelGeometryGroup, index: number) => {
       geo.addGroup(group.start, group.count, index);
       return new T.MeshPhongMaterial({
@@ -350,14 +354,6 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
       { label: "Schema", value: gd.schema },
     ]);
 
-    this.layers.set(
-      Object.entries(this.IFC_COLORS).map(([name, rgb]) => ({
-        name: name.replace("Ifc", ""),
-        color: `rgb(${rgb.map((v: number) => Math.round(v * 255)).join(",")})`,
-        visible: true,
-      })),
-    );
-
     const animate = () => {
       this.animId = requestAnimationFrame(animate);
       controls.update();
@@ -379,9 +375,26 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
     console.log("Selected:", node.type, node.name);
   }
 
+  /**
+   * Show or hide everything a hierarchy node stands for.
+   *
+   * Hiding a group's material is what stops three.js drawing that run — the
+   * renderer skips any group whose material is not visible. Verified against
+   * a real WebGL context before this was relied on: two groups drawn side by
+   * side, one material hidden, and only that half of the canvas cleared.
+   *
+   * A node whose types have no geometry toggles nothing, which is the correct
+   * outcome rather than a failure — a synthetic hierarchy names types this
+   * particular model need not contain.
+   */
   onVisibilityChanged(event: { node: IfcNode; visible: boolean }) {
-    // Toggle element type visibility in Three.js mesh
-    console.log("Visibility changed:", event.node.type, event.visible);
+    const materials = this.viewport?.mesh?.material;
+    if (!Array.isArray(materials)) return;
+
+    const slots = materialSlotsForTypes(this.modelGroups, elementTypesIn(event.node));
+    for (const slot of slots) {
+      materials[slot].visible = event.visible;
+    }
   }
 
   resetCamera() {
@@ -400,10 +413,6 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
   snapView(view: string) {
     /* set camera position */
   }
-  toggleLayer(layer: any) {
-    layer.visible = !layer.visible;
-  }
-
   goBack() {
     this.router.navigate(["/"]);
   }

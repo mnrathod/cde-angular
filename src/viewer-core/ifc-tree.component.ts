@@ -107,11 +107,16 @@ const IFC_ICONS: Record<string, string> = {
               {{ node.expanded ? '▾' : '▸' }}
             </button>
 
-            <!-- Visibility toggle -->
-            <button (click)="toggleVisibility(node); $event.stopPropagation()"
-              class="w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity"
-              [title]="node.visible ? 'Hide' : 'Show'">
-              {{ node.visible ? '👁' : '🔲' }}
+            <!-- Visibility toggle. See toggleVisibility() for why it is
+                 shaped this way. -->
+            <button type="button"
+              (click)="toggleVisibility(node); $event.stopPropagation()"
+              class="w-6 h-6 flex items-center justify-center flex-shrink-0 transition-opacity
+                     opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+              [class.opacity-100]="!node.visible"
+              [attr.aria-pressed]="!node.visible"
+              [attr.aria-label]="'Hide ' + (node.name || node.type)">
+              <span aria-hidden="true">{{ node.visible ? '👁' : '🔲' }}</span>
             </button>
 
             <!-- Icon + Name -->
@@ -231,6 +236,32 @@ export class IfcTreeComponent implements OnChanges {
     this.treeNodes.update(n => [...n]);  // trigger change detection
   }
 
+  /**
+   * Show or hide one node and everything under it.
+   *
+   * <p>The control this drives is transparent until its row is hovered, which
+   * is tolerable for an action you are reaching for and not for state you
+   * need to find again — so `focus-visible:opacity-100` keeps it visible
+   * under keyboard focus (SC 2.4.7, 2.4.11), and a hidden node pins it
+   * visible regardless, because an unmarked hidden branch cannot be found by
+   * mouse or keyboard.
+   *
+   * <p>Its accessible name is text rather than the emoji: a screen reader
+   * announcing "eye" says nothing about what pressing it does or what it acts
+   * on. `aria-pressed` carries the on/off state, and the emoji and the
+   * strikethrough are the visual half of the same information — §1A.2 forbids
+   * colour as the only cue.
+   *
+   * <p>The box is 24×24 rather than the 16×16 it was, which is SC 2.5.8's
+   * floor. Measured in a browser rather than reasoned about: the emoji inside
+   * it is still 16px, so the control looked the right size while the target
+   * was not. The expand toggle beside it is still 16×16 and has the same
+   * defect — untouched here because it is a different control.
+   *
+   * <p>The event is emitted once, for the node that was clicked, while the
+   * descendants are marked here. A listener wanting the full set expands it
+   * itself — `elementTypesIn` in `model-visibility` is what does that.
+   */
   toggleVisibility(node: IfcNode) {
     node.visible = !node.visible;
     this.propagateVisibility(node, node.visible);
