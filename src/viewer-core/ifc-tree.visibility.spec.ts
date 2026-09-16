@@ -176,6 +176,62 @@ describe('the expand toggle', () => {
     expect(toggle.getAttribute('type')).toBe('button');
   });
 
+  it('is named for what it discloses, not by its glyph', () => {
+    // ▸ announces as nothing useful. The name says "Contents of …" rather
+    // than the node's own name, which would be indistinguishable from the
+    // row text sitting beside it.
+    const toggle = expandToggle(renderTree([branch()]).nativeElement);
+
+    expect(toggle.getAttribute('aria-label')).toBe('Contents of Level 00');
+  });
+
+  it('hides its glyph from assistive technology', () => {
+    const toggle = expandToggle(renderTree([branch()]).nativeElement);
+
+    expect(toggle.querySelector('[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('reports whether the children are showing', () => {
+    const fixture = renderTree([branch()]);
+    const toggle = expandToggle(fixture.nativeElement);
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+    toggle.click();
+    fixture.detectChanges();
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('keeps its name fixed as it expands and collapses', () => {
+    // aria-expanded carries the state. A name that flipped to "Collapse"
+    // would rename the control underneath anyone who had learned it, and
+    // would repeat what aria-expanded already says.
+    const fixture = renderTree([branch()]);
+    const toggle = expandToggle(fixture.nativeElement);
+    const before = toggle.getAttribute('aria-label');
+
+    toggle.click();
+    fixture.detectChanges();
+
+    expect(toggle.getAttribute('aria-label')).toBe(before);
+  });
+
+  it('claims no disclosure state on a node with nothing to disclose', () => {
+    // §1A.2: bad ARIA is worse than none. A leaf's button is `invisible`,
+    // so it is out of the accessibility tree anyway — announcing it as a
+    // collapsed disclosure would be a promise of children that do not exist.
+    const leaf: IfcNode = {
+      id: 'walls', name: 'Walls', type: 'IfcWall',
+      expanded: false, selected: false, visible: true, children: [],
+    };
+
+    const toggle = expandToggle(renderTree([leaf]).nativeElement);
+
+    expect(toggle.getAttribute('aria-expanded')).toBeNull();
+    expect(toggle.getAttribute('aria-label')).toBeNull();
+  });
+
   it('still expands the node it belongs to', () => {
     // Growing the target must not break what it was already doing.
     const nodes = [branch()];

@@ -100,13 +100,16 @@ const IFC_ICONS: Record<string, string> = {
             (click)="selectNode(node)"
             (dblclick)="toggleNode(node)">
 
-            <!-- Expand toggle. 24px for the same reason as its neighbour:
-                 the glyph is smaller than the target has to be. -->
+            <!-- Expand toggle. See toggleNode() for why it is shaped this way. -->
             <button type="button"
               (click)="toggleNode(node); $event.stopPropagation()"
               class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 flex-shrink-0"
-              [class.invisible]="!node.children?.length">
-              {{ node.expanded ? '▾' : '▸' }}
+              [class.invisible]="!node.children?.length"
+              [attr.aria-expanded]="node.children?.length ? node.expanded : null"
+              [attr.aria-label]="node.children?.length
+                                   ? 'Contents of ' + (node.name || node.type)
+                                   : null">
+              <span aria-hidden="true">{{ node.expanded ? '▾' : '▸' }}</span>
             </button>
 
             <!-- Visibility toggle. See toggleVisibility() for why it is
@@ -233,6 +236,28 @@ export class IfcTreeComponent implements OnChanges {
     this.elementSelected.emit(node);
   }
 
+  /**
+   * Show or hide one node's children.
+   *
+   * <p>The control is a disclosure button, so `aria-expanded` carries the
+   * state and the accessible name stays put. A name that flipped between
+   * "Expand" and "Collapse" would rename the control underneath anyone who
+   * had learned it, and would say the same thing `aria-expanded` already
+   * says. The name is "Contents of …" rather than the node's own name, which
+   * would be indistinguishable from the row's text beside it.
+   *
+   * <p>Both attributes are dropped entirely on a node with no children: that
+   * button is `invisible`, which takes it out of the accessibility tree and
+   * out of the tab order, and a disclosure state for a disclosure that does
+   * not exist is worse than none (§1A.2 — bad ARIA is worse than no ARIA).
+   *
+   * <p>The ▸ glyph is `aria-hidden`; it is the visual half of what
+   * `aria-expanded` states, not a second name.
+   *
+   * <p>This is not the full `role="tree"` pattern — that puts `aria-expanded`
+   * on the row and brings roving tabindex and arrow-key navigation with it.
+   * Worth doing, considerably larger than making this button announce itself.
+   */
   toggleNode(node: IfcNode) {
     node.expanded = !node.expanded;
     this.treeNodes.update(n => [...n]);  // trigger change detection
