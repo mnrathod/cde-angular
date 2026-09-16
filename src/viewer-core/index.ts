@@ -32,6 +32,8 @@ export * from './drawing-search.service';
 export * from './pdf-engine.service';
 export * from './model-geometry';
 export * from './model-visibility';
+export * from './tree-navigation';
+export * from './ifc-icons';
 
 export * from './icon.component';
 export * from './tool-catalog';
@@ -40,4 +42,5 @@ export * from './cad-viewer.component';
 export * from './outline-panel.component';
 export * from './page-links.component';
 export * from './ifc-tree.component';
+export * from './ifc-properties.component';
 export * from './tool-rail.component';

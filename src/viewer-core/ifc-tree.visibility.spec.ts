@@ -141,15 +141,22 @@ describe('the visibility toggle', () => {
   });
 });
 
-describe('the expand toggle', () => {
 
-  /** The row's other button: the one that is not the visibility toggle. */
-  function expandToggle(element: HTMLElement): HTMLButtonElement {
-    const button = [...element.querySelectorAll('button')]
-      .find((candidate) => !(candidate.getAttribute('aria-label') ?? '').startsWith('Hide '));
-    expect(button, 'no expand toggle rendered').toBeDefined();
-    return button!;
-  }
+/**
+ * The row as a tree item.
+ *
+ * <p>An earlier pass put `aria-expanded` and an accessible name on the little
+ * ▸ button, which announced correctly but was not the tree pattern — it made
+ * every row two tab stops and gave a reader no way to move between rows except
+ * Tab. This is the WAI-ARIA tree view instead, which is what a screen-reader
+ * user already knows from every file explorer (§1.3: do not invent
+ * interactions for solved problems), and the reason it matters here is §1A.4:
+ * this panel is the equivalent accessible route to a WebGL canvas, and since
+ * the fabricated fallback was deleted it is the only one.
+ *
+ * <p>So the state moved onto the row, and the ▸ became decorative.
+ */
+describe('a row, as a tree item', () => {
 
   function branch(): IfcNode {
     return {
@@ -160,85 +167,291 @@ describe('the expand toggle', () => {
     };
   }
 
-  it('is at least 24 CSS px square', () => {
-    // Same defect and same cause as its neighbour: it was sized to the ▸
-    // glyph rather than to SC 2.5.8's 24×24 floor, so it looked correct
-    // while being too small to hit.
-    const toggle = expandToggle(renderTree([branch()]).nativeElement);
+  function rows(element: HTMLElement): HTMLElement[] {
+    return [...element.querySelectorAll<HTMLElement>('[role="treeitem"]')];
+  }
 
-    expect(toggle.classList.contains('w-6')).toBe(true);
-    expect(toggle.classList.contains('h-6')).toBe(true);
-  });
-
-  it('is typed as a button, so it does not submit anything', () => {
-    const toggle = expandToggle(renderTree([branch()]).nativeElement);
-
-    expect(toggle.getAttribute('type')).toBe('button');
-  });
-
-  it('is named for what it discloses, not by its glyph', () => {
-    // ▸ announces as nothing useful. The name says "Contents of …" rather
-    // than the node's own name, which would be indistinguishable from the
-    // row text sitting beside it.
-    const toggle = expandToggle(renderTree([branch()]).nativeElement);
-
-    expect(toggle.getAttribute('aria-label')).toBe('Contents of Level 00');
-  });
-
-  it('hides its glyph from assistive technology', () => {
-    const toggle = expandToggle(renderTree([branch()]).nativeElement);
-
-    expect(toggle.querySelector('[aria-hidden="true"]')).not.toBeNull();
-  });
-
-  it('reports whether the children are showing', () => {
+  it('sits inside something that declares itself a tree', () => {
     const fixture = renderTree([branch()]);
-    const toggle = expandToggle(fixture.nativeElement);
 
-    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    const tree = fixture.nativeElement.querySelector('[role="tree"]');
 
-    toggle.click();
+    expect(tree).not.toBeNull();
+    expect(tree.getAttribute('aria-labelledby')).toBe('model-tree-heading');
+  });
+
+  it('is a tree item', () => {
+    const fixture = renderTree([branch()]);
+
+    expect(rows(fixture.nativeElement)).toHaveLength(1);
+  });
+
+  it('reports whether its children are showing', () => {
+    const fixture = renderTree([branch()]);
+    const [row] = rows(fixture.nativeElement);
+
+    expect(row!.getAttribute('aria-expanded')).toBe('false');
+
+    // ArrowDown enters the tree; ArrowRight then opens the focused branch.
+    row!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    row!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     fixture.detectChanges();
 
-    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(rows(fixture.nativeElement)[0]!.getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('keeps its name fixed as it expands and collapses', () => {
-    // aria-expanded carries the state. A name that flipped to "Collapse"
-    // would rename the control underneath anyone who had learned it, and
-    // would repeat what aria-expanded already says.
-    const fixture = renderTree([branch()]);
-    const toggle = expandToggle(fixture.nativeElement);
-    const before = toggle.getAttribute('aria-label');
+  it('claims no disclosure state when it has nothing to disclose', () => {
+    // §1A.2 — a collapsed disclosure that discloses nothing promises children
+    // that do not exist.
+    const fixture = renderTree([storey()]);
 
-    toggle.click();
+    expect(rows(fixture.nativeElement)[0]!.getAttribute('aria-expanded')).toBeNull();
+  });
+
+  it('announces itself as the element, not as "hide" then the element', () => {
+    // Found in Chromium, not here: with the name left to be computed from the
+    // row's contents, the visibility button's label folded into it and every
+    // row read "Hide Level 00 Level 00". Nothing in the markup shows that —
+    // only asking the browser what it computed does.
+    const fixture = renderTree([branch()]);
+
+    expect(rows(fixture.nativeElement)[0]!.getAttribute('aria-label')).toBe('Level 00');
+  });
+
+  it('spells the quantity out rather than leaving it as a symbol', () => {
+    // "×42" is announced as a multiplication sign, which is not what it means.
+    const counted: IfcNode = { ...storey(), count: 42 };
+
+    const fixture = renderTree([counted]);
+
+    expect(rows(fixture.nativeElement)[0]!.getAttribute('aria-label'))
+      .toBe('Walls, 42 elements');
+  });
+
+  it('says how deep it is and where it sits among its siblings', () => {
+    const fixture = renderTree([{ ...branch(), expanded: true }]);
+    const [parent, child] = rows(fixture.nativeElement);
+
+    expect(parent!.getAttribute('aria-level')).toBe('1');
+    expect(parent!.getAttribute('aria-posinset')).toBe('1');
+    expect(parent!.getAttribute('aria-setsize')).toBe('1');
+    expect(child!.getAttribute('aria-level')).toBe('2');
+  });
+
+  it('numbers siblings from one, not from zero', () => {
+    const fixture = renderTree([storey(), { ...storey(), id: 'slabs', name: 'Slabs' }]);
+    const positions = rows(fixture.nativeElement)
+      .map((row) => row.getAttribute('aria-posinset'));
+
+    expect(positions).toEqual(['1', '2']);
+  });
+
+  it('reports whether it is the selected element', () => {
+    const fixture = renderTree([storey()]);
+    const [row] = rows(fixture.nativeElement);
+
+    expect(row!.getAttribute('aria-selected')).toBe('false');
+
+    row!.click();
     fixture.detectChanges();
 
-    expect(toggle.getAttribute('aria-label')).toBe(before);
+    expect(rows(fixture.nativeElement)[0]!.getAttribute('aria-selected')).toBe('true');
   });
 
-  it('claims no disclosure state on a node with nothing to disclose', () => {
-    // §1A.2: bad ARIA is worse than none. A leaf's button is `invisible`,
-    // so it is out of the accessibility tree anyway — announcing it as a
-    // collapsed disclosure would be a promise of children that do not exist.
-    const leaf: IfcNode = {
-      id: 'walls', name: 'Walls', type: 'IfcWall',
-      expanded: false, selected: false, visible: true, children: [],
-    };
+  it('hides collapsed children from the tree entirely', () => {
+    // Not merely visually: a row a reader cannot see must not be a row they
+    // can arrow onto.
+    const fixture = renderTree([branch()]);
 
-    const toggle = expandToggle(renderTree([leaf]).nativeElement);
-
-    expect(toggle.getAttribute('aria-expanded')).toBeNull();
-    expect(toggle.getAttribute('aria-label')).toBeNull();
+    expect(rows(fixture.nativeElement)).toHaveLength(1);
   });
 
-  it('still expands the node it belongs to', () => {
-    // Growing the target must not break what it was already doing.
+  it('shows its glyph to the eye only, not as a control', () => {
+    // The ▸ used to be a button carrying aria-expanded. The row carries it
+    // now, so a second announcement of the same state would be noise.
+    const fixture = renderTree([branch()]);
+    const glyph = rows(fixture.nativeElement)[0]!
+      .querySelector('[aria-hidden="true"]');
+
+    expect(glyph).not.toBeNull();
+    expect(glyph!.tagName).not.toBe('BUTTON');
+  });
+
+  it('still expands when the glyph is clicked', () => {
+    // The mouse path the old button served has to survive it becoming a span.
     const nodes = [branch()];
     const fixture = renderTree(nodes);
+    const glyph = rows(fixture.nativeElement)[0]!
+      .querySelector<HTMLElement>('[aria-hidden="true"]');
 
-    expandToggle(fixture.nativeElement).click();
+    glyph!.click();
 
     expect(nodes[0]!.expanded).toBe(true);
+  });
+});
+
+/**
+ * The tree's single tab stop, and the arrows that move within it.
+ *
+ * <p>A tree is one stop in the page's tab order, not one per row. A model with
+ * four hundred elements would otherwise put four hundred stops between a
+ * reader and whatever follows the panel, which is the failure the roving
+ * tabindex exists to prevent.
+ */
+describe('moving around the tree', () => {
+
+  function threeStoreys(): IfcNode[] {
+    return [
+      { id: 'a', name: 'Level 00', type: 'IfcBuildingStorey',
+        expanded: false, selected: false, visible: true,
+        children: [{ id: 'a-walls', name: 'Walls', type: 'IfcWall',
+                     expanded: false, selected: false, visible: true, children: [] }] },
+      { id: 'b', name: 'Level 01', type: 'IfcBuildingStorey',
+        expanded: false, selected: false, visible: true, children: [] },
+      { id: 'c', name: 'Roof', type: 'IfcRoof',
+        expanded: false, selected: false, visible: true, children: [] },
+    ];
+  }
+
+  function rows(element: HTMLElement): HTMLElement[] {
+    return [...element.querySelectorAll<HTMLElement>('[role="treeitem"]')];
+  }
+
+  function press(fixture: ReturnType<typeof renderTree>, key: string) {
+    fixture.nativeElement.querySelector('[role="tree"]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    fixture.detectChanges();
+  }
+
+  /** The ids of rows that are in the page's tab order. */
+  function tabbable(element: HTMLElement): string[] {
+    return rows(element)
+      .filter((row) => row.getAttribute('tabindex') === '0')
+      .map((row) => row.getAttribute('data-node-id') ?? '');
+  }
+
+  it('offers a row to Tab before anyone has arrived', () => {
+    // The bug this exists for, found by counting tab stops in Chromium and
+    // invisible to a test that presses keys straight at the container. With
+    // the tab stop driven only by what is focused, a freshly rendered tree has
+    // every row at tabindex -1: Tab skips the panel entirely, no row can take
+    // focus, and nothing can set the focus that would make one tabbable. The
+    // tree announces perfectly and cannot be entered at all.
+    const fixture = renderTree(threeStoreys());
+
+    expect(tabbable(fixture.nativeElement)).toEqual(['a']);
+  });
+
+  it('offers exactly one row to Tab, wherever the reader is', () => {
+    const fixture = renderTree(threeStoreys());
+
+    press(fixture, 'ArrowDown');
+    press(fixture, 'ArrowDown');
+
+    expect(tabbable(fixture.nativeElement)).toHaveLength(1);
+  });
+
+  it('puts the tab stop on the selected row, so Tab returns a reader to it', () => {
+    const fixture = renderTree(threeStoreys());
+    const rowsNow = rows(fixture.nativeElement);
+
+    rowsNow[2]!.click();
+    fixture.detectChanges();
+
+    expect(tabbable(fixture.nativeElement)).toEqual(['c']);
+  });
+
+  it('enters at the first row', () => {
+    const fixture = renderTree(threeStoreys());
+
+    press(fixture, 'ArrowDown');
+
+    expect(tabbable(fixture.nativeElement)).toEqual(['a']);
+  });
+
+  it('walks down and back up', () => {
+    const fixture = renderTree(threeStoreys());
+
+    press(fixture, 'ArrowDown');
+    press(fixture, 'ArrowDown');
+    expect(tabbable(fixture.nativeElement)).toEqual(['b']);
+
+    press(fixture, 'ArrowUp');
+    expect(tabbable(fixture.nativeElement)).toEqual(['a']);
+  });
+
+  it('stays put at the bottom rather than wrapping', () => {
+    const fixture = renderTree(threeStoreys());
+    press(fixture, 'End');
+
+    press(fixture, 'ArrowDown');
+
+    expect(tabbable(fixture.nativeElement)).toEqual(['c']);
+  });
+
+  it('jumps to the first and last rows', () => {
+    const fixture = renderTree(threeStoreys());
+
+    press(fixture, 'End');
+    expect(tabbable(fixture.nativeElement)).toEqual(['c']);
+
+    press(fixture, 'Home');
+    expect(tabbable(fixture.nativeElement)).toEqual(['a']);
+  });
+
+  it('opens a closed branch with Right, then steps into it', () => {
+    const fixture = renderTree(threeStoreys());
+    press(fixture, 'ArrowDown');
+
+    press(fixture, 'ArrowRight');
+    expect(rows(fixture.nativeElement)).toHaveLength(4);
+
+    press(fixture, 'ArrowRight');
+    expect(tabbable(fixture.nativeElement)).toEqual(['a-walls']);
+  });
+
+  it('closes an open branch with Left, then steps out of it', () => {
+    const fixture = renderTree(threeStoreys());
+    press(fixture, 'ArrowDown');
+    press(fixture, 'ArrowRight');   // open
+    press(fixture, 'ArrowRight');   // into the child
+
+    press(fixture, 'ArrowLeft');    // a leaf: out to the parent
+    expect(tabbable(fixture.nativeElement)).toEqual(['a']);
+
+    press(fixture, 'ArrowLeft');    // an open branch: closed
+    expect(rows(fixture.nativeElement)).toHaveLength(3);
+  });
+
+  it('selects the focused row with Enter', () => {
+    const nodes = threeStoreys();
+    const fixture = renderTree(nodes);
+    const chosen: string[] = [];
+    fixture.componentInstance.elementSelected.subscribe((node: IfcNode) => chosen.push(node.id));
+
+    press(fixture, 'ArrowDown');
+    press(fixture, 'Enter');
+
+    expect(chosen).toEqual(['a']);
+  });
+
+  it('leaves Tab alone, so the panel is not a keyboard trap', () => {
+    // §1A.2. This panel sits beside a canvas some readers cannot use at all;
+    // one they could not leave would be the worse failure by far.
+    const fixture = renderTree(threeStoreys());
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+
+    fixture.nativeElement.querySelector('[role="tree"]')!.dispatchEvent(tab);
+
+    expect(tab.defaultPrevented).toBe(false);
+  });
+
+  it('leaves typing alone, so search still receives it', () => {
+    const fixture = renderTree(threeStoreys());
+    const typed = new KeyboardEvent('keydown', { key: 'w', bubbles: true, cancelable: true });
+
+    fixture.nativeElement.querySelector('[role="tree"]')!.dispatchEvent(typed);
+
+    expect(typed.defaultPrevented).toBe(false);
   });
 });
