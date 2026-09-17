@@ -40,7 +40,9 @@
                 "glob": "**/*",
                 "input": "node_modules/pdfjs-dist/wasm",
                 "output": "assets/pdfjs/wasm",
-                "ignore": ["quickjs-eval.*"]
+                "ignore": [
+                  "quickjs-eval.*"
+                ]
               },
               {
                 "glob": "**/*",
@@ -113,7 +115,27 @@
           "options": {
             "setupFiles": [
               "src/test-setup.ts"
-            ]
+            ],
+            "coverage": true,
+            "coverageInclude": [
+              "src/**/*.ts"
+            ],
+            "coverageExclude": [
+              "src/**/*.spec.ts",
+              "src/main.ts",
+              "src/test-setup.ts",
+              "src/environments/**"
+            ],
+            "coverageReporters": [
+              "text-summary",
+              "lcov"
+            ],
+            "coverageThresholds": {
+              "statements": 44,
+              "branches": 43,
+              "functions": 38,
+              "lines": 43
+            }
           }
         }
       }

@@ -27,6 +27,25 @@
  * text it already has.
  */
 
+/** Where the package lives, as the glob below spells it. */
+const PACKAGE_ROOT = '/src/viewer-core/';
+
+/**
+ * This file, excluded from its own rules.
+ *
+ * <p>It has to contain every string it forbids — that is what a list of
+ * forbidden strings is — so including it makes the rules fail on their own
+ * statement of themselves. That went unnoticed because Vite included this
+ * file in the glob under coverage instrumentation and left it out without,
+ * so the suite passed or failed depending on a flag. Excluded explicitly now,
+ * which is deterministic either way.
+ *
+ * <p>Named exactly rather than skipping every spec: a spec is still part of
+ * the package, and one that fetched something would still be worth knowing
+ * about.
+ */
+const THIS_FILE = PACKAGE_ROOT + 'viewer-core.boundary.spec.ts';
+
 /**
  * Every TypeScript file in this directory, as raw source, keyed by path.
  *
@@ -35,15 +54,28 @@
  * to a variable first, or casting it inline, leaves the call intact at
  * runtime and it fails with "statically replaced during file transformation".
  *
+ * <p>Rooted at the project rather than written `./*.ts`. The relative form
+ * resolved against this file in an ordinary run and against the *project
+ * root* once coverage instrumentation was switched on — where it matched a
+ * single unrelated file, `playwright.config.ts`, and every rule below became
+ * a statement about the wrong directory. The count guard is the only reason
+ * that was not silent. An absolute pattern has no base to shift.
+ *
+ * <p>`?raw` returns the committed bytes in both modes; that was checked
+ * rather than assumed, because a rule read off transformed output would be
+ * asserting about something nobody wrote.
+ *
  * <p>Its type comes from the reference above rather than from the spec
  * tsconfig's `types` array, which is shared by every spec in the repository:
  * one test needing one type is a poor reason to widen what all of them see.
  */
-const SOURCES = import.meta.glob('./*.ts', {
-  query: '?raw',
-  import: 'default',
-  eager: true,
-}) as Record<string, string>;
+const SOURCES: Record<string, string> = Object.fromEntries(
+  Object.entries(import.meta.glob('/src/viewer-core/*.ts', {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+  }) as Record<string, string>).filter(([path]) => path !== THIS_FILE),
+);
 
 describe('viewer-core boundary', () => {
 
@@ -88,6 +120,16 @@ describe('viewer-core boundary', () => {
     // Without this, renaming the directory turns every assertion below into
     // a vacuous truth over an empty set.
     expect(Object.keys(SOURCES).length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('reads the files this package actually contains', () => {
+    // The count alone said "too few" when the glob re-based itself and
+    // matched the project root instead. That is the right answer to the wrong
+    // question: what had gone wrong was *where it was looking*, and naming a
+    // file it must contain says so directly.
+    expect(Object.keys(SOURCES)).toContain(PACKAGE_ROOT + 'ifc-tree.component.ts');
+    expect(Object.keys(SOURCES)).toContain(PACKAGE_ROOT + 'model-geometry.ts');
+    expect(Object.keys(SOURCES)).not.toContain(THIS_FILE);
   });
 
   it('imports nothing from the application', () => {
