@@ -86,15 +86,21 @@ export class CollaborationService implements OnDestroy {
   });
 
   connect(documentId: number) {
-    const token = this.auth.token();
-    if (!token || this.client) return;
+    if (!this.auth.isLoggedIn() || this.client) return;
 
     this.documentId = documentId;
     this.client = new Client({
       brokerURL: this.brokerUrl(),
-      // The handshake is a plain GET the browser cannot add headers to, so
-      // the token travels in the CONNECT frame instead.
-      connectHeaders: { Authorization: `Bearer ${token}` },
+      // No credential is sent from here, because there is none to send: the
+      // session is an HttpOnly cookie and script cannot read it (§4.6). The
+      // browser attaches that cookie to the handshake by itself — a handshake
+      // is an ordinary GET — and the server lifts it across to authenticate
+      // the STOMP session. A native client still sends a token on CONNECT;
+      // this is the browser's half of the same door.
+      //
+      // The server's endpoint no longer accepts any origin, which it could
+      // afford to while a bearer token was the only credential and cannot now
+      // that a cookie rides along uninvited. See WebSocketConfig.
       reconnectDelay: 4000,
       heartbeatIncoming: 10000,
       heartbeatOutgoing: 10000,
