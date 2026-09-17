@@ -42,6 +42,41 @@ describe('RegisterFormComponent', () => {
     return body;
   };
 
+  /** The last message the form asked the page to show. */
+  function reportedFailure(): string {
+    let reported = '';
+    component.failed.subscribe(message => (reported = message));
+    component.submit();
+    return reported;
+  }
+
+  it('says which fields are missing rather than failing silently', () => {
+    // Browser autofill can populate the visible inputs without ngModel
+    // noticing, so an apparently-filled form can submit empty. Saying
+    // nothing would look like the button was broken.
+    component.username = '';
+
+    expect(reportedFailure()).toContain('username, email and password');
+  });
+
+  it('keeps the user signed out while the form is incomplete', () => {
+    component.password = '';
+    component.submit();
+
+    expect(component.loading()).toBe(false);
+  });
+
+  it('clears any previous failure when a valid form is submitted', () => {
+    // Otherwise a stale error sits above a request that is in flight and may
+    // well succeed.
+    let reported = 'a previous problem';
+    component.failed.subscribe(message => (reported = message));
+    component.submit();
+    sentBody();
+
+    expect(reported).toBe('');
+  });
+
   it('founds a new organisation when no invitation is offered', () => {
     component.submit();
 

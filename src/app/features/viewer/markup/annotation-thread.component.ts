@@ -62,6 +62,7 @@ import { AuthService } from '../../../core/services/auth.service';
                         @if (canDelete(reply)) {
                           <button (click)="deleteReply(thread.annotation.id, reply)"
                             [disabled]="deletingReplyId() === reply.id"
+                            i18n-title="@@annotationThread.deleteReply"
                             title="Delete reply"
                             class="opacity-0 group-hover:opacity-100 text-xs text-gray-400
                                    hover:text-red-600 disabled:opacity-40">✕</button>
@@ -80,10 +81,12 @@ import { AuthService } from '../../../core/services/auth.service';
                 <input
                   [(ngModel)]="replyInputs[thread.annotation.id]"
                   (keydown.enter)="submitReply(thread.annotation)"
+                  i18n-placeholder="@@annotationThread.replyPlaceholder"
                   placeholder="Reply..."
                   class="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-accent" />
                 <button (click)="submitReply(thread.annotation)"
                   [disabled]="!replyInputs[thread.annotation.id]?.trim()"
+                  i18n="Posts a reply to an annotation thread@@annotationThread.send"
                   class="px-3 py-1.5 text-xs bg-accent text-white rounded disabled:opacity-40 hover:bg-blue-700">
                   Send
                 </button>
@@ -92,7 +95,10 @@ import { AuthService } from '../../../core/services/auth.service';
               @if (thread.annotation.status === 'OPEN') {
                 <button (click)="resolveThread(thread)"
                   class="mt-1.5 text-xs text-green-600 hover:text-green-700 hover:underline">
-                  ✓ Mark as Resolved
+                  <span aria-hidden="true">✓</span>
+                  <ng-container i18n="Closes an annotation thread as dealt with@@annotationThread.resolve"
+                    >Mark as Resolved</ng-container
+                  >
                 </button>
               }
             </div>
@@ -101,17 +107,20 @@ import { AuthService } from '../../../core/services/auth.service';
 
         @if (threads().length === 0) {
           <div class="text-center text-gray-400 text-xs py-12">
-            <div class="text-3xl mb-2">💬</div>
-            No annotation threads yet.
+            <div class="text-3xl mb-2" aria-hidden="true">💬</div>
+            <ng-container i18n="Empty state for the annotation comments panel@@annotationThread.empty"
+              >No annotation threads yet.</ng-container
+            >
           </div>
         }
       </div>
 
       <!-- New annotation comment -->
       <div class="border-t border-gray-200 p-3 flex-shrink-0 bg-white">
-        <div class="text-xs font-semibold text-gray-600 mb-2">Add Comment</div>
+        <div i18n="@@annotationThread.addCommentHeading" class="text-xs font-semibold text-gray-600 mb-2">Add Comment</div>
         <textarea
           [(ngModel)]="newComment"
+          i18n-placeholder="@@annotationThread.commentPlaceholder"
           placeholder="Add a comment to the selected annotation..."
           rows="2"
           class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded resize-none focus:outline-none focus:ring-1 focus:ring-accent mb-2">
@@ -119,12 +128,14 @@ import { AuthService } from '../../../core/services/auth.service';
         <div class="flex justify-end">
           <button (click)="postComment()"
             [disabled]="!newComment.trim() || !selectedAnnotationId()"
+            i18n="Posts a new comment on the selected annotation@@annotationThread.post"
             class="px-3 py-1.5 text-xs bg-accent text-white rounded disabled:opacity-40 hover:bg-blue-700">
             Post
           </button>
         </div>
         @if (!selectedAnnotationId()) {
-          <div class="text-xs text-gray-400 mt-1">Select an annotation to comment on it</div>
+          <div i18n="Explains why the Post button is unavailable@@annotationThread.selectFirst"
+               class="text-xs text-gray-400 mt-1">Select an annotation to comment on it</div>
         }
       </div>
     </div>
@@ -216,7 +227,9 @@ export class AnnotationThreadComponent implements OnInit, OnChanges {
         const tempReply: AnnotationReply = {
           id: Date.now(),
           annotationId: annotation.id,
-          authorName: this.auth.username() || 'Me',
+          authorName:
+            this.auth.username() ||
+            $localize`:Stands in for the signed-in user's name when it is not known@@annotationThread.selfAuthor:Me`,
           content,
           createdAt: new Date().toISOString()
         };

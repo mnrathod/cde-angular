@@ -39,15 +39,12 @@ const ROOTS = ['src/app', 'src/viewer-core'];
  * below will tell you if you forget.
  */
 const NOT_YET_TRANSLATED = new Set([
-  'src/app/features/auth/register-form.component.ts',
   'src/app/features/compare/compare.component.ts',
   'src/app/features/projects/shell.component.ts',
   'src/app/features/viewer/compare-viewer/visual-compare.component.ts',
-  'src/app/features/viewer/markup/annotation-thread.component.ts',
   'src/app/features/viewer/markup/document-signature.component.ts',
   'src/app/features/viewer/markup/page-organiser.component.ts',
   'src/app/features/viewer/markup/pdf-form.component.ts',
-  'src/app/features/viewer/markup/redaction-panel.component.ts',
   'src/app/features/viewer/sidebar/viewer-sidebar.component.ts',
   'src/app/features/viewer/toolbar/markup-toolbar.component.ts',
   'src/app/features/viewer/viewer-shell.component.ts',

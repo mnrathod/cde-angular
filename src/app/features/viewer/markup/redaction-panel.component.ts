@@ -24,14 +24,15 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex-1 overflow-y-auto p-3">
-      <div class="text-sm font-semibold text-gray-800 mb-1">Redaction</div>
-      <p class="text-xs text-gray-500 mb-3">
+      <div i18n="@@redaction.heading" class="text-sm font-semibold text-gray-800 mb-1">Redaction</div>
+      <p i18n="Warning above the redaction controls. Redaction is irreversible in the produced file.@@redaction.warning"
+         class="text-xs text-gray-500 mb-3">
         Permanently destroys the covered content and commits a new version.
         The previous version stays in the history. PDF documents only.
       </p>
 
       <!-- ── Find and redact ──────────────────────────────────── -->
-      <div class="text-xs font-semibold text-gray-500 mb-1.5">Find and redact</div>
+      <div i18n="@@redaction.findHeading" class="text-xs font-semibold text-gray-500 mb-1.5">Find and redact</div>
 
       <div class="flex flex-wrap gap-1 mb-2">
         @for (preset of presets; track preset.id) {
@@ -46,27 +47,29 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
       </div>
 
       <input type="text" [(ngModel)]="term" (ngModelChange)="onSearchChanged()"
+        i18n-placeholder="Follows the preset buttons, so it reads as an alternative to them@@redaction.termPlaceholder"
         placeholder="or type a word or phrase"
         class="w-full text-xs border border-gray-300 rounded px-2 py-1 mb-1.5" />
 
       <label class="flex items-center gap-1 text-xs text-gray-600 mb-0.5">
         <input type="checkbox" [(ngModel)]="matchCase" (ngModelChange)="onSearchChanged()" />
-        Match case
+        <ng-container i18n="@@redaction.matchCase">Match case</ng-container>
       </label>
       <label class="flex items-center gap-1 text-xs text-gray-600 mb-2">
         <input type="checkbox" [(ngModel)]="wholeWord" (ngModelChange)="onSearchChanged()" />
-        Whole word only
+        <ng-container i18n="@@redaction.wholeWord">Whole word only</ng-container>
       </label>
 
       <div class="flex gap-1.5 mb-2">
         <button (click)="preview()" [disabled]="!hasSearch() || busy()"
           class="flex-1 text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-30">
-          {{ searching() ? 'Searching...' : 'Preview matches' }}
+          {{ searching() ? searchingLabel : previewLabel }}
         </button>
         <button (click)="redactMatches()" [disabled]="!canRedactMatches() || busy()"
+          i18n-title="@@redaction.redactAllHint"
           title="Permanently destroy every match"
           class="flex-1 text-xs px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-30">
-          {{ redacting() ? 'Redacting...' : 'Redact all' }}
+          {{ redacting() ? redactingLabel : redactAllLabel }}
         </button>
       </div>
 
@@ -77,8 +80,9 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
       }
 
       @if (matches().length) {
-        <div class="text-xs font-semibold text-gray-500 mb-1">
-          {{ matches().length }} match(es) — these will be destroyed
+        <div i18n="How many occurrences the search found, above the list of them@@redaction.matchCount"
+             class="text-xs font-semibold text-gray-500 mb-1">
+          {matches().length, plural, =1 {1 match — this will be destroyed} other {{{ matches().length }} matches — these will be destroyed}}
         </div>
         <ul class="mb-3 max-h-40 overflow-y-auto border border-gray-100 rounded">
           @for (match of matches(); track $index) {
@@ -92,25 +96,29 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
       }
 
       <!-- ── Drawn regions ────────────────────────────────────── -->
-      <div class="text-xs font-semibold text-gray-500 mb-1.5 pt-2 border-t border-gray-100">
+      <div i18n="Heading for redaction areas drawn by hand, as opposed to found by search@@redaction.drawnHeading"
+           class="text-xs font-semibold text-gray-500 mb-1.5 pt-2 border-t border-gray-100">
         Drawn regions
       </div>
-      <p class="text-xs text-gray-500 mb-2">
+      <p i18n="How to draw a redaction area. The two emphasised names must match the toolbar labels.@@redaction.drawnInstructions"
+         class="text-xs text-gray-500 mb-2">
         Pick the <span class="font-medium">Redact</span> tool and draw over content, then
         <span class="font-medium">Apply Redaction</span> in the toolbar.
       </p>
 
       @if (state.redactionRegions().length === 0) {
-        <div class="text-center text-gray-400 text-xs py-4">No regions drawn yet.</div>
+        <div i18n="@@redaction.noRegions" class="text-center text-gray-400 text-xs py-4">No regions drawn yet.</div>
       } @else {
         @for (region of state.redactionRegions(); track region.id) {
           <div class="flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 group mb-1 border border-gray-100">
             <div class="w-3 h-3 rounded-sm bg-black flex-shrink-0"></div>
-            <span class="text-xs text-gray-600 flex-1">
+            <span i18n="One drawn redaction area — which page it is on and how big it is in points@@redaction.regionSummary"
+                  class="text-xs text-gray-600 flex-1">
               Page {{ region.page }} · {{ region.width.toFixed(0) }}×{{ region.height.toFixed(0) }}pt
             </span>
             <button (click)="state.removeRedactionRegion(region.id)"
-              class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs ml-1"
+              class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs ms-1"
+              i18n-title="@@redaction.removeRegion"
               title="Remove this region">✕</button>
           </div>
         }
@@ -133,6 +141,15 @@ export class RedactionPanelComponent {
   readonly searching = signal(false);
   readonly redacting = signal(false);
   readonly message   = signal('');
+
+  /**
+   * Button labels, which sit in expressions and so cannot be marked with
+   * `i18n` — see the note in login.component.ts.
+   */
+  readonly previewLabel = $localize`:Finds matches without changing anything@@redaction.previewAction:Preview matches`;
+  readonly searchingLabel = $localize`:Preview button while the search is running@@redaction.searchingAction:Searching...`;
+  readonly redactAllLabel = $localize`:Destroys every match found@@redaction.redactAllAction:Redact all`;
+  readonly redactingLabel = $localize`:Redact-all button while the request is in flight@@redaction.redactingAction:Redacting...`;
   readonly messageIsError = signal(false);
 
   readonly busy = computed(() => this.searching() || this.redacting());
@@ -172,31 +189,37 @@ export class RedactionPanelComponent {
       next: result => {
         this.searching.set(false);
         if (!result.success) {
-          this.report(result.error ?? 'The document could not be searched.', true);
+          this.report(result.error ?? this.searchFailedText(), true);
           return;
         }
         this.matches.set(result.matches ?? []);
         if (!result.matchCount) {
           this.report(result.pagesWithoutText
-            ? 'No matches. Some pages have no text layer — run OCR to make them searchable.'
-            : 'No matches found.', false);
+            ? $localize`:Shown when a search finds nothing and the document has unsearchable scanned pages@@redaction.noMatchesNeedsOcr:No matches. Some pages have no text layer — run OCR to make them searchable.`
+            : $localize`:Shown when a search finds nothing@@redaction.noMatches:No matches found.`, false);
         }
       },
       error: err => {
         this.searching.set(false);
-        this.report(this.errorText(err, 'The document could not be searched.'), true);
+        this.report(this.errorText(err, this.searchFailedText()), true);
       }
     });
+  }
+
+  /** Used from two call sites, which is why it is a method rather than a field. */
+  private searchFailedText(): string {
+    return $localize`:Shown when the document cannot be searched at all@@redaction.searchFailed:The document could not be searched.`;
   }
 
   redactMatches() {
     const count = this.matches().length;
     if (!count) return;
-    if (!confirm(
-      `Permanently destroy ${count} match(es)?\n\n` +
-      'The content cannot be recovered from the resulting file. ' +
-      'The current version stays in the history.'
-    )) return;
+    // Typed confirmation is §1.3's rule for destructive tenant-level
+    // operations; this is destructive but scoped to one document, so a
+    // confirm is the right weight. Undo is not available — that is the point.
+    const question = $localize`:Confirmation before irreversibly destroying content. Shown with a count of matches.@@redaction.confirmQuestion:Permanently destroy ${count}:count: match(es)?`;
+    const consequence = $localize`:Second paragraph of the redaction confirmation@@redaction.confirmConsequence:The content cannot be recovered from the resulting file. The current version stays in the history.`;
+    if (!confirm(`${question}\n\n${consequence}`)) return;
 
     this.redacting.set(true);
     this.redaction.redactMatching(this.state.documentId(), this.search()).subscribe({
@@ -208,7 +231,13 @@ export class RedactionPanelComponent {
       },
       error: err => {
         this.redacting.set(false);
-        this.report(this.errorText(err, 'Redaction failed.'), true);
+        this.report(
+          this.errorText(
+            err,
+            $localize`:Fallback when redaction fails without a reason@@redaction.failed:Redaction failed.`,
+          ),
+          true,
+        );
       }
     });
   }
@@ -228,7 +257,9 @@ export class RedactionPanelComponent {
   }
 
   private errorText(err: { status?: number; error?: { message?: string } }, fallback: string): string {
-    if (err.status === 503) return 'The document conversion service is not running.';
+    if (err.status === 503) {
+      return $localize`:Shown when the backend conversion service is unreachable@@redaction.converterDown:The document conversion service is not running.`;
+    }
     return problemMessage(err, fallback);
   }
 }

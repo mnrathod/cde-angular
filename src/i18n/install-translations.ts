@@ -1,5 +1,3 @@
-import { loadTranslations } from '@angular/localize';
-
 import {
   negotiateLocale,
   type AvailableLocale,
@@ -46,6 +44,18 @@ interface LocaleManifest {
 }
 
 /**
+ * Installs a message catalogue into `$localize`.
+ *
+ * <p>Named rather than imported directly so that it arrives as an argument
+ * like everything else here, which lets a test observe the call without
+ * mocking a module — and, more importantly, keeps this function from reaching
+ * into global state it has not declared.
+ */
+export type TranslationInstaller = (
+  translations: Record<string, string>,
+) => void;
+
+/**
  * The document properties that must agree with the chosen locale.
  *
  * <p>Narrowed to the two attributes this actually sets so that a test can
@@ -70,12 +80,17 @@ export interface LocalisableDocument {
  * turn a translation problem into a blank screen, and the source text is
  * exactly what a user would see if nobody had translated their language yet.
  *
+ * @param fetchResource how to retrieve the manifest and catalogue
+ * @param target the document whose `lang` and `dir` must match
+ * @param preferredLanguages ordered preferences, most-wanted first
+ * @param loadTranslations what to hand the catalogue to, once read
  * @returns the locale that was actually installed
  */
 export async function installTranslations(
   fetchResource: typeof fetch,
   target: LocalisableDocument,
   preferredLanguages: readonly string[],
+  loadTranslations: TranslationInstaller,
 ): Promise<NegotiatedLocale> {
   const available = await readManifest(fetchResource);
   const chosen = negotiateLocale(preferredLanguages, available, SOURCE_LOCALE);

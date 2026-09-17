@@ -19,14 +19,24 @@ export type RedactionPreset =
   | 'email' | 'phone' | 'creditCard' | 'ssn' | 'niNumber' | 'postcode' | 'iban';
 
 /** Labels for the preset buttons, in the order they are offered. */
+/**
+ * The kinds of personal data the redaction panel offers to find.
+ *
+ * <p>`$localize` rather than plain strings: a label in a lookup table is
+ * invisible to the template markup guard, which parses markup. Several of
+ * these are jurisdiction-specific — a National Insurance number and a Social
+ * Security number are the same idea under different names — so a translator
+ * needs the description to choose the right local term rather than a literal
+ * rendering.
+ */
 export const REDACTION_PRESETS: ReadonlyArray<{ id: RedactionPreset; label: string }> = [
-  { id: 'email',      label: 'Email' },
-  { id: 'phone',      label: 'Phone' },
-  { id: 'creditCard', label: 'Card number' },
-  { id: 'iban',       label: 'IBAN' },
-  { id: 'niNumber',   label: 'NI number' },
-  { id: 'ssn',        label: 'SSN' },
-  { id: 'postcode',   label: 'Postcode' }
+  { id: 'email',      label: $localize`:Redaction preset — email addresses@@redactionPreset.email:Email` },
+  { id: 'phone',      label: $localize`:Redaction preset — telephone numbers@@redactionPreset.phone:Phone` },
+  { id: 'creditCard', label: $localize`:Redaction preset — payment card numbers@@redactionPreset.creditCard:Card number` },
+  { id: 'iban',       label: $localize`:Redaction preset — international bank account numbers@@redactionPreset.iban:IBAN` },
+  { id: 'niNumber',   label: $localize`:Redaction preset — the UK National Insurance number. Use the equivalent national identifier where one exists.@@redactionPreset.niNumber:NI number` },
+  { id: 'ssn',        label: $localize`:Redaction preset — the US Social Security number. Use the equivalent national identifier where one exists.@@redactionPreset.ssn:SSN` },
+  { id: 'postcode',   label: $localize`:Redaction preset — postal codes@@redactionPreset.postcode:Postcode` }
 ];
 
 /** What to search for. Any combination may be supplied. */

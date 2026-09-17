@@ -40,6 +40,7 @@ const MIN_PASSWORD_LENGTH = 12;
       <div>
         <label
           for="register-username"
+          i18n="@@register.usernameLabel"
           class="block text-xs font-medium text-gray-600 mb-1"
           >Username</label
         >
@@ -56,6 +57,7 @@ const MIN_PASSWORD_LENGTH = 12;
       <div>
         <label
           for="register-email"
+          i18n="@@register.emailLabel"
           class="block text-xs font-medium text-gray-600 mb-1"
           >Email</label
         >
@@ -72,6 +74,7 @@ const MIN_PASSWORD_LENGTH = 12;
       <div>
         <label
           for="register-password"
+          i18n="@@register.passwordLabel"
           class="block text-xs font-medium text-gray-600 mb-1"
           >Password</label
         >
@@ -84,7 +87,8 @@ const MIN_PASSWORD_LENGTH = 12;
           autocomplete="new-password"
           class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent"
         />
-        <p class="text-xs text-gray-500 mt-1">
+        <p i18n="Minimum password length, set by tenant policy@@register.passwordHint"
+           class="text-xs text-gray-500 mt-1">
           At least {{ minPasswordLength }} characters.
         </p>
       </div>
@@ -97,7 +101,8 @@ const MIN_PASSWORD_LENGTH = 12;
         reader reads two unrelated radios with no idea what the choice is.
       -->
       <fieldset class="border border-gray-200 rounded p-3">
-        <legend class="text-xs font-medium text-gray-600 px-1">
+        <legend i18n="Groups the choice between starting an organisation and joining one@@register.organisationLegend"
+                class="text-xs font-medium text-gray-600 px-1">
           Organisation
         </legend>
 
@@ -111,15 +116,16 @@ const MIN_PASSWORD_LENGTH = 12;
             [checked]="!joiningExisting()"
             (change)="chooseNewOrganisation()"
           />
-          <label for="join-new" class="text-sm text-gray-700">
+          <label for="join-new" i18n="@@register.createOrganisation" class="text-sm text-gray-700">
             Create a new organisation
           </label>
         </div>
 
         @if (!joiningExisting()) {
-          <div class="ml-6 mb-3">
+          <div class="ms-6 mb-3">
             <label
               for="organisation-name"
+              i18n="Label of the optional organisation-name field. The bracketed word is part of the label so a translator can move it.@@register.organisationNameLabel"
               class="block text-xs font-medium text-gray-600 mb-1"
             >
               Organisation name <span class="text-gray-400">(optional)</span>
@@ -131,7 +137,7 @@ const MIN_PASSWORD_LENGTH = 12;
               type="text"
               class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             />
-            <p class="text-xs text-gray-500 mt-1">
+            <p i18n="@@register.organisationNameHint" class="text-xs text-gray-500 mt-1">
               Leave blank and we'll name it after you — you can change it later.
             </p>
           </div>
@@ -147,15 +153,16 @@ const MIN_PASSWORD_LENGTH = 12;
             [checked]="joiningExisting()"
             (change)="chooseExistingOrganisation()"
           />
-          <label for="join-existing" class="text-sm text-gray-700">
+          <label for="join-existing" i18n="@@register.joinOrganisation" class="text-sm text-gray-700">
             Join one I've been invited to
           </label>
         </div>
 
         @if (joiningExisting()) {
-          <div class="ml-6 mt-2">
+          <div class="ms-6 mt-2">
             <label
               for="invitation-token"
+              i18n="@@register.invitationCodeLabel"
               class="block text-xs font-medium text-gray-600 mb-1"
               >Invitation code</label
             >
@@ -173,7 +180,7 @@ const MIN_PASSWORD_LENGTH = 12;
               spellcheck="false"
               class="w-full px-3 py-2 border border-gray-300 rounded text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent"
             />
-            <p class="text-xs text-gray-500 mt-1">
+            <p i18n="@@register.invitationEmailHint" class="text-xs text-gray-500 mt-1">
               Use the same email address the invitation was sent to.
             </p>
           </div>
@@ -185,7 +192,7 @@ const MIN_PASSWORD_LENGTH = 12;
         [disabled]="loading()"
         class="w-full bg-accent hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded text-sm transition-colors"
       >
-        {{ loading() ? "Creating..." : "Create Account" }}
+        {{ loading() ? creatingLabel : createAccountLabel }}
       </button>
     </form>
   `,
@@ -203,6 +210,13 @@ export class RegisterFormComponent {
 
   loading = signal(false);
   joiningExisting = signal(false);
+
+  /**
+   * Labels and messages that live in expressions rather than in markup, so
+   * `i18n` cannot reach them. See the note in login.component.ts.
+   */
+  readonly createAccountLabel = $localize`:Registration submit button@@register.createAccountAction:Create Account`;
+  readonly creatingLabel = $localize`:Registration submit button, while the request is in flight@@register.creatingAction:Creating...`;
 
   username = "";
   email = "";
@@ -227,20 +241,22 @@ export class RegisterFormComponent {
     // Autofill can populate the inputs without ngModel seeing it, so never
     // fail silently on an apparently-filled form.
     if (!this.username || !this.email || !this.password) {
-      this.failed.emit("Please enter a username, email and password.");
+      this.failed.emit(
+        $localize`:Shown when the registration form is submitted with an empty field@@register.missingFields:Please enter a username, email and password.`,
+      );
       return;
     }
     if (this.password.length < MIN_PASSWORD_LENGTH) {
       // Stated up front rather than surfacing the server's rejection, which
       // would cost a round trip to tell the user something knowable here.
       this.failed.emit(
-        `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+        $localize`:Shown when a chosen password is shorter than tenant policy allows@@register.passwordTooShort:Password must be at least ${MIN_PASSWORD_LENGTH}:length: characters.`,
       );
       return;
     }
     if (this.joiningExisting() && !this.invitationToken.trim()) {
       this.failed.emit(
-        "Enter the invitation code, or choose to create a new organisation.",
+        $localize`:Shown when "join an organisation" is chosen but no code was entered@@register.missingInvitationCode:Enter the invitation code, or choose to create a new organisation.`,
       );
       return;
     }
@@ -270,7 +286,7 @@ export class RegisterFormComponent {
           this.failed.emit(
             problemMessage(
               err,
-              "Could not create the account. Please try again.",
+              $localize`:Fallback when the server refuses registration without saying why@@register.failed:Could not create the account. Please try again.`,
             ),
           );
         },

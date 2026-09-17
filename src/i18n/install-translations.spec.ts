@@ -6,15 +6,12 @@
  * may simply not be deployed — so most of these tests are about failing open
  * rather than about the happy path.
  */
-vi.mock('@angular/localize', () => ({ loadTranslations: vi.fn() }));
-
-import { loadTranslations } from '@angular/localize';
-
 import {
   installTranslations,
   LOCALE_MANIFEST_URL,
   SOURCE_LOCALE,
   type LocalisableDocument,
+  type TranslationInstaller,
 } from './install-translations';
 
 /** A document stand-in narrowed to the two attributes that get set. */
@@ -36,7 +33,16 @@ const FRENCH_CATALOGUE = '/assets/locale/messages.fr.json';
 const ARABIC_CATALOGUE = '/assets/locale/messages.ar.json';
 
 describe('installTranslations', () => {
-  beforeEach(() => vi.mocked(loadTranslations).mockClear());
+  /**
+   * Stands in for `$localize`'s loader. A spy passed as an argument rather
+   * than a mocked module: the point of the function taking it is that a test
+   * can watch it without reaching into global state.
+   */
+  let loadTranslations: TranslationInstaller & ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    loadTranslations = vi.fn() as typeof loadTranslations;
+  });
 
   it('loads the catalogue for the language the browser asked for', async () => {
     const fetchResource = serving({
@@ -44,9 +50,7 @@ describe('installTranslations', () => {
       [FRENCH_CATALOGUE]: { locale: 'fr', translations: { greeting: 'Bonjour' } },
     });
 
-    const chosen = await installTranslations(fetchResource, documentStandIn(), [
-      'fr',
-    ]);
+    const chosen = await installTranslations(fetchResource, documentStandIn(), ['fr'], loadTranslations);
 
     expect(chosen.tag).toBe('fr');
     expect(loadTranslations).toHaveBeenCalledWith({ greeting: 'Bonjour' });
@@ -59,7 +63,12 @@ describe('installTranslations', () => {
       [LOCALE_MANIFEST_URL]: { available: [{ tag: SOURCE_LOCALE, name: 'English' }] },
     });
 
-    await installTranslations(fetchResource, documentStandIn(), [SOURCE_LOCALE]);
+    await installTranslations(
+      fetchResource,
+      documentStandIn(),
+      [SOURCE_LOCALE],
+      loadTranslations,
+    );
 
     expect(fetchResource).toHaveBeenCalledTimes(1);
     expect(loadTranslations).not.toHaveBeenCalled();
@@ -74,7 +83,7 @@ describe('installTranslations', () => {
       [FRENCH_CATALOGUE]: { locale: 'fr', translations: {} },
     });
 
-    await installTranslations(fetchResource, target, ['fr']);
+    await installTranslations(fetchResource, target, ['fr'], loadTranslations);
 
     expect(target.documentElement.lang).toBe('fr');
   });
@@ -86,7 +95,7 @@ describe('installTranslations', () => {
       [ARABIC_CATALOGUE]: { locale: 'ar', translations: {} },
     });
 
-    await installTranslations(fetchResource, target, ['ar']);
+    await installTranslations(fetchResource, target, ['ar'], loadTranslations);
 
     expect(target.documentElement.dir).toBe('rtl');
   });
@@ -96,7 +105,7 @@ describe('installTranslations', () => {
     // misconfigured static host produces.
     const target = documentStandIn();
 
-    const chosen = await installTranslations(serving({}), target, ['fr']);
+    const chosen = await installTranslations(serving({}), target, ['fr'], loadTranslations);
 
     expect(chosen.tag).toBe(SOURCE_LOCALE);
     expect(target.documentElement.lang).toBe(SOURCE_LOCALE);
@@ -111,7 +120,7 @@ describe('installTranslations', () => {
       [LOCALE_MANIFEST_URL]: { available: [{ tag: 'fr', name: 'Français' }] },
     });
 
-    const chosen = await installTranslations(fetchResource, target, ['fr']);
+    const chosen = await installTranslations(fetchResource, target, ['fr'], loadTranslations);
 
     expect(chosen.tag).toBe('fr');
     expect(target.documentElement.lang).toBe('fr');
@@ -123,7 +132,7 @@ describe('installTranslations', () => {
       throw new TypeError('Failed to fetch');
     }) as unknown as typeof fetch;
 
-    const chosen = await installTranslations(rejecting, documentStandIn(), ['fr']);
+    const chosen = await installTranslations(rejecting, documentStandIn(), ['fr'], loadTranslations);
 
     expect(chosen.tag).toBe(SOURCE_LOCALE);
   });
@@ -135,9 +144,7 @@ describe('installTranslations', () => {
       [FRENCH_CATALOGUE]: { locale: 'fr' },
     });
 
-    const chosen = await installTranslations(fetchResource, documentStandIn(), [
-      'fr',
-    ]);
+    const chosen = await installTranslations(fetchResource, documentStandIn(), ['fr'], loadTranslations);
 
     expect(chosen.tag).toBe('fr');
     expect(loadTranslations).not.toHaveBeenCalled();
@@ -146,9 +153,7 @@ describe('installTranslations', () => {
   it('ignores a manifest whose shape is wrong', async () => {
     const fetchResource = serving({ [LOCALE_MANIFEST_URL]: { available: 'fr' } });
 
-    const chosen = await installTranslations(fetchResource, documentStandIn(), [
-      'fr',
-    ]);
+    const chosen = await installTranslations(fetchResource, documentStandIn(), ['fr'], loadTranslations);
 
     expect(chosen.tag).toBe(SOURCE_LOCALE);
   });
