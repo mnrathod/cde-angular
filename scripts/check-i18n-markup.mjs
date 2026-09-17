@@ -41,7 +41,6 @@ const ROOTS = ['src/app', 'src/viewer-core'];
 const NOT_YET_TRANSLATED = new Set([
   'src/app/features/auth/register-form.component.ts',
   'src/app/features/compare/compare.component.ts',
-  'src/app/features/embed/embed-viewer.component.ts',
   'src/app/features/projects/shell.component.ts',
   'src/app/features/viewer/compare-viewer/visual-compare.component.ts',
   'src/app/features/viewer/markup/annotation-thread.component.ts',
@@ -49,18 +48,11 @@ const NOT_YET_TRANSLATED = new Set([
   'src/app/features/viewer/markup/page-organiser.component.ts',
   'src/app/features/viewer/markup/pdf-form.component.ts',
   'src/app/features/viewer/markup/redaction-panel.component.ts',
-  'src/app/features/viewer/markup/version-history.component.ts',
   'src/app/features/viewer/sidebar/viewer-sidebar.component.ts',
   'src/app/features/viewer/toolbar/markup-toolbar.component.ts',
   'src/app/features/viewer/viewer-shell.component.ts',
   'src/app/features/viewer/viewer3d/viewer3d.component.ts',
-  'src/app/shared/components/error-toast.component.ts',
-  'src/app/shared/components/offline-banner.component.ts',
   'src/viewer-core/cad-viewer.component.ts',
-  'src/viewer-core/ifc-properties.component.ts',
-  'src/viewer-core/ifc-tree.component.ts',
-  'src/viewer-core/outline-panel.component.ts',
-  'src/viewer-core/tool-rail.component.ts',
 ]);
 
 /** Every non-spec TypeScript file under a directory, recursively. */

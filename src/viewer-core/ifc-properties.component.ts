@@ -30,7 +30,7 @@ import { iconForType } from './ifc-icons';
 
         <dl class="space-y-1">
           <div class="flex justify-between text-xs py-0.5 border-b border-gray-50">
-            <dt class="text-gray-500">Type</dt>
+            <dt i18n="The IFC class of the selected model element@@ifcProperties.typeLabel" class="text-gray-500">Type</dt>
             <dd class="text-gray-800 font-mono text-xs">{{ node.type }}</dd>
           </div>
           @for (property of properties(); track property.key) {

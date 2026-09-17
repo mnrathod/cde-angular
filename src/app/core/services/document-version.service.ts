@@ -46,16 +46,24 @@ export interface ProcessingResult {
 }
 
 /** Labels for the history panel, keyed by the server's operation names. */
+/**
+ * What each recorded operation is called in the history list.
+ *
+ * <p>`$localize` rather than plain strings because these are read by a user
+ * and a lookup table is invisible to the template markup guard — the sort of
+ * place untranslated text hides until someone opens the application in
+ * another language.
+ */
 const OPERATION_LABELS: Record<DocumentOperation, string> = {
-  UPLOAD:      'Uploaded',
-  REDACT:      'Redacted',
-  OCR:         'OCR',
-  FLATTEN:     'Flattened',
-  FORM_FILL:   'Form filled',
-  FORM_DESIGN: 'Form fields changed',
-  PAGES:       'Pages changed',
-  SIGN:        'Signed',
-  RESTORE:     'Restored'
+  UPLOAD:      $localize`:Document history entry@@documentOperation.upload:Uploaded`,
+  REDACT:      $localize`:Document history entry@@documentOperation.redact:Redacted`,
+  OCR:         $localize`:Document history entry — text was recognised in a scanned document@@documentOperation.ocr:OCR`,
+  FLATTEN:     $localize`:Document history entry — markup was burned into the page@@documentOperation.flatten:Flattened`,
+  FORM_FILL:   $localize`:Document history entry@@documentOperation.formFill:Form filled`,
+  FORM_DESIGN: $localize`:Document history entry@@documentOperation.formDesign:Form fields changed`,
+  PAGES:       $localize`:Document history entry — pages were added, removed or reordered@@documentOperation.pages:Pages changed`,
+  SIGN:        $localize`:Document history entry@@documentOperation.sign:Signed`,
+  RESTORE:     $localize`:Document history entry — an earlier version was made current@@documentOperation.restore:Restored`
 };
 
 @Injectable({ providedIn: 'root' })

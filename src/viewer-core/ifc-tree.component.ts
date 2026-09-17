@@ -33,9 +33,11 @@ export interface IfcNode {
       <!-- Header -->
       <div class="p-3 border-b border-gray-200 flex-shrink-0">
         <div id="model-tree-heading"
+             i18n="Heading of the accessible, navigable equivalent of the 3D model view@@ifcTree.heading"
              class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Model Tree</div>
         <!-- Search -->
         <input [(ngModel)]="searchQuery" (ngModelChange)="filterTree($event)"
+          i18n-placeholder="@@ifcTree.searchPlaceholder"
           placeholder="Search elements..."
           class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-accent" />
       </div>
@@ -51,7 +53,7 @@ export interface IfcNode {
         }
         @if (rows().length === 0) {
           <div class="text-xs text-gray-400 text-center py-8">
-            {{ searchQuery ? 'No matching elements' : 'No model data' }}
+            {{ searchQuery ? noMatchesLabel : noModelLabel }}
           </div>
         }
       </div>
@@ -100,7 +102,7 @@ export interface IfcNode {
                    opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
             [class.opacity-100]="!row.node.visible"
             [attr.aria-pressed]="!row.node.visible"
-            [attr.aria-label]="'Hide ' + (row.node.name || row.node.type)">
+            [attr.aria-label]="hideLabel(row.node)">
             <span aria-hidden="true">{{ row.node.visible ? '👁' : '🔲' }}</span>
           </button>
 
@@ -210,8 +212,20 @@ export class IfcTreeComponent implements OnChanges {
    */
   rowLabel(node: IfcNode): string {
     const name = node.name || node.type.replace('Ifc', '');
-    return node.count && node.count > 1 ? `${name}, ${node.count} elements` : name;
+    if (!node.count || node.count <= 1) return name;
+    const count = node.count;
+    return $localize`:Accessible name of a model-tree row that stands for several elements, e.g. "Walls, 42 elements"@@ifcTree.rowWithCount:${name}:name:, ${count}:count: elements`;
   }
+
+  /** Accessible name of the control that hides a row's geometry. */
+  hideLabel(node: IfcNode): string {
+    const name = node.name || node.type;
+    return $localize`:Button that hides one element or group in the 3D view@@ifcTree.hide:Hide ${name}:name:`;
+  }
+
+  /** Empty states, which live in an expression and so need `$localize`. */
+  readonly noMatchesLabel = $localize`:Shown when a model-tree search matches nothing@@ifcTree.noMatches:No matching elements`;
+  readonly noModelLabel = $localize`:Shown when no model has been loaded into the tree@@ifcTree.noModelData:No model data`;
 
   ngOnChanges(changes: SimpleChanges) {
     if (!changes['nodes']) return;

@@ -34,20 +34,21 @@ interface VisibleEntry {
   template: `
     <div class="flex-1 overflow-y-auto p-2">
       @if (loading()) {
-        <div class="text-center text-gray-400 text-xs py-8">Reading bookmarks...</div>
+        <div i18n="@@outline.loading" class="text-center text-gray-400 text-xs py-8">Reading bookmarks...</div>
       } @else if (!entries().length) {
-        <div class="text-center text-gray-400 text-xs py-8 px-2">
+        <div i18n="Empty state for the bookmarks panel of a PDF with no outline@@outline.empty"
+             class="text-center text-gray-400 text-xs py-8 px-2">
           This document has no bookmarks.
         </div>
       }
 
       @for (row of visible(); track row.key) {
         <div class="flex items-center gap-1 text-xs rounded hover:bg-gray-50"
-             [style.padding-left.px]="row.entry.depth * 10">
+             [style.padding-inline-start.px]="row.entry.depth * 10">
           @if (row.hasChildren) {
             <button (click)="toggle(row.key)"
               class="w-4 flex-shrink-0 text-gray-400 hover:text-gray-700"
-              [title]="row.collapsed ? 'Expand' : 'Collapse'">
+              [title]="row.collapsed ? expandHint : collapseHint">
               {{ row.collapsed ? '▸' : '▾' }}
             </button>
           } @else {
@@ -55,17 +56,15 @@ interface VisibleEntry {
           }
 
           <button (click)="go(row.entry)" [disabled]="row.entry.page === null"
-            [title]="row.entry.page === null
-              ? 'This bookmark points nowhere'
-              : 'Go to page ' + row.entry.page"
-            class="flex-1 min-w-0 text-left py-1 truncate disabled:text-gray-400
+            [title]="row.entry.page === null ? brokenBookmarkHint : goToPageHint(row.entry.page)"
+            class="flex-1 min-w-0 text-start py-1 truncate disabled:text-gray-400
                    disabled:cursor-default"
             [class.font-medium]="row.entry.page === state.currentPage()">
             {{ row.entry.title }}
           </button>
 
           @if (row.entry.page !== null) {
-            <span class="text-gray-400 flex-shrink-0 pr-1">{{ row.entry.page }}</span>
+            <span class="text-gray-400 flex-shrink-0 pe-1">{{ row.entry.page }}</span>
           }
         </div>
       }
@@ -75,6 +74,19 @@ interface VisibleEntry {
 export class OutlinePanelComponent {
   private outline = inject(OutlineService);
   readonly state  = inject(ViewerStateService);
+
+  /**
+   * Hints that live in an expression rather than in markup, so `i18n` cannot
+   * reach them — see the note in login.component.ts. `$localize` is how they
+   * get into the catalogue.
+   */
+  readonly expandHint = $localize`:Tooltip on the control that opens a collapsed bookmark@@outline.expand:Expand`;
+  readonly collapseHint = $localize`:Tooltip on the control that closes an expanded bookmark@@outline.collapse:Collapse`;
+  readonly brokenBookmarkHint = $localize`:Tooltip on a bookmark whose destination page is missing@@outline.brokenBookmark:This bookmark points nowhere`;
+
+  goToPageHint(page: number): string {
+    return $localize`:Tooltip on a bookmark, naming the page it jumps to@@outline.goToPage:Go to page ${page}:page:`;
+  }
 
   readonly entries   = signal<OutlineEntry[]>([]);
   readonly loading   = signal(false);

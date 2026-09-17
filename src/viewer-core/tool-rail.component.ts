@@ -28,7 +28,7 @@ import { TOOL_SECTIONS, Tool } from './tool-catalog';
       simply cut off the bottom of the window with no scrollbar to reach them
       — the same failure that once hid the left edge of the document.
     -->
-    <nav aria-label="Markup tools"
+    <nav i18n-aria-label="@@toolRail.label" aria-label="Markup tools"
          class="flex flex-col w-11 flex-shrink-0 min-h-0 overflow-y-auto overflow-x-hidden
                 border-r border-gray-200 bg-white py-1">
 

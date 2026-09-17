@@ -8,7 +8,7 @@ import { GlobalErrorHandler } from '../../core/handlers/global-error.handler';
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+    <div class="fixed bottom-4 end-4 z-[9999] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
       @for (err of visibleErrors(); track err.id) {
         <div
           class="pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-lg shadow-lg border text-sm animate-slide-in"
@@ -25,6 +25,7 @@ import { GlobalErrorHandler } from '../../core/handlers/global-error.handler';
             }
             @if (err.type === 'chunk') {
               <button (click)="reload()"
+                i18n="Offered when a lazily-loaded chunk failed, usually because the application was redeployed mid-session@@errorToast.refreshPage"
                 class="mt-1.5 text-xs underline hover:no-underline">
                 Refresh page
               </button>
@@ -34,6 +35,7 @@ import { GlobalErrorHandler } from '../../core/handlers/global-error.handler';
           <!-- Dismiss -->
           <button (click)="handler.dismiss(err.id)"
             class="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+            i18n-aria-label="@@errorToast.dismiss"
             aria-label="Dismiss error">
             ✕
           </button>

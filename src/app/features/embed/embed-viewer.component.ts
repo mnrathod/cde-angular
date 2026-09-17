@@ -37,7 +37,8 @@ import { ProblemDetail } from './embed-protocol';
   template: `
     <div class="shell">
       @if (session.phase() === 'ready') {
-        <div class="toolbar" role="toolbar" aria-label="Document tools">
+        <div class="toolbar" role="toolbar"
+             i18n-aria-label="@@embedViewer.toolbarLabel" aria-label="Document tools">
           <span class="name">{{ session.documentName() }}</span>
 
           @if (session.canDo('markup:create')) {
@@ -50,11 +51,13 @@ import { ProblemDetail } from './embed-protocol';
           }
 
           @if (session.canDo('document:sign')) {
-            <button type="button" (click)="requestSignature()">Sign</button>
+            <button type="button" i18n="@@embedViewer.sign"
+                    (click)="requestSignature()">Sign</button>
           }
 
           <span class="spacer"></span>
-          <span class="page-count">
+          <span class="page-count"
+                i18n="Current position in the document, e.g. Page 3 of 12@@embedViewer.pageCount">
             Page {{ state.currentPage() }} of {{ state.totalPages() }}
           </span>
         </div>
@@ -117,11 +120,19 @@ export class EmbedViewerComponent implements OnInit, OnDestroy {
 
   readonly notice = signal('');
 
+  /**
+   * Markup tools offered in the embedded toolbar.
+   *
+   * <p>`$localize` rather than plain strings: a label in a lookup table is
+   * invisible to the template markup guard, which is exactly where
+   * untranslated text hides until someone opens the product in another
+   * language.
+   */
   readonly tools = [
-    { id: 'pan', label: 'Pan' },
-    { id: 'rect', label: 'Box' },
-    { id: 'cloud', label: 'Cloud' },
-    { id: 'arrow', label: 'Arrow' },
+    { id: 'pan', label: $localize`:Markup tool that moves the page rather than drawing@@markupTool.pan:Pan` },
+    { id: 'rect', label: $localize`:Markup tool that draws a rectangle@@markupTool.rect:Box` },
+    { id: 'cloud', label: $localize`:Markup tool that draws a revision cloud@@markupTool.cloud:Cloud` },
+    { id: 'arrow', label: $localize`:Markup tool that draws an arrow@@markupTool.arrow:Arrow` },
   ] as const;
 
   readonly pageNumbers = computed(() =>

@@ -53,6 +53,25 @@ try {
     return [];
   });
 
+  // A `$localize` description is delimited by colons, so a colon *inside* one
+  // ends the metadata early and the rest of it lands in the message text.
+  // This is invisible at the call site, compiles cleanly, and ships a message
+  // reading "@@documentOperation.ocr:OCR" to every translator — so it is
+  // caught here rather than by whoever opens the catalogue months later.
+  const leakedMetadata = Object.entries(fresh)
+    .filter(([, text]) => text.includes('@@'))
+    .map(([id, text]) => `  ${id}: ${JSON.stringify(text)}`);
+
+  if (leakedMetadata.length > 0) {
+    console.error(
+      'These messages contain `@@`, which means $localize metadata leaked ' +
+        'into the text — usually a colon inside a description:\n',
+    );
+    console.error(leakedMetadata.join('\n'));
+    console.error('\nEscape the colon as \\: or reword the description.');
+    process.exit(1);
+  }
+
   if (problems.length > 0) {
     console.error(`${COMMITTED} does not match the source:\n`);
     console.error(problems.join('\n'));

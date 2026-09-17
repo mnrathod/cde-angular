@@ -25,8 +25,10 @@ import { ViewerStateService } from '../../../../viewer-core/viewer-state.service
   template: `
     <div class="p-3">
       <div class="flex items-center justify-between mb-2">
-        <h3 class="text-xs font-semibold text-gray-600 uppercase tracking-wide">History</h3>
+        <h3 i18n="Heading of the document version-history panel@@versionHistory.heading"
+            class="text-xs font-semibold text-gray-600 uppercase tracking-wide">History</h3>
         <button (click)="refresh()" [disabled]="loading()"
+          i18n-aria-label="@@versionHistory.refresh" aria-label="Refresh history"
           class="text-xs text-gray-500 hover:text-gray-800 disabled:opacity-40">
           {{ loading() ? '...' : '↻' }}
         </button>
@@ -35,7 +37,7 @@ import { ViewerStateService } from '../../../../viewer-core/viewer-state.service
       @if (error()) {
         <p class="text-xs text-red-600 py-2">{{ error() }}</p>
       } @else if (!loading() && versions().length === 0) {
-        <p class="text-xs text-gray-500 py-2">No history for this document.</p>
+        <p i18n="@@versionHistory.empty" class="text-xs text-gray-500 py-2">No history for this document.</p>
       }
 
       <ul class="space-y-1.5">
@@ -50,7 +52,8 @@ import { ViewerStateService } from '../../../../viewer-core/viewer-state.service
                 {{ versionService.operationLabel(version.operation) }}
               </span>
               @if (version.current) {
-                <span class="px-1.5 py-0.5 rounded bg-emerald-600 text-white">current</span>
+                <span i18n="Badge on the version that is currently in use@@versionHistory.currentBadge"
+                      class="px-1.5 py-0.5 rounded bg-emerald-600 text-white">current</span>
               }
             </div>
 
@@ -66,11 +69,12 @@ import { ViewerStateService } from '../../../../viewer-core/viewer-state.service
 
             <div class="flex gap-2 mt-1.5">
               <button (click)="download(version)"
+                i18n="@@versionHistory.download"
                 class="text-blue-600 hover:underline">Download</button>
               @if (!version.current) {
                 <button (click)="restore(version)" [disabled]="restoring() !== null"
                   class="text-amber-700 hover:underline disabled:opacity-40">
-                  {{ restoring() === version.version ? 'Restoring...' : 'Restore' }}
+                  {{ restoring() === version.version ? restoringLabel : restoreLabel }}
                 </button>
               }
             </div>
@@ -89,6 +93,10 @@ export class VersionHistoryComponent {
   readonly error     = signal('');
   /** Version currently being restored, so only its button shows progress. */
   readonly restoring = signal<number | null>(null);
+
+  /** Button labels, which live in an expression and so need `$localize`. */
+  readonly restoreLabel = $localize`:Makes an earlier version current again@@versionHistory.restore:Restore`;
+  readonly restoringLabel = $localize`:Restore button while the request is in flight@@versionHistory.restoring:Restoring...`;
 
   constructor() {
     // Reload whenever an operation commits — the panel is the record of those
