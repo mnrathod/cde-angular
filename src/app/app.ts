@@ -17,8 +17,9 @@ import { OfflineBannerComponent } from "./shared/components/offline-banner.compo
   template: `
     <!-- Skip link for keyboard users -->
     <a
+      i18n="@@app.skipToContent"
       href="#main-content"
-      class="sr-only focus:not-sr-only focus:fixed focus:top-0 focus:left-0 focus:z-50
+      class="sr-only focus:not-sr-only focus:fixed focus:top-0 focus:start-0 focus:z-50
               focus:px-4 focus:py-2 focus:bg-accent focus:text-white focus:text-sm"
     >
       Skip to content

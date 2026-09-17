@@ -23,11 +23,14 @@ import { RegisterFormComponent } from "./register-form.component";
         <!-- Logo -->
         <div class="flex items-center gap-3 mb-8">
           <div
+            i18n="Product mark on the sign-in card. A brand name: leave it as-is in Latin-script languages, transliterate it where the script differs.@@login.brandMark"
             class="w-9 h-9 bg-accent rounded flex items-center justify-center text-white font-black text-sm"
           >
             CDE
           </div>
-          <span class="font-bold text-lg text-gray-800">Platform</span>
+          <span i18n="@@login.brandName" class="font-bold text-lg text-gray-800"
+            >Platform</span
+          >
         </div>
 
         <!--
@@ -42,12 +45,14 @@ import { RegisterFormComponent } from "./register-form.component";
         -->
         <div
           role="tablist"
+          i18n-aria-label="@@login.tablistLabel"
           aria-label="Sign in or register"
           class="flex gap-1 mb-6 bg-gray-100 p-1 rounded"
         >
           <button
             type="button"
             role="tab"
+            i18n="Tab that shows the sign-in form@@login.signInTab"
             (click)="showTab('login')"
             [attr.aria-selected]="tab() === 'login'"
             class="flex-1 py-1.5 text-sm rounded transition-all"
@@ -62,6 +67,7 @@ import { RegisterFormComponent } from "./register-form.component";
           <button
             type="button"
             role="tab"
+            i18n="Tab that shows the registration form@@login.registerTab"
             (click)="showTab('register')"
             [attr.aria-selected]="tab() === 'register'"
             class="flex-1 py-1.5 text-sm rounded transition-all"
@@ -90,6 +96,7 @@ import { RegisterFormComponent } from "./register-form.component";
             <div>
               <label
                 for="login-username"
+                i18n="@@login.usernameLabel"
                 class="block text-xs font-medium text-gray-600 mb-1"
                 >Username</label
               >
@@ -106,6 +113,7 @@ import { RegisterFormComponent } from "./register-form.component";
             <div>
               <label
                 for="login-password"
+                i18n="@@login.passwordLabel"
                 class="block text-xs font-medium text-gray-600 mb-1"
                 >Password</label
               >
@@ -125,7 +133,7 @@ import { RegisterFormComponent } from "./register-form.component";
               [disabled]="loading()"
               class="w-full bg-accent hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded text-sm transition-colors mt-2"
             >
-              {{ loading() ? "Signing in..." : "Sign In" }}
+              {{ loading() ? signingInLabel : signInLabel }}
             </button>
           </form>
           <!--
@@ -134,7 +142,10 @@ import { RegisterFormComponent } from "./register-form.component";
             account it named no longer exists unless a deployment creates one
             with its own password.
           -->
-          <p class="text-xs text-gray-500 text-center mt-4">
+          <p
+            i18n="Invitation to register, shown under the sign-in form. The button in the middle is part of the sentence, so the whole paragraph is one message and a translator may move it.@@login.registerInvitation"
+            class="text-xs text-gray-500 text-center mt-4"
+          >
             No account yet?
             <button
               type="button"
@@ -170,6 +181,17 @@ export class LoginComponent {
   password = "";
 
   /**
+   * Labels that live in an expression rather than in markup.
+   *
+   * <p>`i18n` marks up template *text*; a string inside `{{ a ? "x" : "y" }}`
+   * is an expression and the compiler never sees it as a message. `$localize`
+   * is how those reach the catalogue, and it is the reason the submit
+   * button's two states are fields here rather than literals in the template.
+   */
+  readonly signInLabel = $localize`:Sign-in submit button@@login.signInAction:Sign In`;
+  readonly signingInLabel = $localize`:Sign-in submit button, while the request is in flight@@login.signingInAction:Signing in...`;
+
+  /**
    * The two forms used to share username and password, so the development
    * prefill opened Register already filled with an account that exists — a
    * registration that could only fail as a duplicate — and switching tabs had
@@ -187,7 +209,9 @@ export class LoginComponent {
     if (!this.username || !this.password) {
       // Never fail silently — e.g. browser autofill can populate the visible
       // inputs without ngModel picking up the change, leaving these blank.
-      this.error.set("Please enter both username and password.");
+      this.error.set(
+        $localize`:Shown when the sign-in form is submitted with an empty field@@login.missingCredentials:Please enter both username and password.`,
+      );
       return;
     }
     this.loading.set(true);
@@ -197,7 +221,11 @@ export class LoginComponent {
       .subscribe({
         next: () => this.router.navigate(["/"]),
         error: () => {
-          this.error.set("Invalid username or password");
+          // Deliberately does not say which was wrong: §4.2 forbids
+          // revealing whether an account exists.
+          this.error.set(
+            $localize`:Shown when sign-in is refused@@login.refused:Invalid username or password`,
+          );
           this.loading.set(false);
         },
       });

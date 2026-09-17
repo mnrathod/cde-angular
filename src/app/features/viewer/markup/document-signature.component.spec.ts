@@ -132,8 +132,14 @@ describe('the stamp shown after signing', () => {
   it('shows the date in the reader\'s locale, not as a raw timestamp', () => {
     // The server's SVG carries "2026-03-04 09:30:00". Formatting it here is
     // both better reading and a second thing the stripped SVG cannot fake.
+    //
+    // "4 Mar 2026" is the en-AU rendering, which is what the source locale
+    // declares (angular.json `i18n.sourceLocale`). It read "Mar 4, 2026"
+    // until translations were introduced, because an application with no
+    // declared locale falls back to en-US — so this literal moving is the
+    // locale being honoured rather than a regression.
     signAndRespond();
-    expect(stamp()?.textContent).toContain('Mar 4, 2026');
+    expect(stamp()?.textContent).toContain('4 Mar 2026');
     expect(stamp()?.textContent).toContain('Ref:');
     expect(stamp()?.textContent).not.toContain('2026-03-04 09:30:00');
   });

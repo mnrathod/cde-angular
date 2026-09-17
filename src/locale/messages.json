@@ -1,0 +1,18 @@
+{
+  "locale": "en-AU",
+  "translations": {
+    "app.skipToContent": " Skip to content ",
+    "login.brandMark": " CDE ",
+    "login.brandName": "Platform",
+    "login.tablistLabel": "Sign in or register",
+    "login.signInTab": " Sign In ",
+    "login.registerTab": " Register ",
+    "login.usernameLabel": "Username",
+    "login.passwordLabel": "Password",
+    "login.registerInvitation": " No account yet? {$START_TAG_BUTTON} Create one {$CLOSE_TAG_BUTTON} — you'll get an organisation of your own. ",
+    "login.signInAction": "Sign In",
+    "login.signingInAction": "Signing in...",
+    "login.missingCredentials": "Please enter both username and password.",
+    "login.refused": "Invalid username or password"
+  }
+}

@@ -16,7 +16,11 @@
     "check:samples": "node demo/tools/generate-samples.mjs --check",
     "icons": "node tools/icons/generate-icons.mjs",
     "check:icons": "node tools/icons/generate-icons.mjs --check",
-    "test:demo": "playwright test --config demo/e2e/playwright.config.mjs"
+    "test:demo": "playwright test --config demo/e2e/playwright.config.mjs",
+    "i18n:extract": "ng extract-i18n",
+    "check:i18n": "node scripts/check-i18n-catalogue.mjs",
+    "check:i18n-markup": "node scripts/check-i18n-markup.mjs",
+    "test:scripts": "vitest run --config vitest.scripts.config.mjs"
   },
   "private": true,
   "packageManager": "npm@10.9.7",
@@ -26,6 +30,7 @@
     "@angular/compiler": "^22.1.4",
     "@angular/core": "^22.1.4",
     "@angular/forms": "^22.1.4",
+    "@angular/localize": "22.1.4",
     "@angular/platform-browser": "^22.1.4",
     "@angular/router": "^22.1.4",
     "@angular/service-worker": "^22.1.4",

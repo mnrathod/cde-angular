@@ -17,9 +17,7 @@
      * it a worse example of that.
      */
     "allowJs": true,
-    "types": [
-      "vitest/globals"
-    ]
+    "types": ["vitest/globals", "@angular/localize"]
   },
   "include": [
     "src/**/*.d.ts",

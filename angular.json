@@ -22,6 +22,7 @@
           "options": {
             "browser": "src/main.ts",
             "polyfills": [
+              "@angular/localize/init",
               "zone.js"
             ],
             "tsConfig": "tsconfig.app.json",
@@ -131,13 +132,25 @@
               "lcov"
             ],
             "coverageThresholds": {
-              "statements": 44,
-              "branches": 43,
-              "functions": 38,
-              "lines": 43
+              "statements": 45,
+              "branches": 44,
+              "functions": 39,
+              "lines": 44
             }
           }
+        },
+        "extract-i18n": {
+          "builder": "@angular/build:extract-i18n",
+          "options": {
+            "format": "json",
+            "outputPath": "src/locale",
+            "outFile": "messages.json",
+            "buildTarget": "cde-web:build:production"
+          }
         }
+      },
+      "i18n": {
+        "sourceLocale": "en-AU"
       }
     },
     "viewer-core": {

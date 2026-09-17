@@ -1,0 +1,10 @@
+{
+  "$comment": "Languages this deployment carries a translation catalogue for. Read at startup by src/i18n/install-translations.ts. Adding a language means adding an entry here and dropping messages.<tag>.json alongside it — no rebuild, no redeploy of the application image (CLAUDE.md §9.2). Only the source locale is listed until a translation is actually delivered; listing a language with no catalogue renders source text, which is legible but misleading in a language picker.",
+  "source": "en-AU",
+  "available": [
+    {
+      "tag": "en-AU",
+      "name": "English (Australia)"
+    }
+  ]
+}
