@@ -22,6 +22,7 @@ import {
   materialSlotsForTypes,
   treeFromGeometryGroups,
 } from "../../../../viewer-core/model-visibility";
+import { ModelViewport, buildModelScene } from "./model-scene";
 
 @Component({
   selector: "app-viewer3d",
@@ -148,11 +149,11 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
   private modelGroups: readonly ModelGeometryGroup[] = [];
 
   /** The rendered viewport: renderer, scene, camera, controls and mesh. */
-  private viewport: any = null;
+  private viewport: ModelViewport | null = null;
+  private stopWatchingResize?: () => void;
 
   /** The three.js module namespace, loaded on first use. */
   private threeJs: any = null;
-  private animId: number | null = null;
 
   docId = signal(0);
   // Fetched here rather than by the tree component: viewer-core does no I/O
@@ -174,8 +175,8 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    if (this.animId) cancelAnimationFrame(this.animId);
-    this.viewport?.renderer?.dispose();
+    this.stopWatchingResize?.();
+    this.viewport?.dispose();
   }
 
   /**
@@ -260,124 +261,76 @@ export class Viewer3dComponent implements OnInit, OnDestroy {
     this.threeJs = { ...three, OrbitControls: orbit.OrbitControls };
   }
 
+  /** Sidebar width, which the canvas has to make room for. */
+  private static readonly SIDEBAR_WIDTH_PX = 208;
+
   buildIFCScene(data: ModelGeometry) {
-    const T = this.threeJs;
-    if (!T) return;
-    const canvas = this.canvas.nativeElement;
-    const W = this.wrap.nativeElement.clientWidth - 208;
-    const H = this.wrap.nativeElement.clientHeight;
+    if (!this.threeJs) return;
 
-    const renderer = new T.WebGLRenderer({ canvas, antialias: true });
-    renderer.setSize(W, H);
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.setClearColor(0x13151f);
-
-    const scene = new T.Scene();
-    const camera = new T.PerspectiveCamera(45, W / H, 0.01, 100000);
-    camera.position.set(20, 15, 20);
-
-    scene.add(new T.AmbientLight(0xffffff, 0.6));
-    const dir = new T.DirectionalLight(0xffffff, 0.8);
-    dir.position.set(50, 100, 50);
-    scene.add(dir);
-
-    const controls = new T.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-
-    const grid = new T.GridHelper(100, 20, 0x333344, 0x222233);
-    scene.add(grid);
-
-    const gd = data;
-    const geo = new T.BufferGeometry();
-    geo.setAttribute("position", new T.BufferAttribute(gd.positions, 3));
-    geo.setAttribute("normal", new T.BufferAttribute(gd.normals, 3));
-    geo.setIndex(new T.BufferAttribute(gd.indices, 1));
-
-    /*
-     * One group and one material per element type, rather than one material
-     * over a baked per-vertex colour.
-     *
-     * The colour is the same information either way, but it used to be tiled
-     * across every vertex — twelve bytes each to say "this is a wall" — and
-     * once baked in it could not be changed or hidden, which is why the layer
-     * toggles in this component's own UI have never done anything. The group
-     * offsets are index offsets; three.js expects exactly that on indexed
-     * geometry, and vertex offsets there would silently draw the wrong runs.
-     */
     // Kept in material-slot order: a group's position here is the
-    // materialIndex passed to addGroup below, and the visibility handler
-    // resolves a tree node to those same slots.
-    this.modelGroups = gd.groups;
+    // materialIndex the scene gave it, and the visibility handler resolves a
+    // tree node to those same slots.
+    this.modelGroups = data.groups;
 
-    const materials = gd.groups.map((group: ModelGeometryGroup, index: number) => {
-      geo.addGroup(group.start, group.count, index);
-      return new T.MeshPhongMaterial({
-        color: new T.Color(group.color[0], group.color[1], group.color[2]),
-        side: T.DoubleSide,
-        shininess: 30,
-        transparent: group.opacity < 1,
-        opacity: group.opacity,
-      });
-    });
-
-    const mesh = new T.Mesh(geo, materials);
-    scene.add(mesh);
-
-    // Fit camera
-    const box = new T.Box3().expandByObject(mesh);
-    const center = box.getCenter(new T.Vector3());
-    const size = box.getSize(new T.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    camera.position.set(
-      center.x + maxDim * 1.2,
-      center.y + maxDim * 0.8,
-      center.z + maxDim * 1.2,
+    this.viewport = buildModelScene(
+      this.threeJs,
+      this.canvas.nativeElement,
+      data,
+      this.canvasSize(),
     );
-    controls.target.copy(center);
-    camera.near = maxDim * 0.001;
-    camera.far = maxDim * 100;
-    camera.updateProjectionMatrix();
-    grid.scale.setScalar(maxDim / 10);
-    grid.position.y = box.min.y;
-
-    this.viewport = {
-      renderer,
-      scene,
-      camera,
-      controls,
-      mesh,
-      wireframe: false,
-    };
     this.loading.set(false);
 
-    // A model with no hierarchy of its own still needs the tree, because §1A.4
-    // makes it the accessible route to a canvas some readers cannot use. The
-    // groups are what the extractor genuinely found, so the fallback is
-    // derived from them rather than invented — see treeFromGeometryGroups.
+    // A model with no hierarchy of its own still needs the tree, because
+    // §1A.4 makes it the accessible route to a canvas some readers cannot
+    // use. The groups are what the extractor genuinely found, so the
+    // fallback is derived from them rather than invented.
     if (this.modelTree()?.length === 0) {
-      this.modelTree.set(treeFromGeometryGroups(gd.groups, gd.schema));
+      this.modelTree.set(treeFromGeometryGroups(data.groups, data.schema));
     }
 
     this.stats.set([
-      { label: "Elements", value: gd.elementCount.toLocaleString() },
-      { label: "Triangles", value: gd.triangleCount.toLocaleString() },
-      { label: "Schema", value: gd.schema },
+      {
+        label: $localize`:How many building elements a model contains@@viewer3d.elementCount:Elements`,
+        value: data.elementCount.toLocaleString(),
+      },
+      {
+        label: $localize`:How many triangles the model's geometry is made of@@viewer3d.triangleCount:Triangles`,
+        value: data.triangleCount.toLocaleString(),
+      },
+      {
+        label: $localize`:Which version of the IFC data format the model uses. IFC and its schema names are identifiers, not words to translate.@@viewer3d.schema:Schema`,
+        value: data.schema,
+      },
     ]);
 
-    const animate = () => {
-      this.animId = requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
-    };
-    animate();
+    this.watchForResize();
+  }
 
-    window.addEventListener("resize", () => {
-      const W2 = this.wrap.nativeElement.clientWidth - 208;
-      const H2 = this.wrap.nativeElement.clientHeight;
-      camera.aspect = W2 / H2;
-      camera.updateProjectionMatrix();
-      renderer.setSize(W2, H2);
-    });
+  /** The space the canvas has, once the sidebar has taken its share. */
+  private canvasSize(): { width: number; height: number } {
+    const wrap = this.wrap.nativeElement;
+    return {
+      width: wrap.clientWidth - Viewer3dComponent.SIDEBAR_WIDTH_PX,
+      height: wrap.clientHeight,
+    };
+  }
+
+  /**
+   * Keeps the canvas the size of its container.
+   *
+   * <p>Registered once and removed on destroy. It was added inside the scene
+   * build and removed nowhere, so opening a second model left the first
+   * still listening — and resizing a renderer that had been disposed.
+   */
+  private watchForResize(): void {
+    if (this.stopWatchingResize) return;
+    const onResize = () => {
+      const size = this.canvasSize();
+      this.viewport?.resize(size.width, size.height);
+    };
+    window.addEventListener('resize', onResize);
+    this.stopWatchingResize = () =>
+      window.removeEventListener('resize', onResize);
   }
 
   onElementSelected(node: IfcNode) {

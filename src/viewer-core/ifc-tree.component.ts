@@ -5,7 +5,9 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import { commandForKey, isBranch, visibleRows } from './tree-navigation';
+import {
+  commandForKey, isBranch, matchingNodes, visibleRows,
+} from './tree-navigation';
 import { iconForType } from './ifc-icons';
 import { IfcPropertiesComponent } from './ifc-properties.component';
 
@@ -321,10 +323,6 @@ export class IfcTreeComponent implements OnChanges {
    *
    * <p>The ▸ glyph is `aria-hidden`; it is the visual half of what
    * `aria-expanded` states, not a second name.
-   *
-   * <p>This is not the full `role="tree"` pattern — that puts `aria-expanded`
-   * on the row and brings roving tabindex and arrow-key navigation with it.
-   * Worth doing, considerably larger than making this button announce itself.
    */
   toggleNode(node: IfcNode) {
     node.expanded = !node.expanded;
@@ -365,21 +363,7 @@ export class IfcTreeComponent implements OnChanges {
   }
 
   filterTree(query: string) {
-    if (!query.trim()) {
-      this.filteredNodes.set(this.treeNodes());
-      return;
-    }
-    const q = query.toLowerCase();
-    const filter = (nodes: IfcNode[]): IfcNode[] =>
-      nodes.flatMap(n => {
-        const match = n.name.toLowerCase().includes(q) || n.type.toLowerCase().includes(q);
-        const filteredChildren = filter(n.children || []);
-        if (match || filteredChildren.length) {
-          return [{ ...n, expanded: true, children: filteredChildren }];
-        }
-        return [];
-      });
-    this.filteredNodes.set(filter(this.treeNodes()));
+    this.filteredNodes.set(matchingNodes(this.treeNodes(), query));
   }
 
   /** The glyph for a type. Decoration; every use is aria-hidden. */

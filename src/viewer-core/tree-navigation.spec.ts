@@ -13,7 +13,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { IfcNode } from './ifc-tree.component';
-import { commandForKey, parentRow, visibleRows } from './tree-navigation';
+import { commandForKey, matchingNodes, parentRow, visibleRows } from './tree-navigation';
 
 function node(id: string, children: IfcNode[] = [], expanded = false): IfcNode {
   return {
@@ -170,5 +170,72 @@ describe('what a key does', () => {
     // would leave the arrows dead until the reader clicked something.
     expect(commandForKey('ArrowDown', visibleRows(model(false)), 'wall-a'))
       .toEqual({ kind: 'focus', node: visibleRows(model(false))[0]!.node });
+  });
+});
+
+describe('matchingNodes', () => {
+  /** A node with only the fields the search reads. */
+  function node(name: string, type: string, children: IfcNode[] = []): IfcNode {
+    return {
+      id: name,
+      name,
+      type,
+      children,
+      expanded: false,
+      selected: false,
+      visible: true,
+    };
+  }
+
+  it('returns everything for an empty search', () => {
+    const all = [node('Level 00', 'IfcBuildingStorey')];
+
+    expect(matchingNodes(all, '   ')).toHaveLength(1);
+  });
+
+  it('finds a node by its name', () => {
+    const all = [node('Level 00', 'IfcBuildingStorey'), node('Roof', 'IfcRoof')];
+
+    expect(matchingNodes(all, 'roof').map(match => match.name)).toEqual(['Roof']);
+  });
+
+  it('finds a node by its IFC type', () => {
+    // The type is what a modeller searches by as often as the name.
+    const all = [node('Level 00', 'IfcBuildingStorey')];
+
+    expect(matchingNodes(all, 'storey')).toHaveLength(1);
+  });
+
+  it('keeps the branch that leads to a match', () => {
+    // A match deep in the model is no use if its ancestors are filtered away.
+    const all = [node('Level 00', 'IfcBuildingStorey', [node('Door 1', 'IfcDoor')])];
+
+    const found = matchingNodes(all, 'door');
+
+    expect(found).toHaveLength(1);
+    expect(found[0]?.children?.map(child => child.name)).toEqual(['Door 1']);
+  });
+
+  it('opens the branches it kept', () => {
+    // A reader who searched has already said what they want to see.
+    const all = [node('Level 00', 'IfcBuildingStorey', [node('Door 1', 'IfcDoor')])];
+
+    expect(matchingNodes(all, 'door')[0]?.expanded).toBe(true);
+  });
+
+  it('drops a branch with nothing matching inside it', () => {
+    const all = [node('Level 00', 'IfcBuildingStorey', [node('Window 1', 'IfcWindow')])];
+
+    expect(matchingNodes(all, 'door')).toEqual([]);
+  });
+
+  it('leaves the model it was given untouched', () => {
+    // These are the host's objects (the viewer is embeddable), and a search
+    // must not leave a model permanently expanded behind it.
+    const original = node('Level 00', 'IfcBuildingStorey', [node('Door 1', 'IfcDoor')]);
+
+    matchingNodes([original], 'door');
+
+    expect(original.expanded).toBe(false);
   });
 });

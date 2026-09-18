@@ -152,3 +152,33 @@ function step(rows: readonly TreeRow[], index: number): TreeCommand {
   const row = rows[index];
   return row ? { kind: 'focus', node: row.node } : NOTHING;
 }
+
+/**
+ * The nodes matching a search, with the branches that lead to them.
+ *
+ * <p>A match deep in the model is no use if its ancestors are filtered away,
+ * so a branch survives when anything inside it matched — and arrives
+ * expanded, because a reader who searched has already said what they want to
+ * see.
+ *
+ * <p>The nodes are copied rather than mutated: these are the host's objects
+ * (§3.1 — the viewer is embeddable), and a search must not leave a model
+ * permanently expanded behind it.
+ */
+export function matchingNodes(
+  nodes: readonly IfcNode[],
+  query: string,
+): IfcNode[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [...nodes];
+
+  return nodes.flatMap((node) => {
+    const matches =
+      node.name.toLowerCase().includes(needle) ||
+      node.type.toLowerCase().includes(needle);
+    const children = matchingNodes(node.children ?? [], needle);
+    return matches || children.length
+      ? [{ ...node, expanded: true, children }]
+      : [];
+  });
+}
