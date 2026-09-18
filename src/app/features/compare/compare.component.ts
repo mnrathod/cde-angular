@@ -1,5 +1,6 @@
 import {
   Component,
+  viewChild,
   signal,
   inject,
   OnInit,
@@ -11,14 +12,21 @@ import { CommonModule } from "@angular/common";
 import { CompareService } from "../../core/services/compare.service";
 import { DocumentService } from "../../core/services/document.service";
 import { ProjectService } from "../../core/services/project.service";
-import { Document, CompareResult, ChangeItem } from "../../core/models";
+import { CompareResult, Document } from "../../core/models";
 import { problemMessage } from "../../core/handlers/problem-detail";
-import { parseComparisonReport } from "./comparison-report";
+import { ChangeListComponent } from "./change-list.component";
+import { ComparisonSummaryComponent } from "./comparison-summary.component";
+import { ModalDialogComponent } from "../../shared/components/modal-dialog.component";
 
 @Component({
   selector: "app-compare",
   standalone: true,
-  imports: [CommonModule],
+  imports: [
+    CommonModule,
+    ChangeListComponent,
+    ComparisonSummaryComponent,
+    ModalDialogComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <div
@@ -168,291 +176,43 @@ import { parseComparisonReport } from "./comparison-report";
 
       <!-- Body: change list + AI sidebar -->
       <div class="flex flex-1 overflow-hidden min-h-0">
-        <!-- Change list -->
-        <div class="flex-1 overflow-y-auto p-5 min-w-0">
-          @if (!result()) {
-            <div
-              class="flex flex-col items-center justify-center h-full text-gray-400"
-            >
-              <div class="text-5xl mb-4" aria-hidden="true">🔍</div>
-              <div i18n="Empty state for the comparison page@@compare.empty"
-                   class="font-semibold mb-1">
-                Select two documents to compare
-              </div>
-              <div i18n="Which file kinds can be compared. The names are file formats and stay as they are.@@compare.supportedFormats"
-                   class="text-sm">
-                Supports DXF · DWG · IFC · PDF · Office · Images
-              </div>
-            </div>
-          }
-
-          @if (result(); as r) {
-            <!-- Overall banner -->
-            <div
-              class="flex items-center gap-3 p-3 rounded-lg mb-4 border"
-              [class]="
-                r.overall === 'identical'
-                  ? 'bg-green-50 border-green-200'
-                  : r.totalChanges > 5
-                    ? 'bg-red-50 border-red-200'
-                    : 'bg-amber-50 border-amber-200'
-              "
-            >
-              <span class="text-2xl">{{
-                r.overall === "identical"
-                  ? "✅"
-                  : r.totalChanges > 5
-                    ? "🔴"
-                    : "🟡"
-              }}</span>
-              <div>
-                <div class="font-semibold text-sm">
-                  {{ r.overall === "identical" ? identicalLabel : changedLabel }}
-                </div>
-                <div class="text-xs text-gray-500">
-                  {{ comparisonSubtitle(r) }}
-                </div>
-              </div>
-            </div>
-
-            <!-- Warning -->
-            @if (r.warning) {
-              <div
-                class="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4 text-xs text-amber-800 whitespace-pre-wrap"
-              >
-                ⚠️ {{ r.warning }}
-              </div>
-            }
-
-            <!-- Stats -->
-            @if (r.totalChanges > 0) {
-              <div class="flex gap-3 mb-4 flex-wrap">
-                <div
-                  class="bg-white rounded border border-gray-200 px-4 py-2 text-center min-w-16"
-                >
-                  <div class="text-xl font-bold font-mono text-accent">
-                    {{ r.totalChanges }}
-                  </div>
-                  <div i18n="How many differences were found altogether. Very short — it labels a number in a small tile.@@compare.totalChanges"
-                       class="text-xs text-gray-500">Total</div>
-                </div>
-                <div
-                  class="bg-white rounded border border-gray-200 px-4 py-2 text-center min-w-16"
-                >
-                  <div class="text-xl font-bold font-mono text-green-600">
-                    +{{ r.added }}
-                  </div>
-                  <div i18n="How many things exist in the revision but not the original. Very short — it labels a number in a small tile.@@compare.addedChanges"
-                       class="text-xs text-gray-500">Added</div>
-                </div>
-                <div
-                  class="bg-white rounded border border-gray-200 px-4 py-2 text-center min-w-16"
-                >
-                  <div class="text-xl font-bold font-mono text-red-600">
-                    -{{ r.removed }}
-                  </div>
-                  <div i18n="How many things existed in the original but not the revision. Very short — it labels a number in a small tile.@@compare.removedChanges"
-                       class="text-xs text-gray-500">Removed</div>
-                </div>
-              </div>
-
-              <!-- Changes by category -->
-              @for (group of groupedChanges(); track group.category) {
-                <div class="mb-4">
-                  <div
-                    class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2"
-                  >
-                    {{ group.category }}
-                  </div>
-                  <div class="space-y-1.5">
-                    @for (c of group.items; track c.change) {
-                      <div
-                        class="flex items-start gap-3 p-2.5 rounded-md text-sm"
-                        [class]="
-                          c.type === 'added'
-                            ? 'bg-green-50 border-s-2 border-green-500'
-                            : c.type === 'removed'
-                              ? 'bg-red-50 border-s-2 border-red-500'
-                              : 'bg-amber-50 border-s-2 border-amber-500'
-                        "
-                      >
-                        <span class="text-base flex-shrink-0">{{
-                          c.icon
-                        }}</span>
-                        <div class="flex-1 min-w-0">
-                          <div class="font-medium text-gray-800">
-                            {{ c.change }}
-                            <span
-                              class="ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-semibold"
-                              [class]="
-                                c.severity === 'high'
-                                  ? 'text-red-600 bg-red-100'
-                                  : c.severity === 'medium'
-                                    ? 'text-amber-600 bg-amber-100'
-                                    : 'text-gray-500 bg-gray-100'
-                              "
-                            >
-                              {{ c.severity }}
-                            </span>
-                          </div>
-                          @if (c.detail) {
-                            <div class="text-xs text-gray-500 mt-0.5">
-                              {{ c.detail }}
-                            </div>
-                          }
-                        </div>
-                      </div>
-                    }
-                  </div>
-                </div>
-              }
-            }
-          }
-        </div>
-
-        <!-- AI Sidebar (600px) -->
-        <div
-          class="border-s border-gray-200 bg-white flex flex-col flex-shrink-0"
-          style="width:600px"
-        >
-          <div
-            class="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0"
-          >
-            <span aria-hidden="true">✨</span>
-            <span i18n="Heading of the panel holding a model-written review of the differences@@compare.aiHeading"
-                  class="font-semibold text-sm flex-1">AI Summary</span>
-            @if (aiLoading()) {
-              <div
-                class="w-4 h-4 border-2 border-blue-200 border-t-accent rounded-full animate-spin"
-              ></div>
-            }
-          </div>
-
-          <div class="flex-1 overflow-y-auto min-h-0">
-            @if (!result()) {
-              <div
-                class="flex flex-col items-center justify-center h-full text-gray-400 p-6 text-center"
-              >
-                <div class="text-4xl mb-3" aria-hidden="true">🤖</div>
-                <div i18n="Empty state for the AI panel, before any comparison has been run@@compare.aiBeforeCompare"
-                     class="text-sm">
-                  Run a comparison then generate an AI-powered engineering
-                  review.
-                </div>
-              </div>
-            } @else if (aiText()) {
-              <!-- Rendered line by line rather than as a string of HTML. See
-                   comparison-report.ts for why. -->
-              <div class="p-4 text-sm leading-relaxed text-gray-700">
-                @for (line of reportLines(); track $index) {
-                  @switch (line.kind) {
-                    @case ("section") {
-                      <h3
-                        class="flex items-center gap-1.5 mt-3 mb-1 pb-1 border-b border-gray-200
-                               text-xs font-semibold uppercase tracking-wide text-accent"
-                      >
-                        <span aria-hidden="true">{{ line.icon }}</span>
-                        {{ line.text }}
-                      </h3>
-                    }
-                    @case ("request") {
-                      <div
-                        class="my-1 py-1.5 px-2.5 rounded-sm text-xs bg-amber-50 border-s-4 border-amber-500"
-                      >
-                        <strong class="text-amber-700">{{ line.reference }}</strong
-                        >@if (line.detail) { — {{ line.detail }} }
-                      </div>
-                    }
-                    @case ("bullet") {
-                      <div class="flex gap-1.5 my-0.5 text-xs">
-                        <span class="text-accent flex-shrink-0" aria-hidden="true">▸</span>
-                        <span>{{ line.text }}</span>
-                      </div>
-                    }
-                    @case ("paragraph") {
-                      <p class="my-0.5 text-xs">{{ line.text }}</p>
-                    }
-                    @default {
-                      <div class="h-1"></div>
-                    }
-                  }
-                }
-              </div>
-            } @else {
-              <div
-                class="flex flex-col items-center justify-center h-full text-gray-400 p-6 text-center"
-              >
-                <div class="text-3xl mb-3" aria-hidden="true">🤖</div>
-                <div i18n="Offers the AI review once a comparison exists. An RFI is a Request For Information, a formal query raised on a construction project.@@compare.aiOffer"
-                     class="text-sm mb-4">
-                  Generate an AI-powered review with revision summary, impacted
-                  disciplines, review comments and RFIs.
-                </div>
-              </div>
-            }
-          </div>
-
-          @if (result() && !aiLoading()) {
-            <div class="p-3 border-t border-gray-200 flex-shrink-0">
-              <button
-                (click)="generateAI()"
-                class="w-full flex items-center justify-center gap-2 py-2 rounded border border-blue-200 bg-blue-50 text-accent text-sm font-medium hover:bg-blue-100 transition-colors"
-              >
-                ✨ {{ aiText() ? "Regenerate Summary" : "AI Summary" }}
-              </button>
-            </div>
-          }
-        </div>
+        <app-change-list [result]="result()" />
+        <app-comparison-summary [result]="result()" />
       </div>
     </div>
 
-    <!-- Document picker modal -->
     @if (showPicker()) {
-      <div
-        class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[800] flex items-center justify-center"
+      <app-modal-dialog
+        [heading]="pickerHeading()"
+        (dismissed)="showPicker.set(false)"
       >
-        <div
-          class="bg-white rounded-lg shadow-2xl w-96 max-h-[70vh] flex flex-col"
-        >
-          <div
-            class="flex items-center justify-between p-4 border-b border-gray-200"
-          >
-            <span class="font-semibold text-sm"
-              >{{ pickerHeading() }}</span
-            >
+        <div class="overflow-y-auto max-h-[50vh] -mx-2">
+          @for (doc of docs(); track doc.id) {
             <button
-              (click)="showPicker.set(false)"
-              class="text-gray-400 hover:text-gray-600"
+              type="button"
+              (click)="selectDoc(doc)"
+              class="w-full text-start flex items-center gap-3 p-2.5 rounded-md cursor-pointer hover:bg-gray-50 transition-colors"
             >
-              ✕
-            </button>
-          </div>
-          <div class="overflow-y-auto flex-1 p-2">
-            @for (doc of docs(); track doc.id) {
-              <button
-                type="button"
-                (click)="selectDoc(doc)"
-                class="w-full text-start flex items-center gap-3 p-2.5 rounded-md cursor-pointer hover:bg-gray-50 transition-colors"
-              >
-                <span class="text-xl flex-shrink-0">{{
-                  docService.getFileIcon(doc)
-                }}</span>
-                <div class="min-w-0 flex-1">
-                  <div class="font-medium text-sm truncate">{{ doc.name }}</div>
-                  <div class="text-xs text-gray-500">
-                    {{ doc.fileName }}
-                    {{ doc.revision ? "· Rev " + doc.revision : "" }}
-                  </div>
+              <span class="text-xl flex-shrink-0" aria-hidden="true">{{
+                docService.getFileIcon(doc)
+              }}</span>
+              <div class="min-w-0 flex-1">
+                <div class="font-medium text-sm truncate">{{ doc.name }}</div>
+                <div class="text-xs text-gray-500">
+                  {{ doc.fileName }}{{ doc.revision ? revisionSuffix(doc.revision) : "" }}
                 </div>
-              </button>
-            }
-          </div>
+              </div>
+            </button>
+          }
         </div>
-      </div>
+      </app-modal-dialog>
     }
   `,
 })
 export class CompareComponent implements OnInit {
+  /** The summary panel, so a new comparison can clear the previous one. */
+  private summary = viewChild(ComparisonSummaryComponent);
+
   private router = inject(Router);
   private compareService = inject(CompareService);
   docService = inject(DocumentService);
@@ -464,11 +224,7 @@ export class CompareComponent implements OnInit {
   comparing = signal(false);
   showPicker = signal(false);
   pickingSlot = signal(1);
-  aiText = signal("");
-  aiLoading = signal(false);
 
-  /** The report as lines to render; empty until one has been generated. */
-  reportLines = computed(() => parseComparisonReport(this.aiText()));
   docs = this.docService.documents;
 
   /**
@@ -478,13 +234,6 @@ export class CompareComponent implements OnInit {
   readonly compareLabel = $localize`:Runs the comparison@@compare.runAction:🔍 Compare`;
   readonly analysingLabel = $localize`:Compare button while the two files are being analysed@@compare.analysing:⏳ Analysing...`;
   readonly chooseFileLabel = $localize`:Prompt inside an empty file slot@@compare.chooseFile:Click to select`;
-  readonly identicalLabel = $localize`:Result banner when the two documents match@@compare.identical:Files are identical`;
-  readonly changedLabel = $localize`:Result banner when the two documents differ@@compare.changed:Changes detected`;
-
-  /** Names the two documents being compared, and what kind they are. */
-  comparisonSubtitle(result: CompareResult): string {
-    return $localize`:Subtitle under the comparison result, naming the two documents and the file type they share@@compare.subtitle:${result.doc1Name}:first: vs ${result.doc2Name}:second: · ${result.fileType}:fileType:`;
-  }
 
   /** Heading of the picker, naming which of the two slots is being filled. */
   pickerHeading(): string {
@@ -495,21 +244,6 @@ export class CompareComponent implements OnInit {
   revisionSuffix(revision: string): string {
     return $localize`:Appended after a file name to show its revision@@compare.revisionSuffix:· Rev ${revision}:revision:`;
   }
-
-  groupedChanges = computed(() => {
-    const r = this.result();
-    if (!r) return [];
-    const groups: Record<string, ChangeItem[]> = {};
-    for (const c of r.changes) {
-      const cat = c.category || "OTHER";
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(c);
-    }
-    return Object.entries(groups).map(([category, items]) => ({
-      category,
-      items,
-    }));
-  });
 
   ngOnInit() {
     const p = this.projectService.selected();
@@ -541,7 +275,9 @@ export class CompareComponent implements OnInit {
     if (!d1 || !d2) return;
     this.comparing.set(true);
     this.result.set(null);
-    this.aiText.set("");
+    // The summary on screen describes documents that are about to be
+    // replaced; leaving it there reads as a summary of the new comparison.
+    this.summary()?.forget();
     this.compareService
       .compare({ documentId1: d1.id, documentId2: d2.id })
       .subscribe({
@@ -551,34 +287,6 @@ export class CompareComponent implements OnInit {
         },
         error: () => this.comparing.set(false),
       });
-  }
-
-  generateAI() {
-    const result = this.result();
-    if (!result) return;
-    this.aiLoading.set(true);
-    this.aiText.set("");
-
-    // Facts, not a prompt. The prompt, the model and the token ceiling are the
-    // server's to decide: this used to assemble the whole thing here and POST
-    // it to an endpoint that forwarded it verbatim to a third party, so a
-    // browser chose what the deployment spent and no filter was possible on
-    // the way out.
-    this.compareService.getComparisonReport(result).subscribe({
-      next: (response) => {
-        this.aiText.set(response.report);
-        this.aiLoading.set(false);
-      },
-      error: (err: unknown) => {
-        this.aiText.set(
-          problemMessage(
-            err,
-            $localize`:Shown when the AI summary of a comparison could not be produced. The comparison result itself is still on screen.@@compare.summaryFailed:The summary could not be produced. The comparison itself is unaffected.`,
-          ),
-        );
-        this.aiLoading.set(false);
-      },
-    });
   }
 
   openVisualCompare() {

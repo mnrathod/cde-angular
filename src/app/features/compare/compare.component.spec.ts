@@ -77,36 +77,6 @@ describe("CompareComponent", () => {
     service = TestBed.inject(CompareService);
   });
 
-  describe("grouping the changes", () => {
-    it("has nothing to group before a comparison has run", () => {
-      expect(compare.groupedChanges()).toEqual([]);
-    });
-
-    it("puts changes of the same category together", () => {
-      compare.result.set(
-        comparison({
-          changes: [change("GEOMETRY"), change("TEXT"), change("GEOMETRY")],
-        }),
-      );
-
-      const groups = compare.groupedChanges();
-
-      expect(groups.map((group) => group.category).sort()).toEqual([
-        "GEOMETRY",
-        "TEXT",
-      ]);
-      expect(groups.find((g) => g.category === "GEOMETRY")?.items).toHaveLength(2);
-    });
-
-    it("gives a change with no category somewhere to go", () => {
-      // Dropping it would lose a real difference between two documents, which
-      // is the one thing this screen exists to show.
-      compare.result.set(comparison({ changes: [change("")] }));
-
-      expect(compare.groupedChanges()).toHaveLength(1);
-    });
-  });
-
   describe("running the comparison", () => {
     it("does nothing until both files are chosen", () => {
       const run = vi.spyOn(service, "compare");
@@ -126,19 +96,6 @@ describe("CompareComponent", () => {
 
       expect(run).toHaveBeenCalledWith({ documentId1: 1, documentId2: 2 });
       expect(compare.comparing()).toBe(false);
-    });
-
-    it("drops a summary written about the previous pair", () => {
-      // It describes documents that are no longer on screen, and leaving it
-      // there reads as a summary of the new comparison.
-      vi.spyOn(service, "compare").mockReturnValue(of(comparison()));
-      compare.doc1.set(document(1, "Rev A"));
-      compare.doc2.set(document(2, "Rev B"));
-      compare.aiText.set("An earlier summary");
-
-      compare.runCompare();
-
-      expect(compare.aiText()).toBe("");
     });
 
     it("stops showing itself as busy when the comparison fails", () => {
@@ -169,42 +126,6 @@ describe("CompareComponent", () => {
       expect(compare.doc2()?.id).toBe(9);
       expect(compare.doc1()).toBeNull();
       expect(compare.showPicker()).toBe(false);
-    });
-  });
-
-  describe("the AI summary", () => {
-    it("has nothing to summarise before a comparison has run", () => {
-      const report = vi.spyOn(service, "getComparisonReport");
-
-      compare.generateAI();
-
-      expect(report).not.toHaveBeenCalled();
-    });
-
-    it("shows the summary the server produced", () => {
-      vi.spyOn(service, "getComparisonReport").mockReturnValue(
-        of({ report: "## Summary\nTwo walls moved." } as ComparisonReport),
-      );
-      compare.result.set(comparison());
-
-      compare.generateAI();
-
-      expect(compare.reportLines().length).toBeGreaterThan(0);
-      expect(compare.aiLoading()).toBe(false);
-    });
-
-    it("says the comparison itself is unaffected when the summary fails", () => {
-      // The changes are still on screen and still correct. A failure here
-      // must not read as a failure of the comparison.
-      vi.spyOn(service, "getComparisonReport").mockReturnValue(
-        throwError(() => ({ status: 503 })),
-      );
-      compare.result.set(comparison());
-
-      compare.generateAI();
-
-      expect(compare.aiText()).toContain("comparison itself is unaffected");
-      expect(compare.aiLoading()).toBe(false);
     });
   });
 
@@ -280,42 +201,6 @@ describe("CompareComponent", () => {
       expect(render()).toContain("Select two");
     });
 
-    it("says when the two documents match", () => {
-      // Lowercase, which is what the converter sends (`'identical' if not
-      // changes`). The banner compares against that exact value.
-      compare.result.set(comparison({ overall: "identical", totalChanges: 0 }));
-
-      expect(render()).toContain("Files are identical");
-    });
-
-    it("counts the changes it found", () => {
-      compare.result.set(
-        comparison({
-          overall: "changed",
-          totalChanges: 2,
-          added: 1,
-          removed: 1,
-          changes: [change("GEOMETRY"), change("TEXT")],
-        }),
-      );
-
-      const text = render();
-
-      expect(text).toContain("Changes detected");
-      expect(text).toContain("GEOMETRY");
-      expect(text).toContain("TEXT");
-    });
-
-    it("passes on a warning the server attached to the result", () => {
-      // A comparison can succeed and still be partial — a page that would not
-      // render, say — and the reader has to know that before trusting it.
-      compare.result.set(
-        comparison({ warning: "Page 4 could not be rendered." }),
-      );
-
-      expect(render()).toContain("Page 4 could not be rendered.");
-    });
-
     it("lists the documents that can be chosen once the picker is open", () => {
       TestBed.inject(DocumentService).documents.set([document(1, "Rev A")]);
       compare.pickFile(1);
@@ -325,14 +210,6 @@ describe("CompareComponent", () => {
   });
 
   describe("what the screen says about the pair", () => {
-    it("names both documents and the type they share", () => {
-      const subtitle = compare.comparisonSubtitle(comparison());
-
-      expect(subtitle).toContain("Site plan Rev A");
-      expect(subtitle).toContain("Site plan Rev B");
-      expect(subtitle).toContain("PDF");
-    });
-
     it("says which of the two slots the picker is filling", () => {
       compare.pickFile(2);
 

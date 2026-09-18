@@ -77,14 +77,16 @@ let dialogSequence = 0;
           >
             {{ cancelLabel }}
           </button>
-          <button
-            type="button"
-            (click)="confirmed.emit()"
-            [disabled]="confirmDisabled()"
-            [class]="confirmClasses()"
-          >
-            {{ confirmLabel() }}
-          </button>
+          @if (confirmLabel()) {
+            <button
+              type="button"
+              (click)="confirmed.emit()"
+              [disabled]="confirmDisabled()"
+              [class]="confirmClasses()"
+            >
+              {{ confirmLabel() }}
+            </button>
+          }
         </div>
       </div>
     </div>
@@ -99,8 +101,14 @@ export class ModalDialogComponent implements OnInit, OnDestroy {
    * arrives.
    */
   error = input("");
-  /** What the button that does the thing says — "Create", "Delete", "Upload". */
-  confirmLabel = input.required<string>();
+  /**
+   * What the button that does the thing says — "Create", "Delete", "Upload".
+   *
+   * <p>Left empty by a dialog with no such button: a picker is confirmed by
+   * choosing something from it, and an extra button beside the list would
+   * have nothing to do.
+   */
+  confirmLabel = input("");
   /** Held while the request it starts is in flight. */
   confirmDisabled = input(false);
   /** Colours the confirm button as a destructive action rather than a normal one. */

@@ -19,7 +19,7 @@ import { ModalDialogComponent } from "./modal-dialog.component";
     @if (open()) {
       <app-modal-dialog
         heading="Delete project?"
-        confirmLabel="Delete"
+        [confirmLabel]="confirmLabel()"
         [error]="error()"
         [destructive]="destructive()"
         [confirmDisabled]="busy()"
@@ -36,6 +36,7 @@ class HostsADialog {
   error = signal("");
   destructive = signal(false);
   busy = signal(false);
+  confirmLabel = signal("Delete");
   dismissals = 0;
   confirmations = 0;
 }
@@ -245,5 +246,18 @@ describe("ModalDialogComponent", () => {
         "Could not delete the project.",
       );
     });
+  });
+
+  it("shows no confirm button for a dialog that has no such action", () => {
+    // A picker is confirmed by choosing from it. A button beside the list
+    // would have nothing to do, and a disabled one would be worse.
+    host.confirmLabel.set("");
+    openDialog();
+
+    const buttons = Array.from(
+      dialog().querySelectorAll("button"),
+    ).map((button) => button.textContent?.trim());
+
+    expect(buttons).toEqual(["Cancel"]);
   });
 });
