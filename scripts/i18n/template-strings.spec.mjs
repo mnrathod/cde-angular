@@ -31,7 +31,14 @@ describe('findUnmarkedStrings', () => {
   });
 
   it('reports text that surrounds an interpolation', () => {
-    expect(textsIn('<span>Page {{ n() }} of {{ total() }}</span>')).toEqual([]);
+    // This asserted [] — the opposite of its own name, and with no reason
+    // given where every neighbouring test has one. The behaviour it locked
+    // in is wrong: "Page 3 of 10" is a message whose word order changes with
+    // the language, and it has to be marked with placeholders rather than
+    // left as two English words either side of a value.
+    expect(textsIn('<span>Page {{ n() }} of {{ total() }}</span>')).toEqual([
+      'Page {{ n() }} of {{ total() }}',
+    ]);
   });
 
   it('ignores punctuation between translated fragments', () => {
@@ -140,5 +147,41 @@ describe('findUnmarkedStrings', () => {
     );
 
     expect(found).toEqual([]);
+  });
+
+  it('flags words sitting alongside an interpolation', () => {
+    // The gap this closes. Angular hands the whole node back as an
+    // expression the moment an interpolation appears, so a check for a
+    // string value skipped the words entirely and the sweep reported the
+    // file clean.
+    const found = findUnmarkedStrings(
+      '<span>Select document for File {{ slot() }}</span>',
+      'picker.ts',
+    );
+
+    expect(found).toHaveLength(1);
+    expect(found[0].text).toContain('Select document for File');
+  });
+
+  it('still says nothing about an interpolation on its own', () => {
+    // There is no source text in `{{ count }}` — only a value — so marking
+    // it would produce a catalogue entry no translator can act on.
+    expect(findUnmarkedStrings('<span>{{ count() }}</span>', 'n.ts')).toEqual([]);
+  });
+
+  it('accepts words beside an interpolation when the element is marked', () => {
+    const found = findUnmarkedStrings(
+      '<span i18n="@@p.slot">Select document for File {{ slot() }}</span>',
+      'picker.ts',
+    );
+
+    expect(found).toEqual([]);
+  });
+
+  it('says nothing about a separator between two interpolations', () => {
+    // "{{ a }} · {{ b }}" means the same in every language.
+    expect(
+      findUnmarkedStrings('<span>{{ a() }} · {{ b() }}</span>', 'n.ts'),
+    ).toEqual([]);
   });
 });

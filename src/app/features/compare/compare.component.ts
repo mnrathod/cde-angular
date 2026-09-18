@@ -210,7 +210,7 @@ import { parseComparisonReport } from "./comparison-report";
                   {{ r.overall === "identical" ? identicalLabel : changedLabel }}
                 </div>
                 <div class="text-xs text-gray-500">
-                  {{ r.doc1Name }} vs {{ r.doc2Name }} · {{ r.fileType }}
+                  {{ comparisonSubtitle(r) }}
                 </div>
               </div>
             </div>
@@ -418,7 +418,7 @@ import { parseComparisonReport } from "./comparison-report";
             class="flex items-center justify-between p-4 border-b border-gray-200"
           >
             <span class="font-semibold text-sm"
-              >Select document for File {{ pickingSlot() }}</span
+              >{{ pickerHeading() }}</span
             >
             <button
               (click)="showPicker.set(false)"
@@ -480,6 +480,16 @@ export class CompareComponent implements OnInit {
   readonly chooseFileLabel = $localize`:Prompt inside an empty file slot@@compare.chooseFile:Click to select`;
   readonly identicalLabel = $localize`:Result banner when the two documents match@@compare.identical:Files are identical`;
   readonly changedLabel = $localize`:Result banner when the two documents differ@@compare.changed:Changes detected`;
+
+  /** Names the two documents being compared, and what kind they are. */
+  comparisonSubtitle(result: CompareResult): string {
+    return $localize`:Subtitle under the comparison result, naming the two documents and the file type they share@@compare.subtitle:${result.doc1Name}:first: vs ${result.doc2Name}:second: · ${result.fileType}:fileType:`;
+  }
+
+  /** Heading of the picker, naming which of the two slots is being filled. */
+  pickerHeading(): string {
+    return $localize`:Heading of the dialog for choosing one of the two documents to compare. The placeholder is 1 or 2.@@compare.pickerHeading:Select document for File ${this.pickingSlot()}:slot:`;
+  }
 
   /** The revision suffix shown under a chosen file, e.g. "· Rev B". */
   revisionSuffix(revision: string): string {
@@ -563,7 +573,7 @@ export class CompareComponent implements OnInit {
         this.aiText.set(
           problemMessage(
             err,
-            "The summary could not be produced. The comparison itself is unaffected.",
+            $localize`:Shown when the AI summary of a comparison could not be produced. The comparison result itself is still on screen.@@compare.summaryFailed:The summary could not be produced. The comparison itself is unaffected.`,
           ),
         );
         this.aiLoading.set(false);

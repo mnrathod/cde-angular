@@ -9,6 +9,7 @@ import { Annotation, AnnotationReply, AnnotationThread } from '../../../core/mod
 import { AnnotationService } from '../../../core/services/viewer/annotation.service';
 import { RoleService } from '../../../core/services/role.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { pageLabel } from '../../../../viewer-core/page-labels';
 
 @Component({
   selector: 'app-annotation-thread',
@@ -31,7 +32,7 @@ import { AuthService } from '../../../core/services/auth.service';
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-semibold text-gray-800">{{ thread.annotation.authorName }}</span>
-                  <span class="text-xs text-gray-400">Page {{ thread.annotation.pageNumber }}</span>
+                  <span class="text-xs text-gray-400">{{ pageLabel(thread.annotation.pageNumber) }}</span>
                   <span class="ml-auto text-xs px-1.5 py-0.5 rounded font-semibold"
                     [class]="thread.annotation.status === 'OPEN'
                       ? 'bg-amber-100 text-amber-700'
@@ -142,6 +143,8 @@ import { AuthService } from '../../../core/services/auth.service';
   `
 })
 export class AnnotationThreadComponent implements OnInit, OnChanges {
+  pageLabel = pageLabel;
+
   @Input() annotations: Annotation[] = [];
   @Input() selectedAnnotationId = signal<number | null>(null);
 

@@ -13,6 +13,7 @@ import { PageOrganiserComponent } from '../markup/page-organiser.component';
 import { RedactionPanelComponent } from '../markup/redaction-panel.component';
 import { OutlinePanelComponent } from '../../../../viewer-core/outline-panel.component';
 import { Annotation } from '../../../core/models';
+import { abbreviatedPageLabel } from '../../../../viewer-core/page-labels';
 
 @Component({
   selector: 'app-viewer-sidebar',
@@ -74,7 +75,7 @@ import { Annotation } from '../../../core/models';
                 <div class="flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 group mb-1">
                   <div class="w-3 h-3 rounded-sm flex-shrink-0" [style.background]="s.color"></div>
                   <span class="text-xs text-gray-600 flex-1 capitalize">{{ s.tool }}{{ s.text ? ': ' + s.text : '' }}</span>
-                  <span class="text-xs text-gray-400">p{{ s.pageNumber }}</span>
+                  <span class="text-xs text-gray-400">{{ pageShort(s.pageNumber) }}</span>
                   <button (click)="state.removeShape(s.id)"
                     i18n-aria-label="@@sidebar.removeShape"
                     aria-label="Remove this markup"
@@ -97,7 +98,7 @@ import { Annotation } from '../../../core/models';
                      (click)="goToPage(ann.pageNumber)">
                   <div class="flex items-center justify-between gap-1">
                     <span class="font-medium text-gray-700">{{ ann.authorName }}</span>
-                    <span class="text-gray-400">p{{ ann.pageNumber }}</span>
+                    <span class="text-gray-400">{{ pageShort(ann.pageNumber) }}</span>
                   </div>
                   @if (ann.comment) {
                     <div class="text-gray-500 mt-0.5 truncate">{{ ann.comment }}</div>
@@ -190,7 +191,9 @@ import { Annotation } from '../../../core/models';
                 <div class="flex items-start gap-2">
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-mono font-semibold text-gray-800">{{ m.value }}</div>
-                    <div class="text-xs text-gray-500">{{ m.kind }} · {{ m.detail }} · p{{ m.page }}</div>
+                    <div class="text-xs text-gray-500">
+                      {{ m.kind }} · {{ m.detail }} · {{ pageShort(m.page) }}
+                    </div>
                   </div>
                   <button (click)="state.removeMeasurement(m.id)"
                     class="opacity-0 group-hover:opacity-100 text-xs text-gray-400 hover:text-red-600"
@@ -290,6 +293,8 @@ import { Annotation } from '../../../core/models';
   `
 })
 export class ViewerSidebarComponent {
+  pageShort = abbreviatedPageLabel;
+
   state      = inject(ViewerStateService);
   annService = inject(AnnotationService);
 

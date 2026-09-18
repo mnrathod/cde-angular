@@ -47,7 +47,7 @@ import { ViewerStateService } from '../../../../viewer-core/viewer-state.service
                           ? 'border-emerald-300 bg-emerald-50'
                           : 'border-gray-200 bg-white' }}">
             <div class="flex items-center gap-1.5">
-              <span class="font-semibold text-gray-800">v{{ version.version }}</span>
+              <span class="font-semibold text-gray-800">{{ versionLabel(version.version) }}</span>
               <span class="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
                 {{ versionService.operationLabel(version.operation) }}
               </span>
@@ -85,6 +85,11 @@ import { ViewerStateService } from '../../../../viewer-core/viewer-state.service
   `
 })
 export class VersionHistoryComponent {
+  /** "v3" — a revision of the document, as its history lists it. */
+  versionLabel(version: number): string {
+    return $localize`:A document revision number as the history panel lists it. "v" is the conventional abbreviation.@@versionHistory.versionNumber:v${version}:version:`;
+  }
+
   readonly versionService = inject(DocumentVersionService);
   private  state          = inject(ViewerStateService);
 

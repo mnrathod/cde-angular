@@ -55,8 +55,19 @@ function sourcesUnder(directory) {
 const templates = new Map(
   ROOTS.flatMap(sourcesUnder)
     .map(path => [path, extractInlineTemplate(readFileSync(path, 'utf8'))])
-    .filter(([, template]) => template !== undefined),
+    .filter(([, found]) => found !== undefined),
 );
+
+/** Every unmarked string in one template, at file-relative line numbers. */
+function problemsIn(path) {
+  const { template, startLine } = templates.get(path);
+  return findUnmarkedStrings(template, path).map(found => ({
+    ...found,
+    // The template's own first line is the line the backtick sits on, so the
+    // two overlap by one.
+    line: found.line + startLine - 1,
+  }));
+}
 
 const problems = [];
 
@@ -81,7 +92,7 @@ if (stale.length > 0) {
 
 const nowClean = [...NOT_YET_TRANSLATED]
   .filter(path => templates.has(path))
-  .filter(path => findUnmarkedStrings(templates.get(path), path).length === 0);
+  .filter(path => problemsIn(path).length === 0);
 if (nowClean.length > 0) {
   problems.push(
     'These are marked up now, so they must come off the baseline — it is ' +
@@ -94,7 +105,7 @@ const unmarked = [...templates.keys()]
   .filter(path => !NOT_YET_TRANSLATED.has(path))
   .sort()
   .flatMap(path =>
-    findUnmarkedStrings(templates.get(path), path).map(
+    problemsIn(path).map(
       found =>
         `  ${path}:${found.line}  ` +
         (found.attribute ? `${found.attribute}="${found.text}"` : found.text),

@@ -61,7 +61,7 @@ const STROKE_WIDTHS = [1, 2, 3, 5];
               i18n-aria-label="@@toolbar.strokeWidthLabel" aria-label="Line width"
               class="h-6 w-16 text-xs border border-gray-300 rounded px-1.5 bg-white">
               @for (width of strokeWidths; track width) {
-                <option [value]="width">{{ width }} px</option>
+                <option [value]="width">{{ pixelLabel(width) }}</option>
               }
             </select>
           </label>
@@ -100,6 +100,11 @@ const STROKE_WIDTHS = [1, 2, 3, 5];
   `,
 })
 export class MarkupContextBarComponent {
+  /** "2 px" — a line width. Where the unit sits varies by language. */
+  pixelLabel(width: number): string {
+    return $localize`:A line width in screen pixels, offered in a dropdown@@toolbar.strokeWidthOption:${width}:width: px`;
+  }
+
   readonly state = inject(ViewerStateService);
   private engine = inject(MarkupEngineService);
 

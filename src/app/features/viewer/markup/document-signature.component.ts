@@ -156,7 +156,7 @@ import { ViewerStateService } from '../../../../viewer-core/viewer-state.service
                 <div class="text-xs text-gray-400 mt-1">
                   {{ sig.signedAt | date:'medium' }}
                   @if (sig.version) {
-                    · covers v{{ sig.version }}
+                    {{ coversVersionLabel(sig.version) }}
                   }
                 </div>
               </div>
@@ -186,6 +186,11 @@ import { ViewerStateService } from '../../../../viewer-core/viewer-state.service
   `
 })
 export class DocumentSignatureComponent implements OnInit {
+  /** Says which revision of the document a signature was applied to. */
+  coversVersionLabel(version: number): string {
+    return $localize`:Follows a signature's details to say which revision of the document it covers@@signature.coversVersion:· covers v${version}:version:`;
+  }
+
   @Input({ required: true }) documentId!: number;
 
   private service = inject(SignatureService);

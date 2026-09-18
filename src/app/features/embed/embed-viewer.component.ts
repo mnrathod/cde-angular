@@ -79,7 +79,7 @@ import { ProblemDetail } from './embed-protocol';
           <h1>{{ session.problem()?.title }}</h1>
           <p>{{ session.problem()?.detail }}</p>
           @if (session.problem()?.traceId; as traceId) {
-            <p class="trace">Reference: {{ traceId }}</p>
+            <p class="trace">{{ referenceLabel(traceId) }}</p>
           }
         </div>
       } @else {
@@ -114,6 +114,11 @@ import { ProblemDetail } from './embed-protocol';
   `],
 })
 export class EmbedViewerComponent implements OnInit, OnDestroy {
+  /** The identifier a user quotes to support (§1.4). */
+  referenceLabel(traceId: string): string {
+    return $localize`:Precedes the identifier a user can quote to support when reporting a fault@@embed.traceReference:Reference: ${traceId}:traceId:`;
+  }
+
 
   readonly session = inject(EmbedSession);
   readonly state = inject(ViewerStateService);

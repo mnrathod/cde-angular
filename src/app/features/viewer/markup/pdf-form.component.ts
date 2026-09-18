@@ -8,6 +8,7 @@ import {
 import { PdfFormService, PdfFormField } from '../../../core/services/pdf-form.service';
 import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 import { problemMessage } from '../../../core/handlers/problem-detail';
+import { abbreviatedPageLabel } from '../../../../viewer-core/page-labels';
 
 /**
  * Renders a PDF's AcroForm fields as an editable form and writes the values
@@ -50,7 +51,7 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
                   i18n-placeholder="@@pdfForm.fieldNamePlaceholder"
                   placeholder="field name"
                   class="flex-1 min-w-0 text-xs border border-gray-300 rounded px-1.5 py-0.5" />
-                <span class="text-xs text-gray-400">p{{ draft.page }}</span>
+                <span class="text-xs text-gray-400">{{ pageShort(draft.page) }}</span>
                 <button (click)="state.removeFormFieldDraft(draft.id)"
                   class="text-red-400 hover:text-red-600 text-xs"
                   i18n-title="Removes one drawn field before it is added@@pdfForm.discardDraft"
@@ -243,6 +244,8 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
   `
 })
 export class PdfFormComponent implements OnInit {
+  pageShort = abbreviatedPageLabel;
+
   @Input({ required: true }) documentId!: number;
   @Input() documentName = 'document';
 

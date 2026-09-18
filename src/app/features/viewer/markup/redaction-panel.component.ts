@@ -7,6 +7,7 @@ import {
 } from '../../../core/services/redaction.service';
 import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 import { problemMessage } from '../../../core/handlers/problem-detail';
+import { abbreviatedPageLabel } from '../../../../viewer-core/page-labels';
 
 /**
  * Redaction: by hand, and by rule.
@@ -88,7 +89,7 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
           @for (match of matches(); track $index) {
             <li (click)="state.navigateTo(match.page)"
                 class="flex items-center gap-2 px-1.5 py-1 text-xs hover:bg-gray-50 cursor-pointer">
-              <span class="text-gray-400 w-8 flex-shrink-0">p{{ match.page }}</span>
+              <span class="text-gray-400 w-8 flex-shrink-0">{{ pageShort(match.page) }}</span>
               <span class="font-mono truncate flex-1 text-gray-700">{{ match.text }}</span>
             </li>
           }
@@ -127,6 +128,8 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
   `
 })
 export class RedactionPanelComponent {
+  pageShort = abbreviatedPageLabel;
+
   private redaction = inject(RedactionService);
   readonly state    = inject(ViewerStateService);
 

@@ -55,6 +55,28 @@ const TRANSLATABLE_ATTRIBUTES = [
  * thing in every language, and marking it produces a catalogue entry no
  * translator can act on.
  */
+/**
+ * The words in a text node, with any interpolated values left out.
+ *
+ * <p>Returns undefined when there is nothing a translator could act on — a
+ * bare `{{ count }}` carries a value, not a message.
+ *
+ * @param {unknown} value a text node's `value`
+ * @returns {string | undefined} the text to report, or undefined
+ */
+function literalTextOf(value) {
+  if (typeof value === 'string') {
+    return isUserFacing(value) ? value : undefined;
+  }
+
+  // An interpolation: `strings` holds the literal pieces around each
+  // expression, and `source` is the original text, which is what a reader
+  // needs to find the line again.
+  const strings = value?.ast?.strings ?? value?.strings;
+  if (!Array.isArray(strings)) return undefined;
+  return isUserFacing(strings.join(' ')) ? (value.source ?? strings.join(' ')) : undefined;
+}
+
 function isUserFacing(text) {
   const withoutInterpolations = text.replace(/\{\{[^}]*\}\}/g, '');
   return /\p{Letter}/u.test(withoutInterpolations);
@@ -93,11 +115,16 @@ function visit(nodes, translated, found) {
   for (const node of nodes) {
     const candidate = node;
 
-    // A text node: `value` is a string for literal text, and an expression
-    // object for an interpolation, which carries no source text to translate.
+    // A text node. `value` is a plain string for literal text, and an
+    // expression object once an interpolation appears anywhere in it —
+    // including when literal words sit alongside one. Those words are exactly
+    // as user-facing as any other, so the literal parts are pulled back out
+    // rather than skipped: `Select document for File {{ slot() }}` read as an
+    // expression and passed a sweep that reported the file clean.
     if (candidate.attributes === undefined && candidate.value !== undefined) {
-      if (!translated && typeof candidate.value === 'string') {
-        record(candidate.value, candidate, found);
+      if (!translated) {
+        const text = literalTextOf(candidate.value);
+        if (text !== undefined) record(text, candidate, found);
       }
       continue;
     }

@@ -13,6 +13,7 @@ import { RemoteCursorsComponent } from '../markup/remote-cursors.component';
 import { PageLinksComponent } from '../../../../viewer-core/page-links.component';
 import { MarkupShapesComponent } from '../../../../viewer-core/markup-shapes.component';
 import { MarkupDrawingSession, MarkupSurface } from '../../../../viewer-core/markup-drawing-session';
+import { pageLabel } from '../../../../viewer-core/page-labels';
 
 @Component({
   selector: 'app-pdf-page',
@@ -36,7 +37,7 @@ import { MarkupDrawingSession, MarkupSurface } from '../../../../viewer-core/mar
       <!-- Placeholder shown while this page is outside the render window -->
       @if (!rendered()) {
         <div class="absolute inset-0 bg-white shadow-lg flex items-center justify-center">
-          <span class="text-xs text-gray-400 select-none">Page {{ pageNumber }}</span>
+          <span class="text-xs text-gray-400 select-none">{{ pageLabel(pageNumber) }}</span>
         </div>
       }
 
@@ -173,6 +174,8 @@ import { MarkupDrawingSession, MarkupSurface } from '../../../../viewer-core/mar
 })
 export class PdfPageComponent
   implements OnInit, AfterViewInit, OnChanges, OnDestroy, MarkupSurface {
+  pageLabel = pageLabel;
+
   @Input({ required: true }) pdfDoc!:    any;
   @Input({ required: true }) pageNumber!: number;
   @Input()                   zoom        = 1.0;
