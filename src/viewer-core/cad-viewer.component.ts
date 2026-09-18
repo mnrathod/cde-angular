@@ -11,18 +11,26 @@ import { MeasurementService } from './measurement.service';
 import { DrawingSearchService } from './drawing-search.service';
 import { MarkupShapesComponent } from './markup-shapes.component';
 import { MarkupDrawingSession, MarkupSurface } from './markup-drawing-session';
+import { CadLayerPanelComponent } from './cad-layer-panel.component';
+import {
+  CadLayer, readLayers, readViewBox, sizeOfViewBox, withLayersHidden,
+} from './cad-layers';
 
-export interface CadLayer {
-  name:    string;
-  color:   string;
-  visible: boolean;
-  count:   number;
-}
+export type { CadLayer } from './cad-layers';
+
+/**
+ * How many layer names the drawing's alternative text lists.
+ *
+ * <p>A drawing can carry hundreds. Reading all of them aloud is not a
+ * description, it is an obstacle — the point is to say what the drawing is.
+ */
+const MAX_LAYERS_DESCRIBED = 8;
+
 
 @Component({
   selector: 'app-cad-viewer',
   standalone: true,
-  imports: [CommonModule, FormsModule, MarkupShapesComponent],
+  imports: [CommonModule, FormsModule, MarkupShapesComponent, CadLayerPanelComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [MarkupDrawingSession],
   template: `
@@ -82,74 +90,12 @@ export interface CadLayer {
         </div>
       </div>
 
-      <!-- Layer panel -->
-      <div class="w-56 bg-white border-s border-gray-200 flex flex-col flex-shrink-0">
-        <div class="p-3 border-b border-gray-200 flex items-center justify-between">
-          <span i18n="Heading of the CAD drawing's layer panel@@cadViewer.layersHeading"
-                class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Layers</span>
-          <div class="flex gap-1">
-            <button (click)="showAll()"
-              i18n="Shows every layer. Very short — it shares a row with another control.@@cadViewer.showAllLayers"
-              class="text-xs text-blue-600 hover:underline">All</button>
-            <span class="text-gray-300" aria-hidden="true">|</span>
-            <button (click)="hideAll()"
-              i18n="Hides every layer. Very short — it shares a row with another control.@@cadViewer.hideAllLayers"
-              class="text-xs text-gray-500 hover:underline">None</button>
-          </div>
-        </div>
-        <div class="flex-1 overflow-y-auto p-2">
-          @for (layer of layers(); track layer.name) {
-            <div class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer"
-                 (click)="toggleLayer(layer)">
-              <!-- Visibility checkbox -->
-              <div class="w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors"
-                   [style.border-color]="layer.color"
-                   [style.background]="layer.visible ? layer.color : 'transparent'">
-                @if (layer.visible) {
-                  <svg viewBox="0 0 10 8" class="w-2.5 h-2 text-white fill-current">
-                    <path d="M1 4L4 7L9 1" stroke="white" stroke-width="1.5" fill="none"/>
-                  </svg>
-                }
-              </div>
-              <!-- Layer swatch -->
-              <div class="w-3 h-3 rounded-sm flex-shrink-0" [style.background]="layer.color"></div>
-              <!-- Layer name -->
-              <span class="text-xs truncate flex-1" [class.text-gray-400]="!layer.visible"
-                    [class.text-gray-700]="layer.visible">
-                {{ layer.name }}
-              </span>
-              <!-- Entity count -->
-              <span class="text-xs text-gray-400 flex-shrink-0">{{ layer.count }}</span>
-            </div>
-          }
-
-          @if (layers().length === 0) {
-            <div i18n="Empty state for the layer panel of a drawing with no layers@@cadViewer.noLayers"
-                 class="text-xs text-gray-400 text-center py-6">No layer data</div>
-          }
-        </div>
-
-        <!-- Stats -->
-        <div class="p-3 border-t border-gray-200 text-xs text-gray-500 space-y-1">
-          <div class="flex justify-between">
-            <span i18n="How many layers are shown, out of how many exist@@cadViewer.visibleLayers">Visible layers</span>
-            <span class="font-mono">{{ visibleCount() }} / {{ layers().length }}</span>
-          </div>
-          @if (dxfVersion) {
-            <div class="flex justify-between">
-              <span i18n="Which revision of the DXF format the drawing uses. DXF is a format name and stays as it is.@@cadViewer.dxfVersion">DXF version</span>
-              <span class="font-mono">{{ dxfVersion }}</span>
-            </div>
-          }
-          @if (entityCount > 0) {
-            <div class="flex justify-between">
-              <span i18n="How many drawable objects the CAD file contains@@cadViewer.entityCount">Entities</span>
-              <span class="font-mono">{{ entityCount }}</span>
-            </div>
-          }
-        </div>
-
-      </div>
+      <app-cad-layer-panel
+        [layers]="layers()"
+        (toggled)="toggleLayer($event)"
+        (allShown)="showAll()"
+        (allHidden)="hideAll()"
+      />
     </div>
   `,
   styles: [`
@@ -303,7 +249,7 @@ export class CadViewerComponent implements OnChanges, AfterViewInit, MarkupSurfa
     container.scrollTop  = 0;
     container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
   }
-  visibleCount  = computed(() => this.layers().filter(l => l.visible).length);
+  visibleCount = computed(() => this.layers().filter((l) => l.visible).length);
 
   // ── Markup ───────────────────────────────────────────────────
   contentViewBox = signal('0 0 800 600');
@@ -342,18 +288,8 @@ export class CadViewerComponent implements OnChanges, AfterViewInit, MarkupSurfa
   });
 
   /** Width and height of the drawing's own coordinate space. */
-  private contentSize = computed<[number, number]>(() => {
-    const parts = this.contentViewBox().split(/\s+/).map(Number);
-    const [, , width, height] = parts;
-    // The viewBox comes from a converted drawing, so a malformed one is an
-    // input problem rather than an impossible state. Falling back to a
-    // sensible page size renders something a user can see, which beats an
-    // exception in a computed signal.
-    return parts.length === 4 && width !== undefined && height !== undefined
-        && !isNaN(width) && !isNaN(height)
-      ? [width, height]
-      : [800, 600];
-  });
+  private contentSize = computed<[number, number]>(() =>
+    sizeOfViewBox(this.contentViewBox()));
 
   /**
    * The drawing with hidden layers styled out, as a string.
@@ -363,24 +299,21 @@ export class CadViewerComponent implements OnChanges, AfterViewInit, MarkupSurfa
    * from this page reaches into it. That isolation is the point; it costs the
    * hover transition the stylesheet used to apply, and nothing else.
    */
-  private readonly drawingSvg = computed(() => {
-    const svg = this.content();
-    if (!svg) return '';
-    const hidden = this.layers().filter((layer) => !layer.visible).map((layer) => layer.name);
-    if (!hidden.length) return svg;
-
-    const rules = hidden
-      .map((name) => `[data-layer="${CSS.escape(name)}"] { display: none !important; }`)
-      .join(' ');
-    return svg.replace('</svg>', `<style>${rules}</style></svg>`);
-  });
+  private readonly drawingSvg = computed(() =>
+    withLayersHidden(this.content(), this.layers()));
 
   /** What a screen reader is told the image is (§1A.4). */
   readonly drawingDescription = computed(() => {
     const named = this.layers().map((layer) => layer.name).filter(Boolean);
-    return named.length
-      ? `Drawing, ${named.length} layers: ${named.slice(0, 8).join(', ')}`
-      : 'Drawing';
+    if (!named.length) {
+      return $localize`:Alternative text for a drawing whose layers could not be read, so there is nothing to name@@cadViewer.drawingAlone:Drawing`;
+    }
+    // A whole sentence with the count and the names as placeholders, rather
+    // than three fragments joined with commas: the word order, the plural
+    // agreement and the list separator are all different in other languages,
+    // and none of them survives concatenation.
+    const shown = named.slice(0, MAX_LAYERS_DESCRIBED).join(', ');
+    return $localize`:Alternative text for a drawing, naming its layers. The first placeholder is how many layers there are in total, the second is the names of the first few@@cadViewer.drawingWithLayers:Drawing with ${named.length}:count: layers: ${shown}:names:`;
   });
 
   /** The drawing as an object URL, revoked when it is replaced. */
@@ -395,106 +328,17 @@ export class CadViewerComponent implements OnChanges, AfterViewInit, MarkupSurfa
   ngOnChanges(changes: SimpleChanges) {
     if (changes['svgContent'] && this.svgContent) {
       // Mirrored into a signal because drawingSvg() is computed and an @Input
-      // is not reactive. Set after the parses below would leave one render
+      // is not reactive. Set after the reads below would leave one render
       // against the previous drawing's layers.
       this.content.set(this.svgContent);
-      this.parseLayers();
-      this.parseViewBox();
+      this.layers.set(readLayers(this.svgContent));
+      this.contentViewBox.set(readViewBox(this.svgContent));
       // Index the drawing's own text so it can be searched. Without this the
       // search panel had nothing to look at for a drawing and answered every
       // query with "No matches found".
       this.state.drawingText.set(this.drawingSearch.extractText(this.svgContent));
       this.state.searchFocus.set(null);
     }
-  }
-
-  // ── Read the embedded drawing's own coordinate space so the markup
-  //    overlay lines up with it exactly, at any zoom/pan level ──────
-  private parseViewBox() {
-    const parser = new DOMParser();
-    const doc    = parser.parseFromString(this.svgContent, 'image/svg+xml');
-    const svgEl  = doc.querySelector('svg');
-    if (!svgEl) return;
-
-    const viewBox = svgEl.getAttribute('viewBox');
-    if (viewBox) {
-      this.contentViewBox.set(viewBox);
-      return;
-    }
-    const width  = parseFloat(svgEl.getAttribute('width')  || '') || 800;
-    const height = parseFloat(svgEl.getAttribute('height') || '') || 600;
-    this.contentViewBox.set(`0 0 ${width} ${height}`);
-  }
-
-  private parseLayers() {
-    // Parse SVG to extract layer names from group IDs and data-layer attributes
-    const parser = new DOMParser();
-    const doc    = parser.parseFromString(this.svgContent, 'image/svg+xml');
-
-    const layerMap = new Map<string, { color: string; count: number }>();
-
-    // Method 1: Look for groups with data-layer or id="layer:NAME"
-    doc.querySelectorAll('g[id^="layer:"], g[data-layer]').forEach(g => {
-      const name  = g.getAttribute('data-layer') || g.id.replace('layer:', '');
-      const color = this.extractColor(g) || this.layerColor(name);
-      if (!layerMap.has(name)) {
-        layerMap.set(name, { color, count: 0 });
-      }
-      layerMap.get(name)!.count += g.querySelectorAll('*').length;
-    });
-
-    // Method 2: ezdxf SVG uses class="layer-NAME" on elements
-    doc.querySelectorAll('[class*="layer-"]').forEach(el => {
-      const match = (el as SVGElement).className?.baseVal?.match(/layer-([^\s]+)/);
-      if (match) {
-        const name  = match[1];
-        const color = this.extractColor(el) || this.layerColor(name);
-        if (!layerMap.has(name)) {
-          layerMap.set(name, { color, count: 0 });
-        }
-        layerMap.get(name)!.count += 1;
-      }
-    });
-
-    // Method 3: Look for <g> with title children (common DXF SVG pattern)
-    if (layerMap.size === 0) {
-      doc.querySelectorAll('g').forEach(g => {
-        const title = g.querySelector('title');
-        if (title?.textContent) {
-          const name  = title.textContent.trim();
-          const color = this.extractColor(g) || this.layerColor(name);
-          if (!layerMap.has(name)) {
-            layerMap.set(name, { color, count: 0 });
-          }
-          layerMap.get(name)!.count += g.children.length;
-        }
-      });
-    }
-
-    this.layers.set(
-      Array.from(layerMap.entries()).map(([name, info]) => ({
-        name, color: info.color, visible: true, count: info.count
-      })).sort((a, b) => a.name.localeCompare(b.name))
-    );
-  }
-
-  private extractColor(el: Element): string {
-    const stroke = el.getAttribute('stroke');
-    if (stroke && stroke !== 'none' && stroke !== 'currentColor') return stroke;
-    const fill = el.getAttribute('fill');
-    if (fill && fill !== 'none' && fill !== 'currentColor') return fill;
-    return '';
-  }
-
-  private layerColor(name: string): string {
-    // Generate consistent color from layer name
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = ((hash << 5) - hash) + name.charCodeAt(i);
-      hash |= 0;
-    }
-    const h = Math.abs(hash) % 360;
-    return `hsl(${h}, 65%, 55%)`;
   }
 
   toggleLayer(layer: CadLayer) {
