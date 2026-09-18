@@ -12,12 +12,14 @@ import { CollaborationService } from '../../../core/services/collaboration.servi
 import { RemoteCursorsComponent } from '../markup/remote-cursors.component';
 import { PageLinksComponent } from '../../../../viewer-core/page-links.component';
 import { MarkupShapesComponent } from '../../../../viewer-core/markup-shapes.component';
+import { MarkupDrawingSession, MarkupSurface } from '../../../../viewer-core/markup-drawing-session';
 
 @Component({
   selector: 'app-pdf-page',
   standalone: true,
   imports: [CommonModule, RemoteCursorsComponent, PageLinksComponent, MarkupShapesComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [MarkupDrawingSession],
   template: `
     <!-- Outer box takes the rotated footprint so the scroll container
          reserves the right space; the inner box is what actually turns. -->
@@ -63,13 +65,13 @@ import { MarkupShapesComponent } from '../../../../viewer-core/markup-shapes.com
         [attr.viewBox]="'0 0 ' + pageWidth() + ' ' + pageHeight()"
         [style.cursor]="cursorStyle()"
         [style.pointer-events]="drawingEnabled() ? 'auto' : 'none'"
-        (mousedown)="onPointerDown($event)"
-        (mousemove)="onPointerMove($event)"
-        (mouseup)="onPointerUp($event)"
-        (dblclick)="onDoubleClick($event)"
-        (touchstart)="onPointerDown($event); $event.preventDefault()"
-        (touchmove)="onPointerMove($event); $event.preventDefault()"
-        (touchend)="onPointerUp($event)">
+        (mousedown)="session.pointerDown($event)"
+        (mousemove)="session.pointerMove($event)"
+        (mouseup)="session.pointerUp()"
+        (dblclick)="session.doubleClick($event)"
+        (touchstart)="session.pointerDown($event); $event.preventDefault()"
+        (touchmove)="session.pointerMove($event); $event.preventDefault()"
+        (touchend)="session.pointerUp()">
 
         <!-- Saved / persisted shapes -->
         <g markupShapes [shapes]="shapesOnPage()"></g>
@@ -97,9 +99,9 @@ import { MarkupShapesComponent } from '../../../../viewer-core/markup-shapes.com
         }
 
         <!-- In-progress shape being drawn (polygon/polyline rubber-band
-             to the cursor between clicks via previewShape()) -->
-        @if (activeShape()) {
-          <g markupShapes [shapes]="[previewShape()]"></g>
+             to the cursor between clicks via the session) -->
+        @if (session.activeShape()) {
+          <g markupShapes [shapes]="[session.previewShape()]"></g>
         }
       </svg>
 
@@ -169,7 +171,8 @@ import { MarkupShapesComponent } from '../../../../viewer-core/markup-shapes.com
     }
   `]
 })
-export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDestroy {
+export class PdfPageComponent
+  implements OnInit, AfterViewInit, OnChanges, OnDestroy, MarkupSurface {
   @Input({ required: true }) pdfDoc!:    any;
   @Input({ required: true }) pageNumber!: number;
   @Input()                   zoom        = 1.0;
@@ -189,18 +192,14 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   state   = inject(ViewerStateService);
   engine  = inject(PdfEngineService);
   markup  = inject(MarkupEngineService);
+  session = inject(MarkupDrawingSession);
   measure = inject(MeasurementService);
   private collaboration = inject(CollaborationService);
 
   pageWidth  = signal(0);
   pageHeight = signal(0);
   rendered   = signal(false);
-  activeShape = signal<ShapeData | null>(null);
-  private drawing = false;
   private viewport: any = null;
-  // Live cursor position while a polygon/polyline is mid-click-sequence,
-  // so the in-progress shape rubber-bands to the pointer between vertices.
-  private polyHover: PointerPoint | null = null;
 
   /**
    * With the pan tool the markup overlay stops capturing pointer events, so
@@ -225,6 +224,9 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
   // ngOnInit/ngOnChanges — calling render() before this silently no-ops
   // on its `!this.canvas` guard, which is why pages never painted.
   ngAfterViewInit() {
+    // After the view exists, because the session measures against the markup
+    // overlay and reads it through the getter above.
+    this.session.attachTo(this);
     this.render();
   }
 
@@ -319,34 +321,35 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       }));
   });
 
-  // ── Unified pointer handling (mouse + touch) ─────────────────
-  onPointerDown(e: MouseEvent | TouchEvent) {
-    const tool = this.state.activeTool();
-    if (tool === 'pan' || tool === 'select') return;
-
-    const pt = this.markup.getSvgPoint(e, this.svg.nativeElement);
-
-    if (this.markup.isTextTool(tool)) {
-      this.drawing = true;
-      this.handleTextTool(pt, tool);
-      return;
-    }
-
-    if (this.markup.isVertexTool(tool)) {
-      this.handlePolyClick(pt, tool, (e as MouseEvent).detail ?? 1);
-      return;   // click-driven — never sets `drawing`, mouseup is a no-op
-    }
-
-    this.drawing = true;
-    const shape = this.markup.startShape(
-      tool, pt, this.pageNumber,
-      this.state.strokeColor(),
-      this.state.strokeWidth(),
-      this.state.fillOpacity(),
-      'current-user'
-    );
-    this.activeShape.set(shape);
+  /**
+   * The gesture that draws a shape lives in the session, shared with the CAD
+   * drawing so the two cannot disagree about which gestures finish a shape.
+   * What stays here is what is genuinely this page's: its number, its zoom,
+   * and the fact that a redaction or a form field goes somewhere other than
+   * the shape list.
+   */
+  get overlay(): SVGSVGElement {
+    return this.svg.nativeElement;
   }
+  get acceptsDrawing(): boolean {
+    const tool = this.state.activeTool();
+    return tool !== 'pan' && tool !== 'select';
+  }
+  commit(shape: ShapeData): void {
+    if (shape.tool === 'redact') {
+      this.commitRedactionRegion(shape);
+    } else if (shape.tool === 'formfield') {
+      this.commitFormFieldDraft(shape);
+    } else {
+      this.state.addShape(shape);
+    }
+  }
+
+  @HostListener('document:keydown.enter')
+  finishFromKeyboard() { this.session.finishFromKeyboard(); }
+
+  @HostListener('document:keydown.escape')
+  cancelPolyInProgress() { this.session.cancel(); }
 
   /**
    * Tells other viewers where this pointer is.
@@ -366,150 +369,6 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
       x: (e.clientX - box.left) / scale,
       y: (e.clientY - box.top) / scale
     });
-  }
-
-  onPointerMove(e: MouseEvent | TouchEvent) {
-    const active = this.activeShape();
-    if (!active) return;
-    const pt = this.markup.getSvgPoint(e, this.svg.nativeElement);
-    if (this.markup.isVertexTool(active.tool)) {
-      this.polyHover = pt;   // rubber-band only; vertices are click-committed
-      return;
-    }
-    if (!this.drawing) return;
-    this.activeShape.set(this.markup.updateShape(active, pt));
-  }
-
-  onPointerUp(e: MouseEvent | TouchEvent) {
-    if (!this.drawing || !this.activeShape()) return;
-    this.drawing = false;
-    const shape  = this.activeShape()!;
-    // Only commit if the shape has meaningful size
-    if (this.markup.hasMinimumSize(shape)) {
-      if (shape.tool === 'redact') {
-        this.commitRedactionRegion(shape);
-      } else if (shape.tool === 'formfield') {
-        this.commitFormFieldDraft(shape);
-      } else {
-        this.state.addShape(shape);
-      }
-    }
-    this.activeShape.set(null);
-  }
-
-  // ── Vertex tools: click to add a point, double-click to finish ────
-  private handlePolyClick(pt: PointerPoint, tool: MarkupTool, clickDetail = 1) {
-    const current = this.activeShape();
-
-    // One decision covers every way of ending the shape, so the PDF page and
-    // the CAD drawing cannot drift apart on which gestures work.
-    if (current && current.tool === tool
-        && this.markup.finishesShape(current, pt, this.closeTolerance(), clickDetail)) {
-      this.finishVertexShape(current);
-      return;
-    }
-
-    const shape = current && current.tool === tool
-      ? this.markup.addVertex(current, pt)
-      : this.markup.startShape(
-          tool, pt, this.pageNumber,
-          this.state.strokeColor(), this.state.strokeWidth(), this.state.fillOpacity(),
-          'current-user');
-
-    // Radius and calibration take exactly two clicks, so they complete
-    // themselves rather than waiting for a double-click the user has no
-    // reason to expect.
-    const required = this.markup.requiredVertices(tool);
-    if (required !== null && (shape.points?.length ?? 0) >= required) {
-      this.finishVertexShape(shape);
-      return;
-    }
-    this.activeShape.set(shape);
-  }
-
-  onDoubleClick(e: MouseEvent) {
-    const shape = this.activeShape();
-    if (!shape || !this.markup.isVertexTool(shape.tool)) return;
-    e.preventDefault();
-    // The dblclick's second click already added a spurious vertex — drop it.
-    this.finishVertexShape(this.markup.removeLastVertex(shape));
-  }
-
-  private finishVertexShape(shape: ShapeData) {
-    this.polyHover = null;
-    this.activeShape.set(null);
-    if (!this.markup.hasMinimumSize(shape)) return;
-
-    if (this.isMeasurementTool(shape.tool)) {
-      this.commitMeasurement(shape);
-      return;
-    }
-    this.state.addShape(shape);
-  }
-
-  @HostListener('document:keydown.escape')
-  cancelPolyInProgress() {
-    const shape = this.activeShape();
-    if (shape && this.markup.isVertexTool(shape.tool)) {
-      this.activeShape.set(null);
-      this.polyHover = null;
-    }
-  }
-
-  /**
-   * Finish the shape from the keyboard. Enter is the primary way out: unlike
-   * a double-click it does not depend on two presses landing close enough
-   * together in time and space to be recognised as one gesture.
-   */
-  @HostListener('document:keydown.enter')
-  finishFromKeyboard() {
-    const shape = this.activeShape();
-    if (!this.markup.canFinish(shape)) return;
-    this.finishVertexShape(shape!);
-  }
-
-  /**
-   * How near a vertex a click has to land to end the shape, expressed in this
-   * overlay's own coordinates. Taken from the element's screen transform so it
-   * is always the same distance to the eye, whatever the viewBox scale or the
-   * zoom level.
-   */
-  private closeTolerance(): number {
-    return this.markup.toleranceInUserUnits(this.svg.nativeElement);
-  }
-
-  private isMeasurementTool(tool: MarkupTool): boolean {
-    return tool === 'dimension' || tool === 'area'
-        || tool === 'radius'    || tool === 'calibrate';
-  }
-
-  /**
-   * Turns a drawn measurement into its readouts. Lengths are computed in
-   * page pixels first and then scaled, so a calibration applied later
-   * cannot change what was already measured.
-   */
-  private commitMeasurement(shape: ShapeData) {
-    const points = shape.points ?? [];
-    const scale  = this.state.measurementScale();
-
-    // Calibration is not a measurement — it defines the scale, so it hands
-    // the drawn length to the toolbar and draws nothing.
-    if (shape.tool === 'calibrate') {
-      this.state.pendingCalibrationPixels.set(this.measure.pathLength(points) / this.zoom);
-      return;
-    }
-
-    const { shape: described, entry } = this.measure.describe(shape, scale, this.zoom);
-    this.state.addShape(described);
-    this.state.addMeasurement({ ...entry, id: shape.id, page: this.pageNumber });
-  }
-
-  // ── Live shape used for rendering only — appends the un-committed
-  //    cursor position to polygon/polyline so they rubber-band to the
-  //    pointer between clicks; every other tool renders unchanged. ──────
-  previewShape(): ShapeData {
-    const shape = this.activeShape()!;
-    return this.markup.withPreviewPoint(shape, this.polyHover);
   }
 
   // Convert a drawn rect (screen pixels, top-left origin, current zoom)
@@ -573,22 +432,6 @@ export class PdfPageComponent implements OnInit, AfterViewInit, OnChanges, OnDes
         screenHeight: draft.height * zoom
       }));
   });
-
-  // ── Text tool — show input prompt ───────────────────────────
-  private handleTextTool(pt: PointerPoint, tool: MarkupTool) {
-    const promptText = tool === 'stamp' ? 'Stamp text:'
-      : tool === 'note' ? 'Sticky note:'
-      : tool === 'callout' ? 'Callout text:' : 'Enter annotation text:';
-    const text = prompt(promptText);
-    if (text?.trim()) {
-      const shape = this.markup.startShape(
-        tool, pt, this.pageNumber,
-        this.state.strokeColor(), this.state.strokeWidth(), 0
-      );
-      this.state.addShape({ ...shape, text });
-    }
-    this.drawing = false;
-  }
 
   // ── Build the text layer and mark search matches ─────────────
   private async highlightSearch() {

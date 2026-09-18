@@ -1,6 +1,7 @@
 import {
   Component, inject, signal, computed, effect, Input, OnChanges,
-  SimpleChanges, ChangeDetectionStrategy, ElementRef, ViewChild, HostListener
+  SimpleChanges, ChangeDetectionStrategy, ElementRef, ViewChild, HostListener,
+  AfterViewInit
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -9,6 +10,7 @@ import { ViewerStateService, ShapeData, MarkupTool } from './viewer-state.servic
 import { MeasurementService } from './measurement.service';
 import { DrawingSearchService } from './drawing-search.service';
 import { MarkupShapesComponent } from './markup-shapes.component';
+import { MarkupDrawingSession, MarkupSurface } from './markup-drawing-session';
 
 export interface CadLayer {
   name:    string;
@@ -22,6 +24,7 @@ export interface CadLayer {
   standalone: true,
   imports: [CommonModule, FormsModule, MarkupShapesComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [MarkupDrawingSession],
   template: `
     <div class="flex flex-1 overflow-hidden min-h-0">
 
@@ -50,18 +53,18 @@ export interface CadLayer {
             [attr.viewBox]="contentViewBox()"
             [style.cursor]="cursorStyle()"
             [style.pointer-events]="drawingEnabled() ? 'auto' : 'none'"
-            (mousedown)="onPointerDown($event)"
-            (mousemove)="onPointerMove($event)"
-            (mouseup)="onPointerUp($event)"
-            (dblclick)="onDoubleClick($event)"
-            (touchstart)="onPointerDown($event); $event.preventDefault()"
-            (touchmove)="onPointerMove($event); $event.preventDefault()"
-            (touchend)="onPointerUp($event)">
+            (mousedown)="session.pointerDown($event)"
+            (mousemove)="session.pointerMove($event)"
+            (mouseup)="session.pointerUp()"
+            (dblclick)="session.doubleClick($event)"
+            (touchstart)="session.pointerDown($event); $event.preventDefault()"
+            (touchmove)="session.pointerMove($event); $event.preventDefault()"
+            (touchend)="session.pointerUp()">
 
             <!-- Saved / in-progress shapes (CAD/SVG drawings have a single "page") -->
             <g markupShapes [shapes]="shapesOnDrawing()"></g>
-            @if (activeShape()) {
-              <g markupShapes [shapes]="[previewShape()]"></g>
+            @if (session.activeShape()) {
+              <g markupShapes [shapes]="[session.previewShape()]"></g>
             }
 
             <!--
@@ -155,7 +158,7 @@ export interface CadLayer {
     .cad-svg-host { display: block; max-width: 100%; }
   `]
 })
-export class CadViewerComponent implements OnChanges {
+export class CadViewerComponent implements OnChanges, AfterViewInit, MarkupSurface {
   /*
    * The drawing is rendered through `<img>`, never injected as markup.
    *
@@ -186,6 +189,7 @@ export class CadViewerComponent implements OnChanges {
   markup = inject(MarkupEngineService);
   measure = inject(MeasurementService);
   private drawingSearch = inject(DrawingSearchService);
+  session = inject(MarkupDrawingSession);
 
   layers        = signal<CadLayer[]>([]);
   /** `svgContent` as a signal; see ngOnChanges. */
@@ -303,11 +307,8 @@ export class CadViewerComponent implements OnChanges {
 
   // ── Markup ───────────────────────────────────────────────────
   contentViewBox = signal('0 0 800 600');
-  activeShape    = signal<ShapeData | null>(null);
-  private drawing = false;
   // Live cursor position while a polygon/polyline is mid-click-sequence —
   // mirrors PdfPageComponent's identical rubber-band handling.
-  private polyHover: PointerPoint | null = null;
 
   drawingEnabled = computed(() => {
     const tool = this.state.activeTool();
@@ -384,6 +385,12 @@ export class CadViewerComponent implements OnChanges {
 
   /** The drawing as an object URL, revoked when it is replaced. */
   readonly drawingUrl = signal<string | null>(null);
+
+  ngAfterViewInit(): void {
+    // After the view exists, because the session measures against the overlay
+    // element and reads it through the getter below.
+    this.session.attachTo(this);
+  }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['svgContent'] && this.svgContent) {
@@ -511,174 +518,33 @@ export class CadViewerComponent implements OnChanges {
   zoomIn()    { this.state.zoomIn(); }
   zoomOut()   { this.state.zoomOut(); }
 
-  // ── Markup drawing — mirrors PdfPageComponent's pointer handling,
-  //    against this drawing's own viewBox instead of a rendered PDF page ──
-  /** A CAD drawing is a single page, so everything on page 1 belongs here. */
-  readonly shapesOnDrawing = computed(() =>
-    this.state.shapes().filter((shape) => shape.pageNumber === 1));
-
-  onPointerDown(e: MouseEvent | TouchEvent) {
-    if (!this.drawingEnabled()) return;
-    const tool = this.state.activeTool();
-    const pt   = this.markup.getSvgPoint(e, this.markupSvg.nativeElement);
-
-    if (this.markup.isTextTool(tool)) {
-      this.drawing = true;
-      this.handleTextTool(pt, tool);
-      return;
-    }
-
-    if (this.markup.isVertexTool(tool)) {
-      this.handlePolyClick(pt, tool, (e as MouseEvent).detail ?? 1);
-      return;   // click-driven — never sets `drawing`, mouseup is a no-op
-    }
-
-    this.drawing = true;
-    const shape = this.markup.startShape(
-      tool, pt, 1,
-      this.state.strokeColor(),
-      this.state.strokeWidth(),
-      this.state.fillOpacity(),
-      'current-user'
-    );
-    this.activeShape.set(shape);
-  }
-
-  onPointerMove(e: MouseEvent | TouchEvent) {
-    const active = this.activeShape();
-    if (!active) return;
-    const pt = this.markup.getSvgPoint(e, this.markupSvg.nativeElement);
-    if (this.markup.isVertexTool(active.tool)) {
-      this.polyHover = pt;
-      return;
-    }
-    if (!this.drawing) return;
-    this.activeShape.set(this.markup.updateShape(active, pt));
-  }
-
-  onPointerUp(e: MouseEvent | TouchEvent) {
-    if (!this.drawing || !this.activeShape()) return;
-    this.drawing = false;
-    const shape = this.activeShape()!;
-    if (this.markup.hasMinimumSize(shape)) {
-      this.state.addShape(shape);
-    }
-    this.activeShape.set(null);
-  }
-
-  // ── Polygon / polyline: click to add a vertex, double-click to finish ──
-  private handlePolyClick(pt: PointerPoint, tool: MarkupTool, clickDetail = 1) {
-    const current = this.activeShape();
-
-    // One decision covers every way of ending the shape, so the PDF page and
-    // the CAD drawing cannot drift apart on which gestures work.
-    if (current && current.tool === tool
-        && this.markup.finishesShape(current, pt, this.closeTolerance(), clickDetail)) {
-      this.finishVertexShape(current);
-      return;
-    }
-
-    const shape = current && current.tool === tool
-      ? this.markup.addVertex(current, pt)
-      : this.markup.startShape(
-          tool, pt, 1,
-          this.state.strokeColor(), this.state.strokeWidth(), this.state.fillOpacity(),
-          'current-user');
-
-    // Radius and calibration take exactly two clicks and complete themselves.
-    const required = this.markup.requiredVertices(tool);
-    if (required !== null && (shape.points?.length ?? 0) >= required) {
-      this.finishVertexShape(shape);
-      return;
-    }
-    this.activeShape.set(shape);
-  }
-
-  onDoubleClick(e: MouseEvent) {
-    const shape = this.activeShape();
-    if (!shape || !this.markup.isVertexTool(shape.tool)) return;
-    e.preventDefault();
-    this.finishVertexShape(this.markup.removeLastVertex(shape));
-  }
-
   /**
-   * Finish the shape from the keyboard. Enter is the primary way out: unlike
-   * a double-click it does not depend on two presses landing close enough
-   * together in time and space to be recognised as one gesture.
+   * The shape being drawn, and the gesture that draws it, both live in the
+   * session — shared with the PDF page so the two cannot disagree about which
+   * gestures finish a shape.
    */
-  @HostListener('document:keydown.enter')
-  finishFromKeyboard() {
-    const shape = this.activeShape();
-    if (!this.markup.canFinish(shape)) return;
-    this.finishVertexShape(shape!);
+  get overlay(): SVGSVGElement {
+    return this.markupSvg.nativeElement;
   }
-
-  /** Abandon a half-drawn shape. Without this it could not be got rid of. */
-  @HostListener('document:keydown.escape')
-  cancelVertexShape() {
-    const shape = this.activeShape();
-    if (!shape || !this.markup.isVertexTool(shape.tool)) return;
-    this.activeShape.set(null);
-    this.polyHover = null;
+  /** A CAD drawing is a single page, so everything belongs to page 1. */
+  readonly pageNumber = 1;
+  get zoom(): number {
+    return this.state.zoom();
   }
-
-  /**
-   * How near a vertex a click has to land to end the shape, expressed in this
-   * overlay's own coordinates. Taken from the element's screen transform so it
-   * is always the same distance to the eye, whatever the viewBox scale or the
-   * zoom level.
-   */
-  private closeTolerance(): number {
-    return this.markup.toleranceInUserUnits(this.markupSvg.nativeElement);
+  get acceptsDrawing(): boolean {
+    return this.drawingEnabled();
   }
-
-  private finishVertexShape(shape: ShapeData) {
-    this.polyHover = null;
-    this.activeShape.set(null);
-    if (!this.markup.hasMinimumSize(shape)) return;
-
-    if (shape.tool === 'calibrate') {
-      // Calibration defines the scale rather than recording a measurement,
-      // so it hands its drawn length to the toolbar and draws nothing.
-      this.state.pendingCalibrationPixels.set(
-        this.measure.pathLength(shape.points ?? []) / this.state.zoom());
-      return;
-    }
-    if (shape.tool === 'dimension' || shape.tool === 'area' || shape.tool === 'radius') {
-      const { shape: described, entry } =
-        this.measure.describe(shape, this.state.measurementScale(), this.state.zoom());
-      this.state.addShape(described);
-      this.state.addMeasurement({ ...entry, id: shape.id, page: 1 });
-      return;
-    }
+  commit(shape: ShapeData): void {
     this.state.addShape(shape);
   }
 
+  /** Everything on page 1 — which, on a drawing, is everything. */
+  readonly shapesOnDrawing = computed(() =>
+    this.state.shapes().filter((shape) => shape.pageNumber === 1));
+
+  @HostListener('document:keydown.enter')
+  finishFromKeyboard() { this.session.finishFromKeyboard(); }
+
   @HostListener('document:keydown.escape')
-  cancelPolyInProgress() {
-    const shape = this.activeShape();
-    if (shape && this.markup.isVertexTool(shape.tool)) {
-      this.activeShape.set(null);
-      this.polyHover = null;
-    }
-  }
-
-  previewShape(): ShapeData {
-    const shape = this.activeShape()!;
-    return this.markup.withPreviewPoint(shape, this.polyHover);
-  }
-
-  private handleTextTool(pt: PointerPoint, tool: MarkupTool) {
-    const promptText = tool === 'stamp' ? 'Stamp text:'
-      : tool === 'note' ? 'Sticky note:'
-      : tool === 'callout' ? 'Callout text:' : 'Enter annotation text:';
-    const text = prompt(promptText);
-    if (text?.trim()) {
-      const shape = this.markup.startShape(
-        tool, pt, 1, this.state.strokeColor(), this.state.strokeWidth(), 0
-      );
-      this.state.addShape({ ...shape, text });
-    }
-    this.drawing = false;
-  }
+  cancelVertexShape() { this.session.cancel(); }
 }
