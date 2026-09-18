@@ -42,39 +42,45 @@ import {
           (click)="goBack()"
           class="text-xs px-3 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20"
         >
-          ← Back
+          <span aria-hidden="true">←</span>
+          <ng-container i18n="Leaves the 3D model view and returns to the document list@@viewer3d.back">Back</ng-container>
         </button>
         <span class="text-sm font-semibold flex-1 truncate">{{ title() }}</span>
         <button
           (click)="resetCamera()"
           class="text-xs px-2 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20"
         >
-          ⌂ Reset
+          <span aria-hidden="true">⌂</span>
+          <ng-container i18n="Returns the camera to its starting position. Very short — it sits in a crowded toolbar.@@viewer3d.resetCamera">Reset</ng-container>
         </button>
         <button
           (click)="toggleWireframe()"
           class="text-xs px-2 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20"
           [class.bg-accent]="wireframe()"
         >
-          ⬡ Wire
+          <span aria-hidden="true">⬡</span>
+          <ng-container i18n="Toggles wireframe rendering, showing edges rather than solid faces. Very short — it sits in a crowded toolbar.@@viewer3d.wireframe">Wire</ng-container>
         </button>
         <button
           (click)="snapView('top')"
           class="text-xs px-2 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20"
         >
-          ⊤ Top
+          <span aria-hidden="true">⊤</span>
+          <ng-container i18n="Snaps the camera to look straight down at the model. Very short — it sits in a crowded toolbar.@@viewer3d.viewTop">Top</ng-container>
         </button>
         <button
           (click)="snapView('front')"
           class="text-xs px-2 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20"
         >
-          ◫ Front
+          <span aria-hidden="true">◫</span>
+          <ng-container i18n="Snaps the camera to look at the model from the front. Very short — it sits in a crowded toolbar.@@viewer3d.viewFront">Front</ng-container>
         </button>
         <button
           (click)="snapView('side')"
           class="text-xs px-2 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20"
         >
-          ◧ Side
+          <span aria-hidden="true">◧</span>
+          <ng-container i18n="Snaps the camera to look at the model from the side. Very short — it sits in a crowded toolbar.@@viewer3d.viewSide">Side</ng-container>
         </button>
       </div>
 

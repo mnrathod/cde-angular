@@ -195,7 +195,10 @@ describe('MarkupEngineService', () => {
       // Promising a double-click here would be wrong: these finish by
       // themselves on the second click.
       for (const tool of ['radius', 'calibrate'] as MarkupTool[]) {
-        expect(service.completionHint(tool)).toBe('click 2 points');
+        // Sentence-cased at the source. It used to be a lowercase fragment
+        // the toolbar capitalised with charAt(0).toUpperCase(), which is
+        // correct in English and wrong wherever casing rules differ.
+        expect(service.completionHint(tool)).toBe('Click 2 points');
         expect(service.completionHint(tool)).not.toContain('double-click');
       }
     });

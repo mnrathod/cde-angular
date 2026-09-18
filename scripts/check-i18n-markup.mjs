@@ -41,11 +41,6 @@ const ROOTS = ['src/app', 'src/viewer-core'];
 const NOT_YET_TRANSLATED = new Set([
   'src/app/features/compare/compare.component.ts',
   'src/app/features/projects/shell.component.ts',
-  'src/app/features/viewer/compare-viewer/visual-compare.component.ts',
-  'src/app/features/viewer/toolbar/markup-toolbar.component.ts',
-  'src/app/features/viewer/viewer-shell.component.ts',
-  'src/app/features/viewer/viewer3d/viewer3d.component.ts',
-  'src/viewer-core/cad-viewer.component.ts',
 ]);
 
 /** Every non-spec TypeScript file under a directory, recursively. */

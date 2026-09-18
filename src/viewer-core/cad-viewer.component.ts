@@ -82,11 +82,16 @@ export interface CadLayer {
       <!-- Layer panel -->
       <div class="w-56 bg-white border-l border-gray-200 flex flex-col flex-shrink-0">
         <div class="p-3 border-b border-gray-200 flex items-center justify-between">
-          <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Layers</span>
+          <span i18n="Heading of the CAD drawing's layer panel@@cadViewer.layersHeading"
+                class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Layers</span>
           <div class="flex gap-1">
-            <button (click)="showAll()"   class="text-xs text-blue-600 hover:underline">All</button>
-            <span class="text-gray-300">|</span>
-            <button (click)="hideAll()"   class="text-xs text-gray-500 hover:underline">None</button>
+            <button (click)="showAll()"
+              i18n="Shows every layer. Very short — it shares a row with another control.@@cadViewer.showAllLayers"
+              class="text-xs text-blue-600 hover:underline">All</button>
+            <span class="text-gray-300" aria-hidden="true">|</span>
+            <button (click)="hideAll()"
+              i18n="Hides every layer. Very short — it shares a row with another control.@@cadViewer.hideAllLayers"
+              class="text-xs text-gray-500 hover:underline">None</button>
           </div>
         </div>
         <div class="flex-1 overflow-y-auto p-2">
@@ -116,25 +121,26 @@ export interface CadLayer {
           }
 
           @if (layers().length === 0) {
-            <div class="text-xs text-gray-400 text-center py-6">No layer data</div>
+            <div i18n="Empty state for the layer panel of a drawing with no layers@@cadViewer.noLayers"
+                 class="text-xs text-gray-400 text-center py-6">No layer data</div>
           }
         </div>
 
         <!-- Stats -->
         <div class="p-3 border-t border-gray-200 text-xs text-gray-500 space-y-1">
           <div class="flex justify-between">
-            <span>Visible layers</span>
+            <span i18n="How many layers are shown, out of how many exist@@cadViewer.visibleLayers">Visible layers</span>
             <span class="font-mono">{{ visibleCount() }} / {{ layers().length }}</span>
           </div>
           @if (dxfVersion) {
             <div class="flex justify-between">
-              <span>DXF version</span>
+              <span i18n="Which revision of the DXF format the drawing uses. DXF is a format name and stays as it is.@@cadViewer.dxfVersion">DXF version</span>
               <span class="font-mono">{{ dxfVersion }}</span>
             </div>
           }
           @if (entityCount > 0) {
             <div class="flex justify-between">
-              <span>Entities</span>
+              <span i18n="How many drawable objects the CAD file contains@@cadViewer.entityCount">Entities</span>
               <span class="font-mono">{{ entityCount }}</span>
             </div>
           }

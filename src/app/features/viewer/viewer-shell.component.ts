@@ -47,17 +47,19 @@ import { DrawingSearchService } from '../../../viewer-core/drawing-search.servic
       <!-- ── Top bar ────────────────────────────────────────────── -->
       <div class="flex items-center h-11 px-3 gap-2 flex-shrink-0 text-white"
            style="background:var(--nav);box-shadow:0 2px 4px rgba(0,0,0,.15)">
-        <button type="button" (click)="goBack()" title="Back to documents"
+        <button type="button" (click)="goBack()"
+          i18n-title="@@viewerShell.backHint" title="Back to documents"
           class="h-7 px-2.5 inline-flex items-center gap-1.5 text-xs rounded-md
                  bg-white/10 hover:bg-white/20 transition-colors">
           <app-icon name="arrow-left" [size]="15" />
-          <span>Back</span>
+          <span i18n="Leaves the viewer and returns to the document list@@viewerShell.back">Back</span>
         </button>
 
         <div class="flex items-center gap-2 flex-1 min-w-0">
-          <span class="font-semibold text-sm truncate">{{ state.viewerData()?.name || 'Loading...' }}</span>
+          <span class="font-semibold text-sm truncate">{{ state.viewerData()?.name || loadingLabel }}</span>
           @if (state.viewerData()?.revision) {
-            <span class="text-xs px-2 py-0.5 rounded bg-white/20">Rev {{ state.viewerData()?.revision }}</span>
+            <span i18n="The document's revision identifier, abbreviated to fit the title bar@@viewerShell.revision"
+                  class="text-xs px-2 py-0.5 rounded bg-white/20">Rev {{ state.viewerData()?.revision }}</span>
           }
           @if (state.viewerData()?.drawingNumber) {
             <span class="text-xs text-white/70">{{ state.viewerData()?.drawingNumber }}</span>
@@ -66,7 +68,7 @@ import { DrawingSearchService } from '../../../viewer-core/drawing-search.servic
 
         <!-- Who else is viewing this document -->
         @if (collaboration.others().length) {
-          <div class="flex items-center -space-x-1.5 mr-1"
+          <div class="flex items-center -space-x-1.5 me-1"
                [title]="presenceTitle()">
             @for (participant of collaboration.others(); track participant.username) {
               <span class="w-6 h-6 rounded-full flex items-center justify-center
@@ -78,7 +80,8 @@ import { DrawingSearchService } from '../../../viewer-core/drawing-search.servic
           </div>
         }
         @if (collaboration.connected()) {
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1"
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 me-1"
+                i18n-title="Tooltip on the indicator that real-time collaboration is connected@@viewerShell.liveHint"
                 title="Live — changes from others appear as they happen"></span>
         }
 
@@ -86,14 +89,18 @@ import { DrawingSearchService } from '../../../viewer-core/drawing-search.servic
         @if (state.totalPages() > 1) {
           <div class="flex items-center gap-1 text-xs">
             <button type="button" (click)="state.navigateTo(state.currentPage()-1)"
-              [disabled]="state.currentPage() <= 1" title="Previous page" aria-label="Previous page"
+              [disabled]="state.currentPage() <= 1"
+              i18n-title="@@viewerShell.previousPage" title="Previous page"
+              i18n-aria-label="@@viewerShell.previousPageLabel" aria-label="Previous page"
               class="w-7 h-7 inline-flex items-center justify-center rounded-md
                      bg-white/10 hover:bg-white/20 disabled:opacity-30">
               <app-icon name="chevron-left" [size]="15" />
             </button>
             <span class="w-20 text-center tabular-nums">{{ state.currentPage() }} / {{ state.totalPages() }}</span>
             <button type="button" (click)="state.navigateTo(state.currentPage()+1)"
-              [disabled]="state.currentPage() >= state.totalPages()" title="Next page" aria-label="Next page"
+              [disabled]="state.currentPage() >= state.totalPages()"
+              i18n-title="@@viewerShell.nextPage" title="Next page"
+              i18n-aria-label="@@viewerShell.nextPageLabel" aria-label="Next page"
               class="w-7 h-7 inline-flex items-center justify-center rounded-md
                      bg-white/10 hover:bg-white/20 disabled:opacity-30">
               <app-icon name="chevron-right" [size]="15" />
@@ -103,7 +110,7 @@ import { DrawingSearchService } from '../../../viewer-core/drawing-search.servic
 
         <!-- Toggle sidebar -->
         <button type="button" (click)="state.sidebarOpen.update(v => !v)"
-          [title]="state.sidebarOpen() ? 'Hide side panel' : 'Show side panel'"
+          [title]="state.sidebarOpen() ? hideSidebarHint : showSidebarHint"
           [attr.aria-pressed]="state.sidebarOpen()"
           class="w-7 h-7 inline-flex items-center justify-center rounded-md
                  bg-white/10 hover:bg-white/20">
@@ -172,7 +179,7 @@ import { DrawingSearchService } from '../../../viewer-core/drawing-search.servic
                      is. An empty alt would be right for decoration; this is
                      the content of the page. -->
                 <img [src]="imageUrl" class="max-w-full max-h-full shadow-lg"
-                     [alt]="state.viewerData()?.name || 'Document'" />
+                     [alt]="state.viewerData()?.name || untitledDocumentLabel" />
               </div>
             }
 
@@ -180,8 +187,8 @@ import { DrawingSearchService } from '../../../viewer-core/drawing-search.servic
             @if (isUnsupported()) {
               <div class="flex-1 flex items-center justify-center text-gray-400">
                 <div class="text-center">
-                  <div class="text-5xl mb-3">📄</div>
-                  <div>Preview not available for this file type</div>
+                  <div class="text-5xl mb-3" aria-hidden="true">📄</div>
+                  <div i18n="Shown for a file the viewer cannot render@@viewerShell.noPreview">Preview not available for this file type</div>
                   <div class="text-sm mt-1 text-gray-500">{{ state.viewerData()?.fileName }}</div>
                 </div>
               </div>
@@ -289,10 +296,20 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
   }
 
   presenceTitle(): string {
-    return this.collaboration.others()
+    const names = this.collaboration.others()
       .map(participant => participant.username)
-      .join(', ') + ' also viewing';
+      .join(', ');
+    return $localize`:Tooltip listing the other people with this document open@@viewerShell.alsoViewing:${names}:names: also viewing`;
   }
+
+  /**
+   * Labels that live in expressions, so `i18n` cannot mark them — see the
+   * note in login.component.ts.
+   */
+  readonly loadingLabel = $localize`:Stands in for the document title until it has loaded@@viewerShell.loadingTitle:Loading...`;
+  readonly hideSidebarHint = $localize`:Tooltip on the control that closes the side panel@@viewerShell.hideSidebar:Hide side panel`;
+  readonly showSidebarHint = $localize`:Tooltip on the control that opens the side panel@@viewerShell.showSidebar:Show side panel`;
+  readonly untitledDocumentLabel = $localize`:Alternative text for an image whose document has no name@@viewerShell.untitledDocument:Document`;
 
   initialsOf(username: string): string {
     return username.slice(0, 2).toUpperCase();
@@ -300,14 +317,18 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
 
   private async loadDocument(id: number) {
     this.state.loading.set(true);
-    this.state.loadingMsg.set('Loading document...');
+    this.state.loadingMsg.set(
+      $localize`:Progress message while the document is being fetched@@viewerShell.loadingDocument:Loading document...`,
+    );
 
     this.http.get<any>(`/api/viewer/${id}`).subscribe({
       next: async (data: any) => {
         if (data.type === 'svg') {
           this.state.viewerData.set(data);
         } else if (data.type === 'pdf' || data.pdfUrl) {
-          this.state.loadingMsg.set('Rendering PDF...');
+          this.state.loadingMsg.set(
+            $localize`:Progress message while the PDF is being drawn@@viewerShell.renderingPdf:Rendering PDF...`,
+          );
           const url = data.pdfUrl || `/api/viewer/${id}/pdf`;
           // Fetch via HttpClient (authInterceptor attaches the JWT) rather than
           // handing pdf.js a URL to fetch itself — pdf.js's internal fetch is a

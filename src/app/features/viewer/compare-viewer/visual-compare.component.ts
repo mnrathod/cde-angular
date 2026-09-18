@@ -25,19 +25,21 @@ export type CompareMode = 'side-by-side' | 'slider' | 'overlay';
            style="background:var(--nav);box-shadow:0 2px 4px rgba(0,0,0,.2)">
         <button (click)="goBack()"
           class="text-xs px-3 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20">
-          ← Back
+          <span aria-hidden="true">←</span>
+          <ng-container i18n="Leaves the comparison view@@visualCompare.back">Back</ng-container>
         </button>
-        <span class="font-semibold text-sm">Visual Comparison</span>
+        <span i18n="Title of the side-by-side drawing comparison view@@visualCompare.heading"
+              class="font-semibold text-sm">Visual Comparison</span>
 
         <!-- Mode switcher -->
-        <div class="flex gap-1 ml-4">
+        <div class="flex gap-1 ms-4">
           @for (m of modes; track m.id) {
             <button (click)="mode.set(m.id)"
               class="text-xs px-3 py-1 rounded transition-all"
               [class]="mode() === m.id
                 ? 'bg-white text-nav font-semibold'
                 : 'border border-white/30 bg-white/10 hover:bg-white/20'">
-              {{ m.icon }} {{ m.label }}
+              <span aria-hidden="true">{{ m.icon }}</span> {{ m.label }}
             </button>
           }
         </div>
@@ -48,9 +50,11 @@ export type CompareMode = 'side-by-side' | 'slider' | 'overlay';
         @if (totalPages() > 1) {
           <div class="flex items-center gap-1 text-xs">
             <button (click)="prevPage()" [disabled]="currentPage() <= 1"
+              i18n-aria-label="@@visualCompare.previousPage" aria-label="Previous page"
               class="px-2 py-1 rounded border border-white/30 bg-white/10 disabled:opacity-30">‹</button>
             <span class="w-20 text-center">{{ currentPage() }} / {{ totalPages() }}</span>
             <button (click)="nextPage()" [disabled]="currentPage() >= totalPages()"
+              i18n-aria-label="@@visualCompare.nextPage" aria-label="Next page"
               class="px-2 py-1 rounded border border-white/30 bg-white/10 disabled:opacity-30">›</button>
           </div>
         }
@@ -58,8 +62,9 @@ export type CompareMode = 'side-by-side' | 'slider' | 'overlay';
         <!-- Overlay opacity (overlay mode only) -->
         @if (mode() === 'overlay') {
           <div class="flex items-center gap-2 text-xs">
-            <span class="text-white/70">Opacity</span>
-            <input type="range" min="0" max="100" [(ngModel)]="overlayOpacity"
+            <label i18n="How strongly the revised drawing shows through the original@@visualCompare.opacity"
+                   class="text-white/70" for="overlay-opacity">Opacity</label>
+            <input id="overlay-opacity" type="range" min="0" max="100" [(ngModel)]="overlayOpacity"
               class="w-20 accent-white" />
             <span class="w-8">{{ overlayOpacity }}%</span>
           </div>
@@ -71,10 +76,12 @@ export type CompareMode = 'side-by-side' | 'slider' | 'overlay';
            style="background:rgba(0,0,0,.3)">
         <div class="flex items-center gap-2 text-sm">
           <div class="w-3 h-3 rounded-sm bg-blue-400"></div>
-          <span class="text-white/80">File 1:</span>
+          <span i18n="Names the first of the two documents being compared@@visualCompare.file1"
+                class="text-white/80">File 1:</span>
           <span class="text-white font-medium">{{ doc1()?.name || '—' }}</span>
           @if (doc1()?.revision) {
-            <span class="text-white/50 text-xs">Rev {{ doc1()!.revision }}</span>
+            <span i18n="The document's revision identifier, abbreviated@@visualCompare.revision1"
+                  class="text-white/50 text-xs">Rev {{ doc1()!.revision }}</span>
           }
         </div>
         @if (mode() !== 'overlay') {
@@ -82,10 +89,12 @@ export type CompareMode = 'side-by-side' | 'slider' | 'overlay';
         }
         <div class="flex items-center gap-2 text-sm">
           <div class="w-3 h-3 rounded-sm bg-amber-400"></div>
-          <span class="text-white/80">File 2:</span>
+          <span i18n="Names the second of the two documents being compared@@visualCompare.file2"
+                class="text-white/80">File 2:</span>
           <span class="text-white font-medium">{{ doc2()?.name || '—' }}</span>
           @if (doc2()?.revision) {
-            <span class="text-white/50 text-xs">Rev {{ doc2()!.revision }}</span>
+            <span i18n="The document's revision identifier, abbreviated@@visualCompare.revision2"
+                  class="text-white/50 text-xs">Rev {{ doc2()!.revision }}</span>
           }
         </div>
       </div>
@@ -104,7 +113,8 @@ export type CompareMode = 'side-by-side' | 'slider' | 'overlay';
           <!-- Left panel -->
           <div class="flex-1 overflow-auto flex flex-col items-center p-3 gap-3"
                style="background:#2a2d3a">
-            <div class="text-xs text-blue-300 font-semibold mb-1 self-start px-1">ORIGINAL</div>
+            <div i18n="Labels the earlier of the two drawings, side-by-side view@@visualCompare.originalPanel"
+                 class="text-xs text-blue-300 font-semibold mb-1 self-start px-1">ORIGINAL</div>
             <canvas #canvas1 class="shadow-xl max-w-full"></canvas>
           </div>
           <!-- Divider -->
@@ -112,7 +122,8 @@ export type CompareMode = 'side-by-side' | 'slider' | 'overlay';
           <!-- Right panel -->
           <div class="flex-1 overflow-auto flex flex-col items-center p-3 gap-3"
                style="background:#2a2d3a">
-            <div class="text-xs text-amber-300 font-semibold mb-1 self-start px-1">REVISED</div>
+            <div i18n="Labels the later of the two drawings, side-by-side view@@visualCompare.revisedPanel"
+                 class="text-xs text-amber-300 font-semibold mb-1 self-start px-1">REVISED</div>
             <canvas #canvas2 class="shadow-xl max-w-full"></canvas>
           </div>
         </div>
@@ -146,10 +157,12 @@ export type CompareMode = 'side-by-side' | 'slider' | 'overlay';
             </div>
 
             <!-- Labels -->
-            <div class="absolute top-2 left-2 text-xs text-blue-200 bg-blue-900/60 px-2 py-0.5 rounded pointer-events-none">
+            <div i18n="Labels the earlier drawing, slider view@@visualCompare.originalSlider"
+                 class="absolute top-2 start-2 text-xs text-blue-200 bg-blue-900/60 px-2 py-0.5 rounded pointer-events-none">
               ORIGINAL
             </div>
-            <div class="absolute top-2 right-2 text-xs text-amber-200 bg-amber-900/60 px-2 py-0.5 rounded pointer-events-none">
+            <div i18n="Labels the later drawing, slider view@@visualCompare.revisedSlider"
+                 class="absolute top-2 end-2 text-xs text-amber-200 bg-amber-900/60 px-2 py-0.5 rounded pointer-events-none">
               REVISED
             </div>
           </div>
@@ -203,10 +216,20 @@ export class VisualCompareComponent implements OnInit, AfterViewInit {
   private pdfDoc2: any = null;
   private rendered = false;
 
+  /**
+   * The three ways of comparing two drawings.
+   *
+   * <p>`$localize` rather than plain strings: labels in a lookup table are
+   * invisible to the template markup guard. They sit in a crowded toolbar, so
+   * the descriptions ask for short translations.
+   */
   readonly modes = [
-    { id: 'side-by-side' as CompareMode, icon: '⊟', label: 'Side by Side' },
-    { id: 'slider'       as CompareMode, icon: '⇔', label: 'Slider' },
-    { id: 'overlay'      as CompareMode, icon: '⊕', label: 'Overlay' },
+    { id: 'side-by-side' as CompareMode, icon: '⊟',
+      label: $localize`:Comparison mode — the two drawings in adjacent panels. Short; it sits in a crowded toolbar.@@compareMode.sideBySide:Side by Side` },
+    { id: 'slider' as CompareMode, icon: '⇔',
+      label: $localize`:Comparison mode — one drawing revealed over the other by dragging. Short; it sits in a crowded toolbar.@@compareMode.slider:Slider` },
+    { id: 'overlay' as CompareMode, icon: '⊕',
+      label: $localize`:Comparison mode — the two drawings stacked, differences highlighted. Short; it sits in a crowded toolbar.@@compareMode.overlay:Overlay` },
   ];
 
   ngOnInit() {
@@ -227,7 +250,9 @@ export class VisualCompareComponent implements OnInit, AfterViewInit {
     await this.pdfEngine.ensureLoaded();
 
     try {
-      this.loadingMsg.set('Loading File 1...');
+      this.loadingMsg.set(
+        $localize`:Progress message while both drawings are being fetched@@visualCompare.loading:Loading drawings...`,
+      );
       const [data1, data2] = await Promise.all([
         this.fetchViewerData(id1),
         this.fetchViewerData(id2)
@@ -247,8 +272,11 @@ export class VisualCompareComponent implements OnInit, AfterViewInit {
       this.loading.set(false);
 
       setTimeout(() => this.renderCurrentPage(), 100);
-    } catch (e: any) {
-      this.loadingMsg.set('Error: ' + e.message);
+    } catch (error: unknown) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.loadingMsg.set(
+        $localize`:Shown when the two drawings cannot be loaded for comparison@@visualCompare.loadFailed:The drawings could not be loaded: ${reason}:reason:`,
+      );
     }
   }
 

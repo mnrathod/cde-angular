@@ -85,13 +85,20 @@ export class ToolRailComponent {
    * Radius silently unexplained.
    */
   hintFor(tool: Tool): string {
+    const label = tool.label;
     if (this.isDisabled(tool)) {
-      return `${tool.label} is only available for PDF documents`;
+      return $localize`:Tooltip on a tool that needs a PDF, shown for a drawing or an image@@toolRail.pdfOnly:${label}:tool: is only available for PDF documents`;
     }
 
-    const base = `${tool.label} (${tool.key})`;
+    // Built as two whole messages rather than by concatenating a label, a
+    // shortcut and a hint. Word order is not the same in every language, and
+    // a translator handed the pieces separately cannot fix an order they
+    // never see.
+    const key = tool.key;
     const completion = this.engine.completionHint(tool.id);
-    return completion ? `${base} — ${completion}` : base;
+    return completion
+      ? $localize`:Tooltip on a tool that needs several clicks — its name, its keyboard shortcut, and how to finish@@toolRail.hintWithCompletion:${label}:tool: (${key}:key:) — ${completion}:completion:`
+      : $localize`:Tooltip on a tool — its name and its keyboard shortcut@@toolRail.hint:${label}:tool: (${key}:key:)`;
   }
 
   selectTool(tool: Tool) {

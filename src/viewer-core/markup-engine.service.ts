@@ -179,10 +179,14 @@ export class MarkupEngineService {
   completionHint(tool: MarkupTool): string {
     if (!this.isVertexTool(tool)) return '';
 
+    // Returned as a finished sentence rather than a fragment the caller
+    // capitalises. Upper-casing the first character in the caller works in
+    // English and is wrong wherever casing rules differ, and it leaves the
+    // translator a fragment with no way to know how it will be presented.
     const fixed = this.requiredVertices(tool);
     return fixed
-      ? `click ${fixed} points`
-      : 'click each point — press Enter, or click the first point again, to finish';
+      ? $localize`:Tells the user how to finish a shape that ends after a set number of clicks@@markupHint.fixedVertices:Click ${fixed}:count: points`
+      : $localize`:Tells the user how to finish a shape with any number of points. Enter is the keyboard key.@@markupHint.anyVertices:Click each point — press Enter, or click the first point again, to finish`;
   }
 
   /**

@@ -43,38 +43,48 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
       <div class="flex items-center h-10 px-2 gap-0.5">
 
         <button type="button" (click)="state.undo()" [disabled]="!state.canUndo()"
-          title="Undo (Ctrl+Z)" aria-label="Undo" [class]="iconButton">
+          i18n-title="Tooltip on undo. Ctrl+Z is the keyboard shortcut and stays as it is.@@toolbar.undoHint"
+          title="Undo (Ctrl+Z)"
+          i18n-aria-label="@@toolbar.undo" aria-label="Undo" [class]="iconButton">
           <app-icon name="undo" [size]="17" />
         </button>
         <button type="button" (click)="state.redo()" [disabled]="!state.canRedo()"
-          title="Redo (Ctrl+Y)" aria-label="Redo" [class]="iconButton">
+          i18n-title="Tooltip on redo. Ctrl+Y is the keyboard shortcut and stays as it is.@@toolbar.redoHint"
+          title="Redo (Ctrl+Y)"
+          i18n-aria-label="@@toolbar.redo" aria-label="Redo" [class]="iconButton">
           <app-icon name="redo" [size]="17" />
         </button>
         <button type="button" (click)="clearAll()"
-          title="Delete all markup" aria-label="Delete all markup"
+          i18n-title="@@toolbar.clearAllHint" title="Delete all markup"
+          i18n-aria-label="@@toolbar.clearAll" aria-label="Delete all markup"
           [class]="iconButton + ' hover:text-red-600'">
           <app-icon name="trash" [size]="17" />
         </button>
 
         <div [class]="divider"></div>
 
-        <button type="button" (click)="state.zoomOut()" title="Zoom out"
-          aria-label="Zoom out" [class]="iconButton">
+        <button type="button" (click)="state.zoomOut()"
+          i18n-title="@@toolbar.zoomOutHint" title="Zoom out"
+          i18n-aria-label="@@toolbar.zoomOut" aria-label="Zoom out" [class]="iconButton">
           <app-icon name="zoom-out" [size]="17" />
         </button>
         <span class="w-12 text-center text-xs tabular-nums text-gray-600">
           {{ (state.zoom() * 100).toFixed(0) }}%
         </span>
-        <button type="button" (click)="state.zoomIn()" title="Zoom in"
-          aria-label="Zoom in" [class]="iconButton">
+        <button type="button" (click)="state.zoomIn()"
+          i18n-title="@@toolbar.zoomInHint" title="Zoom in"
+          i18n-aria-label="@@toolbar.zoomIn" aria-label="Zoom in" [class]="iconButton">
           <app-icon name="zoom-in" [size]="17" />
         </button>
-        <button type="button" (click)="state.zoomFit()" title="Fit page to window"
-          aria-label="Fit page to window" [class]="iconButton">
+        <button type="button" (click)="state.zoomFit()"
+          i18n-title="@@toolbar.zoomFitHint" title="Fit page to window"
+          i18n-aria-label="@@toolbar.zoomFit" aria-label="Fit page to window" [class]="iconButton">
           <app-icon name="fit" [size]="17" />
         </button>
         <button type="button" (click)="state.rotateClockwise()"
-          [title]="rotateHint()" aria-label="Rotate 90 degrees clockwise"
+          [title]="rotateHint()"
+          i18n-aria-label="Spelled out in words rather than as 90°, so a screen reader says it correctly@@toolbar.rotate"
+          aria-label="Rotate 90 degrees clockwise"
           [class]="state.rotation() ? activeIconButton : iconButton">
           <app-icon name="rotate" [size]="17" />
         </button>
@@ -82,71 +92,72 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
         <div [class]="divider"></div>
 
         <button type="button" (click)="saveMarkup()"
-          [title]="state.dirty() ? 'Save annotations (Ctrl+S) — unsaved changes' : 'Save annotations (Ctrl+S)'"
+          [title]="state.dirty() ? saveDirtyHint : saveHint"
           [class]="state.dirty() ? labelledButton + ' text-accent' : labelledButton">
           <app-icon name="save" [size]="16" />
-          <span>{{ saving() ? 'Saving' : state.dirty() ? 'Save' : 'Saved' }}</span>
+          <span>{{ saving() ? savingLabel : state.dirty() ? saveLabel : savedLabel }}</span>
           @if (state.dirty() && !saving()) {
             <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
           }
         </button>
-        <button type="button" (click)="print()" title="Print with annotations (Ctrl+P)"
+        <button type="button" (click)="print()"
+          i18n-title="Tooltip on print. Ctrl+P is the keyboard shortcut and stays as it is.@@toolbar.printHint"
+          title="Print with annotations (Ctrl+P)"
           [class]="labelledButton">
           <app-icon name="print" [size]="16" />
-          <span>Print</span>
+          <span i18n="Short toolbar label@@toolbar.print">Print</span>
         </button>
 
         <div [class]="divider"></div>
 
         <button type="button" (click)="exportXfdf()"
+          i18n-title="Tooltip on export. XFDF is a format name; the three products named are other software and keep their own names.@@toolbar.exportHint"
           title="Export annotations as XFDF (opens in Bluebeam, Acrobat and Procore)"
           [class]="labelledButton">
           <app-icon name="export" [size]="16" />
-          <span>Export</span>
+          <span i18n="Short toolbar label@@toolbar.export">Export</span>
         </button>
-        <label title="Import annotations from an XFDF file"
+        <label i18n-title="XFDF is a format name and stays as it is@@toolbar.importHint"
+          title="Import annotations from an XFDF file"
           [class]="labelledButton + ' cursor-pointer'">
           <app-icon name="import" [size]="16" />
-          <span>Import</span>
+          <span i18n="Short toolbar label@@toolbar.import">Import</span>
           <input type="file" accept=".xfdf" class="hidden" (change)="importXfdf($event)" />
         </label>
 
         <div [class]="divider"></div>
 
         <button type="button" (click)="flattenPdf()" [disabled]="!isPdf() || flattening()"
-          [title]="isPdf()
-            ? 'Bake annotations into the page as permanent content'
-            : 'Flattening is only available for PDF documents'"
+          [title]="isPdf() ? flattenHint : flattenUnavailableHint"
           [class]="labelledButton">
           <app-icon name="flatten" [size]="16" />
-          <span>{{ flattening() ? 'Flattening' : 'Flatten' }}</span>
+          <span>{{ flattening() ? flatteningLabel : flattenLabel }}</span>
         </button>
         <button type="button" (click)="runOcr()" [disabled]="!isPdf() || ocrRunning()"
-          [title]="isPdf()
-            ? 'Make a scanned PDF searchable by adding an invisible text layer'
-            : 'OCR is only available for PDF documents'"
+          [title]="isPdf() ? ocrHint : ocrUnavailableHint"
           [class]="labelledButton">
           <app-icon name="ocr" [size]="16" />
-          <span>{{ ocrRunning() ? 'Reading' : 'OCR' }}</span>
+          <span>{{ ocrRunning() ? ocrRunningLabel : ocrLabel }}</span>
         </button>
 
         <!-- Right-aligned: things that are only sometimes true. -->
-        <div class="ml-auto flex items-center gap-1.5 pl-2">
+        <div class="ms-auto flex items-center gap-1.5 ps-2">
           @if (state.redactionRegions().length > 0) {
             <button type="button" (click)="applyRedaction()" [disabled]="redacting()"
+              i18n-title="@@toolbar.applyRedactionHint"
               title="Permanently destroy the content under these regions and commit a new version"
               class="h-7 px-2.5 inline-flex items-center gap-1.5 text-xs font-medium rounded-md
                      bg-red-50 text-red-700 border border-red-200 hover:bg-red-100
                      disabled:opacity-40">
               <app-icon name="redact" [size]="15" />
-              <span>{{ redacting() ? 'Redacting' : 'Apply redaction (' + state.redactionRegions().length + ')' }}</span>
+              <span>{{ redacting() ? redactingLabel : applyRedactionLabel(state.redactionRegions().length) }}</span>
             </button>
           }
 
           @if (state.processingMessage()) {
             <button type="button"
               (click)="state.sidebarTab.set('versions'); state.processingMessage.set('')"
-              title="Open version history"
+              i18n-title="@@toolbar.openHistoryHint" title="Open version history"
               class="h-7 px-2.5 inline-flex items-center gap-1.5 text-xs rounded-md
                      bg-emerald-50 text-emerald-800 border border-emerald-200
                      hover:bg-emerald-100 max-w-[22rem]">
@@ -169,19 +180,23 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
           @if (usesStrokeStyle(state.activeTool())) {
             <div [class]="contextDivider"></div>
 
-            <label class="flex items-center gap-1.5 cursor-pointer" title="Stroke colour">
-              <span class="text-xs text-gray-500">Colour</span>
+            <label class="flex items-center gap-1.5 cursor-pointer"
+                   i18n-title="@@toolbar.strokeColourHint" title="Stroke colour">
+              <span i18n="Colour of the line a markup tool draws. Short — it sits in a crowded strip.@@toolbar.strokeColour"
+                    class="text-xs text-gray-500">Colour</span>
               <input type="color" [ngModel]="state.strokeColor()"
                 (ngModelChange)="state.strokeColor.set($event)"
-                aria-label="Stroke colour"
+                i18n-aria-label="@@toolbar.strokeColourLabel" aria-label="Stroke colour"
                 class="h-6 w-8 rounded border border-gray-300 cursor-pointer p-0.5 bg-white" />
             </label>
 
-            <label class="flex items-center gap-1.5" title="Line width">
-              <span class="text-xs text-gray-500">Width</span>
+            <label class="flex items-center gap-1.5"
+                   i18n-title="@@toolbar.strokeWidthHint" title="Line width">
+              <span i18n="Thickness of the line a markup tool draws. Short — it sits in a crowded strip.@@toolbar.strokeWidth"
+                    class="text-xs text-gray-500">Width</span>
               <select [ngModel]="state.strokeWidth()"
                 (ngModelChange)="state.strokeWidth.set(+$event)"
-                aria-label="Line width"
+                i18n-aria-label="@@toolbar.strokeWidthLabel" aria-label="Line width"
                 class="h-6 w-16 text-xs border border-gray-300 rounded px-1.5 bg-white">
                 @for (width of strokeWidths; track width) {
                   <option [value]="width">{{ width }} px</option>
@@ -194,24 +209,29 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
             <div [class]="contextDivider"></div>
 
             @if (state.isCalibrated()) {
-              <span class="text-xs text-gray-600">
+              <span i18n="The drawing scale currently in force@@toolbar.scale"
+                    class="text-xs text-gray-600">
                 Scale <span class="font-mono font-medium">{{ scaleLabel() }}</span>
               </span>
               <button type="button" (click)="startCalibration()"
+                i18n="Sets the drawing scale again@@toolbar.recalibrate"
                 class="text-xs text-accent hover:underline">Recalibrate</button>
             } @else {
               <button type="button" (click)="startCalibration()"
+                i18n-title="@@toolbar.calibrateHint"
                 title="Draw a line over a known distance to set the drawing's scale"
                 class="h-6 px-2 inline-flex items-center gap-1.5 text-xs font-medium rounded
                        bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100">
                 <app-icon name="calibrate" [size]="14" />
-                <span>Set scale — readings are in pixels until you do</span>
+                <span i18n="Prompt to calibrate, shown while measurements have no real-world units@@toolbar.setScale"
+                  >Set scale — readings are in pixels until you do</span
+                >
               </button>
             }
           }
 
           @if (completionHint()) {
-            <span class="ml-auto text-xs text-gray-500">{{ completionHint() }}</span>
+            <span class="ms-auto text-xs text-gray-500">{{ completionHint() }}</span>
           }
         </div>
       }
@@ -222,9 +242,12 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
           <div class="bg-white rounded-lg shadow-2xl p-6 w-80">
             <h3 class="font-semibold text-gray-800 mb-1 flex items-center gap-2">
               <app-icon name="calibrate" [size]="18" />
-              Set drawing scale
+              <ng-container i18n="Heading of the dialog that sets a drawing's scale@@toolbar.calibrationHeading"
+                >Set drawing scale</ng-container
+              >
             </h3>
-            <p class="text-xs text-gray-500 mb-4">
+            <p i18n="Asks what real-world distance the drawn reference line represents. The emphasised value is its length on screen in pixels.@@toolbar.calibrationQuestion"
+               class="text-xs text-gray-500 mb-4">
               The line you drew is
               <span class="font-mono font-semibold">{{ state.pendingCalibrationPixels().toFixed(1) }} px</span>.
               What is that distance on the drawing?
@@ -232,10 +255,15 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
 
             <div class="flex gap-2 mb-3">
               <input type="number" [(ngModel)]="calibrationValue" name="calibrationValue"
-                min="0" step="any" placeholder="e.g. 5" aria-label="Known distance"
+                min="0" step="any"
+                i18n-placeholder="Example of a distance@@toolbar.calibrationValuePlaceholder" placeholder="e.g. 5"
+                i18n-aria-label="The real-world distance the drawn line represents@@toolbar.calibrationValueLabel"
+                aria-label="Known distance"
                 class="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded
                        focus:outline-none focus:ring-2 focus:ring-accent" />
-              <select [(ngModel)]="calibrationUnit" name="calibrationUnit" aria-label="Unit"
+              <select [(ngModel)]="calibrationUnit" name="calibrationUnit"
+                i18n-aria-label="The unit the known distance is given in@@toolbar.calibrationUnitLabel"
+                aria-label="Unit"
                 class="px-2 py-1.5 text-sm border border-gray-300 rounded
                        focus:outline-none focus:ring-2 focus:ring-accent">
                 @for (unit of units; track unit) { <option [value]="unit">{{ unit }}</option> }
@@ -250,8 +278,10 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
 
             <div class="flex gap-2 justify-end">
               <button type="button" (click)="cancelCalibration()"
+                i18n="@@toolbar.calibrationCancel"
                 class="px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
               <button type="button" (click)="applyCalibration()"
+                i18n="Confirms the entered scale@@toolbar.calibrationApply"
                 class="px-3 py-1.5 text-xs bg-accent text-white rounded hover:bg-blue-700 font-semibold">
                 Apply
               </button>
@@ -326,10 +356,11 @@ export class MarkupToolbarComponent {
     return this.toolsByRail.find(tool => tool.id === active)?.label ?? '';
   });
 
-  readonly completionHint = computed(() => {
-    const hint = this.engine.completionHint(this.state.activeTool());
-    return hint ? `${hint.charAt(0).toUpperCase()}${hint.slice(1)}.` : '';
-  });
+  // The engine returns a finished sentence now, so there is nothing to
+  // capitalise here — doing so worked in English and was wrong anywhere the
+  // casing rules differ.
+  readonly completionHint = computed(() =>
+    this.engine.completionHint(this.state.activeTool()));
 
   /**
    * Whether the active tool has anything to show. Pan and Select carry no
@@ -353,8 +384,32 @@ export class MarkupToolbarComponent {
   rotateHint(): string {
     const rotation = this.state.rotation();
     return rotation
-      ? `Rotate 90° clockwise (currently ${rotation}°)`
-      : 'Rotate 90° clockwise';
+      ? $localize`:Tooltip on rotate, when the page is already turned@@toolbar.rotateHintTurned:Rotate 90° clockwise (currently ${rotation}:degrees:°)`
+      : $localize`:Tooltip on rotate, when the page is the right way up@@toolbar.rotateHint:Rotate 90° clockwise`;
+  }
+
+  /**
+   * Labels and tooltips that live in expressions, so `i18n` cannot mark them
+   * — see the note in login.component.ts.
+   */
+  readonly saveLabel = $localize`:Save button with unsaved markup. Short toolbar label.@@toolbar.save:Save`;
+  readonly savedLabel = $localize`:Save button when everything is already saved. Short toolbar label.@@toolbar.saved:Saved`;
+  readonly savingLabel = $localize`:Save button while the request is in flight. Short toolbar label.@@toolbar.saving:Saving`;
+  readonly saveHint = $localize`:Tooltip on save. Ctrl+S is the keyboard shortcut and stays as it is.@@toolbar.saveHint:Save annotations (Ctrl+S)`;
+  readonly saveDirtyHint = $localize`:Tooltip on save when there is unsaved markup. Ctrl+S is the keyboard shortcut.@@toolbar.saveDirtyHint:Save annotations (Ctrl+S) — unsaved changes`;
+  readonly flattenLabel = $localize`:Burns markup into the page as permanent content. Short toolbar label.@@toolbar.flatten:Flatten`;
+  readonly flatteningLabel = $localize`:Flatten button while the request is in flight. Short toolbar label.@@toolbar.flattening:Flattening`;
+  readonly flattenHint = $localize`:Tooltip on the enabled flatten button@@toolbar.flattenHint:Bake annotations into the page as permanent content`;
+  readonly flattenUnavailableHint = $localize`:Tooltip explaining why flatten is unavailable@@toolbar.flattenUnavailableHint:Flattening is only available for PDF documents`;
+  readonly ocrLabel = $localize`:Optical character recognition, which makes a scan searchable. Short toolbar label; OCR is widely understood and may stay as it is.@@toolbar.ocr:OCR`;
+  readonly ocrRunningLabel = $localize`:OCR button while the request is in flight. Short toolbar label.@@toolbar.ocrRunning:Reading`;
+  readonly ocrHint = $localize`:Tooltip on the enabled OCR button@@toolbar.ocrHint:Make a scanned PDF searchable by adding an invisible text layer`;
+  readonly ocrUnavailableHint = $localize`:Tooltip explaining why OCR is unavailable@@toolbar.ocrUnavailableHint:OCR is only available for PDF documents`;
+  readonly redactingLabel = $localize`:Redaction button while the request is in flight. Short toolbar label.@@toolbar.redacting:Redacting`;
+
+  /** Label of the button that destroys the drawn regions, with how many. */
+  applyRedactionLabel(regionCount: number): string {
+    return $localize`:Button that permanently destroys the drawn regions, naming how many@@toolbar.applyRedaction:Apply redaction (${regionCount}:count:)`;
   }
 
   isPdf(): boolean {
@@ -370,7 +425,8 @@ export class MarkupToolbarComponent {
   clearAll() {
     const count = this.state.shapes().length;
     if (!count) return;
-    if (!confirm(`Delete all ${count} markup item(s) on this document?`)) return;
+    const question = $localize`:Confirmation before discarding every annotation on the document@@toolbar.confirmClearAll:Delete all ${count}:count: markup item(s) on this document?`;
+    if (!confirm(question)) return;
     this.state.clearAll();
   }
 
@@ -393,7 +449,10 @@ export class MarkupToolbarComponent {
       },
       error: err => {
         this.redacting.set(false);
-        this.state.processingMessage.set(this.failureMessage(err, 'Redaction'));
+        this.state.processingMessage.set(this.failureMessage(err, {
+          whenConverterDown: $localize`:Redaction failed because the backend converter is unreachable@@toolbar.redactionConverterDown:Redaction failed — the document converter service is not running.`,
+          otherwise: $localize`:Fallback when redaction fails without a reason@@toolbar.redactionFailed:Redaction failed.`,
+        }));
       }
     });
   }
@@ -414,7 +473,10 @@ export class MarkupToolbarComponent {
       },
       error: err => {
         this.ocrRunning.set(false);
-        this.state.processingMessage.set(this.failureMessage(err, 'OCR'));
+        this.state.processingMessage.set(this.failureMessage(err, {
+          whenConverterDown: $localize`:Text recognition failed because the backend converter is unreachable@@toolbar.ocrConverterDown:OCR failed — the document converter service is not running.`,
+          otherwise: $localize`:Fallback when text recognition fails without a reason@@toolbar.ocrFailed:OCR failed.`,
+        }));
       }
     });
   }
@@ -427,10 +489,20 @@ export class MarkupToolbarComponent {
    * problem document at all, so it must not be the answer for a request that
    * never arrived — see `problemMessage`, which separates that case out.
    */
+  /**
+   * Turns a failed request into something a person can act on.
+   *
+   * <p>Takes two complete messages rather than a noun to interpolate into
+   * "{action} failed." — a sentence assembled from an English noun and an
+   * English verb cannot be translated, because neither the word order nor the
+   * agreement carries over.
+   */
   private failureMessage(
-    err: { status?: number; error?: { message?: string } }, action: string): string {
-    if (err.status === 503) return `${action} failed — the document converter service is not running.`;
-    return problemMessage(err, `${action} failed.`);
+    err: { status?: number; error?: { message?: string } },
+    messages: { whenConverterDown: string; otherwise: string },
+  ): string {
+    if (err.status === 503) return messages.whenConverterDown;
+    return problemMessage(err, messages.otherwise);
   }
 
   // ── Scale calibration ────────────────────────────────────────
@@ -460,7 +532,9 @@ export class MarkupToolbarComponent {
       this.calibrationUnit
     );
     if (!scale) {
-      this.calibrationError.set('Enter a distance greater than zero.');
+      this.calibrationError.set(
+        $localize`:Validation message in the scale dialog@@toolbar.calibrationInvalid:Enter a distance greater than zero.`,
+      );
       return;
     }
     this.state.setScale(scale);
@@ -518,14 +592,15 @@ export class MarkupToolbarComponent {
   flattenPdf() {
     const shapes = this.state.shapes();
     if (!this.isPdf() || !shapes.length) {
-      this.state.processingMessage.set('There are no annotations to flatten.');
+      this.state.processingMessage.set(
+        $localize`:Shown when flatten is used on a document with no markup@@toolbar.nothingToFlatten:There are no annotations to flatten.`,
+      );
       return;
     }
-    if (!confirm(
-      `Flatten ${shapes.length} annotation(s) into the page?\n\n` +
-      'They become permanent page content and will no longer be editable. ' +
-      'The current version stays in the history and can be restored.'
-    )) return;
+    const shapeCount = shapes.length;
+    const question = $localize`:Confirmation before making markup a permanent part of the page@@toolbar.confirmFlattenQuestion:Flatten ${shapeCount}:count: annotation(s) into the page?`;
+    const consequence = $localize`:Second paragraph of the flatten confirmation@@toolbar.confirmFlattenConsequence:They become permanent page content and will no longer be editable. The current version stays in the history and can be restored.`;
+    if (!confirm(`${question}\n\n${consequence}`)) return;
 
     this.flattening.set(true);
     this.flattenService.flattenToPdf({
@@ -540,7 +615,10 @@ export class MarkupToolbarComponent {
       },
       error: err => {
         this.flattening.set(false);
-        this.state.processingMessage.set(this.failureMessage(err, 'Flatten'));
+        this.state.processingMessage.set(this.failureMessage(err, {
+          whenConverterDown: $localize`:Flattening failed because the backend converter is unreachable@@toolbar.flattenConverterDown:Flatten failed — the document converter service is not running.`,
+          otherwise: $localize`:Fallback when flattening fails without a reason@@toolbar.flattenFailed:Flatten failed.`,
+        }));
       }
     });
   }
