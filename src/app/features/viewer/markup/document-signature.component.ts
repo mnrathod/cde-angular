@@ -15,47 +15,55 @@ import { ViewerStateService } from '../../../../viewer-core/viewer-state.service
       <!-- Header -->
       <div class="flex items-center justify-between">
         <div>
-          <h3 class="text-sm font-semibold text-gray-800">Digital Signatures</h3>
-          <p class="text-xs text-gray-500 mt-0.5">
+          <h3 i18n="@@signatures.heading" class="text-sm font-semibold text-gray-800">Digital Signatures</h3>
+          <p i18n="Explains what kind of signature this is. X.509 and PKI are standard names and stay as they are.@@signatures.subheading"
+             class="text-xs text-gray-500 mt-0.5">
             PKI-based document signing with X.509 certificates
           </p>
         </div>
         <button (click)="showSignForm.set(!showSignForm())"
           class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-accent text-white rounded hover:bg-blue-700 transition-colors">
-          ✍️ Sign Document
+          <span aria-hidden="true">✍️</span>
+          <ng-container i18n="Opens the form for signing this document@@signatures.signDocument"
+            >Sign Document</ng-container
+          >
         </button>
       </div>
 
       <!-- Sign form -->
       @if (showSignForm()) {
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
-          <div class="text-xs font-semibold text-blue-800 mb-2">Sign this document</div>
+          <div i18n="@@signatures.formHeading" class="text-xs font-semibold text-blue-800 mb-2">Sign this document</div>
 
           <div>
-            <label class="block text-xs font-medium text-gray-600 mb-1">Role</label>
+            <label i18n="The capacity in which someone is signing@@signatures.roleLabel"
+                   class="block text-xs font-medium text-gray-600 mb-1">Role</label>
             <select [(ngModel)]="signReq.role"
               class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-accent">
-              <option value="Author">Author</option>
-              <option value="Reviewer">Reviewer</option>
-              <option value="Approver">Approver</option>
+              <option value="Author" i18n="Signing role — the person who produced the document@@signatureRole.author">Author</option>
+              <option value="Reviewer" i18n="Signing role — the person who checked the document@@signatureRole.reviewer">Reviewer</option>
+              <option value="Approver" i18n="Signing role — the person who authorised the document for use@@signatureRole.approver">Approver</option>
             </select>
           </div>
 
           <div>
-            <label class="block text-xs font-medium text-gray-600 mb-1">Reason</label>
+            <label i18n="Why the document is being signed@@signatures.reasonLabel"
+                   class="block text-xs font-medium text-gray-600 mb-1">Reason</label>
             <input [(ngModel)]="signReq.reason"
+              i18n-placeholder="Example of a signing reason@@signatures.reasonPlaceholder"
               placeholder="e.g. Reviewed and approved for construction"
               class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-accent" />
           </div>
 
           <div class="flex justify-end gap-2">
             <button (click)="showSignForm.set(false)"
+              i18n="@@signatures.cancel"
               class="px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50">
               Cancel
             </button>
             <button (click)="signDocument()" [disabled]="signing() || !signReq.reason"
               class="px-3 py-1.5 text-xs bg-accent text-white rounded disabled:opacity-40 hover:bg-blue-700">
-              {{ signing() ? 'Signing...' : '✍️ Apply Signature' }}
+              {{ signing() ? signingLabel : applySignatureLabel }}
             </button>
           </div>
         </div>
@@ -64,34 +72,41 @@ import { ViewerStateService } from '../../../../viewer-core/viewer-state.service
       <!-- Signature stamp preview. See lastSignature for why it is markup
            rather than the server's SVG. -->
       @if (lastSignature(); as stamp) {
-        <section aria-label="Signature just applied"
+        <section i18n-aria-label="Names the block showing the signature that was just added@@signatures.appliedRegion"
+                 aria-label="Signature just applied"
                  class="border border-green-200 rounded-lg p-3 bg-green-50">
-          <div class="text-xs font-semibold text-green-800 mb-2">✅ Signature Applied</div>
+          <div class="text-xs font-semibold text-green-800 mb-2">
+            <span aria-hidden="true">✅</span>
+            <ng-container i18n="@@signatures.applied">Signature Applied</ng-container>
+          </div>
 
           <dl class="inline-block rounded border-2 px-3 py-2 bg-blue-50 not-italic"
               style="border-color:#1e5fbe;min-width:240px">
             <div class="text-xs font-bold tracking-wide pb-1 mb-1 border-b"
                  style="color:#1e5fbe;border-color:#1e5fbe">
-              DIGITALLY SIGNED
+              <ng-container i18n="Wording drawn on the stamp that appears in the document itself@@signatures.stampTitle"
+                >DIGITALLY SIGNED</ng-container
+              >
             </div>
             <div class="flex gap-1 text-xs text-gray-700">
-              <dt class="font-medium">Signed by:</dt><dd>{{ stamp.signerName }}</dd>
+              <dt i18n="@@signatures.stampSignedBy" class="font-medium">Signed by:</dt><dd>{{ stamp.signerName }}</dd>
             </div>
             <div class="flex gap-1 text-xs text-gray-700">
-              <dt class="font-medium">Role:</dt>
+              <dt i18n="@@signatures.stampRole" class="font-medium">Role:</dt>
               <dd>{{ stamp.role }}@if (stamp.reason) { · {{ stamp.reason }} }</dd>
             </div>
             <div class="flex gap-1 text-xs text-gray-500">
-              <dt class="font-medium">Date:</dt>
+              <dt i18n="@@signatures.stampDate" class="font-medium">Date:</dt>
               <dd>{{ stamp.signedAt | date: 'medium' }}</dd>
             </div>
             <div class="flex gap-1 text-xs text-gray-400">
-              <dt class="font-medium">Ref:</dt>
+              <dt i18n="Short reference a signature can be quoted by@@signatures.stampReference" class="font-medium">Ref:</dt>
               <dd class="font-mono">{{ reference(stamp) }}</dd>
             </div>
           </dl>
 
-          <p class="text-xs text-green-700 mt-2">
+          <p i18n="Flattening burns markup into the page, making it part of the document@@signatures.stampNote"
+             class="text-xs text-green-700 mt-2">
             This stamp will appear on the document when flattened.
           </p>
         </section>
@@ -99,16 +114,17 @@ import { ViewerStateService } from '../../../../viewer-core/viewer-state.service
 
       <!-- Signatures list -->
       @if (loading()) {
-        <div class="text-xs text-gray-400 text-center py-4">Loading signatures...</div>
+        <div i18n="@@signatures.loading" class="text-xs text-gray-400 text-center py-4">Loading signatures...</div>
       } @else if (signatures().length === 0) {
         <div class="text-center text-gray-400 py-6">
-          <div class="text-2xl mb-2">🔏</div>
-          <div class="text-xs">No signatures on this document yet</div>
+          <div class="text-2xl mb-2" aria-hidden="true">🔏</div>
+          <div i18n="@@signatures.empty" class="text-xs">No signatures on this document yet</div>
         </div>
       } @else {
         <div class="space-y-2">
-          <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            {{ signatures().length }} Signature{{ signatures().length !== 1 ? 's' : '' }}
+          <div i18n="Counts the signatures already on the document@@signatures.count"
+               class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            {signatures().length, plural, =1 {1 Signature} other {{{ signatures().length }} Signatures}}
           </div>
           @for (sig of signatures(); track sig.signatureId) {
             <div class="flex items-start gap-3 p-3 rounded-lg border"
@@ -129,7 +145,7 @@ import { ViewerStateService } from '../../../../viewer-core/viewer-state.service
                     [class]="roleClass(sig.role)">
                     {{ sig.role }}
                   </span>
-                  <span class="text-xs px-1.5 py-0.5 rounded font-semibold ml-auto"
+                  <span class="text-xs px-1.5 py-0.5 rounded font-semibold ms-auto"
                     [class]="statusClass(sig.status)">
                     {{ sig.status }}
                   </span>
@@ -147,6 +163,7 @@ import { ViewerStateService } from '../../../../viewer-core/viewer-state.service
 
               <div class="flex flex-col gap-1 flex-shrink-0">
                 <button (click)="verifySignature(sig)"
+                  i18n="Re-checks that a signature still matches the document@@signatures.verify"
                   class="text-xs text-blue-600 hover:underline px-1">
                   Verify
                 </button>
@@ -206,6 +223,13 @@ export class DocumentSignatureComponent implements OnInit {
 
   signReq: SignRequest = { role: 'Reviewer', reason: '' };
 
+  /**
+   * Button labels that live in an expression and so cannot carry `i18n` —
+   * see the note in login.component.ts.
+   */
+  readonly applySignatureLabel = $localize`:Applies the signature to the document@@signatures.applyAction:Apply Signature`;
+  readonly signingLabel = $localize`:Apply-signature button while the request is in flight@@signatures.signingAction:Signing...`;
+
   ngOnInit() {
     this.loadSignatures();
   }
@@ -228,8 +252,12 @@ export class DocumentSignatureComponent implements OnInit {
         this.lastSignature.set(result.signature);
         // Signing a PDF rewrites it, so the viewer is now a version behind.
         if (result.embedded) {
-          this.state.applyVersionCommit(result.version ?? 0,
-            `Signed by ${result.signature.signerName} as ${result.signature.role}`);
+          const signer = result.signature.signerName;
+          const role = result.signature.role;
+          this.state.applyVersionCommit(
+            result.version ?? 0,
+            $localize`:Version-history summary written when a document is signed@@signatures.versionSummary:Signed by ${signer}:signer: as ${role}:role:`,
+          );
         }
         this.loadSignatures();
         this.signReq = { role: 'Reviewer', reason: '' };

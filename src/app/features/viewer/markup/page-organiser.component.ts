@@ -49,37 +49,51 @@ export interface DraftPage {
       <!-- Action bar -->
       <div class="flex flex-wrap gap-1 p-2 border-b border-gray-200 flex-shrink-0">
         <button (click)="selectAll()" class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50">
-          {{ allSelected() ? 'None' : 'All' }}
+          {{ allSelected() ? selectNoneLabel : selectAllLabel }}
         </button>
         <button (click)="rotateSelection(-90)" [disabled]="!hasSelection()"
+          i18n-title="@@pageOrganiser.rotateLeft"
           title="Rotate selected pages 90° anticlockwise"
           class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-30">↺</button>
         <button (click)="rotateSelection(90)" [disabled]="!hasSelection()"
+          i18n-title="@@pageOrganiser.rotateRight"
           title="Rotate selected pages 90° clockwise"
           class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-30">↻</button>
         <button (click)="duplicateSelection()" [disabled]="!hasSelection()"
+          i18n-title="@@pageOrganiser.duplicate"
           title="Duplicate selected pages"
           class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-30">⧉</button>
         <button (click)="deleteSelection()" [disabled]="!canDeleteSelection()"
-          [title]="canDeleteSelection() ? 'Delete selected pages' : 'A document must keep at least one page'"
+          [title]="canDeleteSelection() ? deleteHint : lastPageHint"
           class="text-xs px-2 py-1 rounded border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-30">🗑</button>
         <button (click)="extractSelection()" [disabled]="!hasSelection() || dirty() || working()"
-          [title]="dirty() ? 'Apply or discard your changes first' : 'Copy selected pages into a new document'"
-          class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-30">⇱ Extract</button>
+          [title]="dirty() ? applyFirstHint : extractHint"
+          class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-30"
+          ><span aria-hidden="true">⇱</span>
+          <ng-container i18n="Copies the selected pages into a new document@@pageOrganiser.extract"
+            >Extract</ng-container
+          ></button>
         <button (click)="openInsertPicker()" [disabled]="dirty() || working()"
-          [title]="dirty() ? 'Apply or discard your changes first' : 'Insert pages from another document'"
-          class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-30">⇲ Insert</button>
+          [title]="dirty() ? applyFirstHint : insertHint"
+          class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-30"
+          ><span aria-hidden="true">⇲</span>
+          <ng-container i18n="Adds pages from another document@@pageOrganiser.insert"
+            >Insert</ng-container
+          ></button>
       </div>
 
       <!-- Insert picker: siblings in the same project -->
       @if (picking()) {
         <div class="p-2 border-b border-gray-200 bg-gray-50 flex-shrink-0">
           <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-semibold text-gray-700">Insert all pages from</span>
-            <button (click)="picking.set(false)" class="text-xs text-gray-500 hover:text-gray-800">✕</button>
+            <span i18n="Heading over the list of documents to take pages from@@pageOrganiser.insertFromHeading"
+                  class="text-xs font-semibold text-gray-700">Insert all pages from</span>
+            <button (click)="picking.set(false)"
+              i18n-aria-label="@@pageOrganiser.closeInsertPicker" aria-label="Close"
+              class="text-xs text-gray-500 hover:text-gray-800">✕</button>
           </div>
           @if (candidates().length === 0) {
-            <p class="text-xs text-gray-500 py-1">
+            <p i18n="@@pageOrganiser.noInsertCandidates" class="text-xs text-gray-500 py-1">
               No other PDF in this project to insert from.
             </p>
           }
@@ -87,13 +101,14 @@ export interface DraftPage {
             @for (candidate of candidates(); track candidate.id) {
               <li>
                 <button (click)="insertFrom(candidate.id)" [disabled]="working()"
-                  class="w-full text-left text-xs px-1.5 py-1 rounded hover:bg-white disabled:opacity-40 truncate">
+                  class="w-full text-start text-xs px-1.5 py-1 rounded hover:bg-white disabled:opacity-40 truncate">
                   {{ candidate.name }}
                 </button>
               </li>
             }
           </ul>
-          <p class="text-xs text-gray-400 mt-1">
+          <p i18n="Says where inserted pages will land, e.g. 'Inserted at the end.'@@pageOrganiser.insertPosition"
+             class="text-xs text-gray-400 mt-1">
             Inserted {{ insertAtLabel() }}.
           </p>
         </div>
@@ -104,12 +119,13 @@ export interface DraftPage {
         <div class="flex items-center gap-2 px-2 py-1.5 bg-amber-50 border-b border-amber-200 flex-shrink-0">
           <span class="text-xs text-amber-800 flex-1">{{ pendingLabel() }}</span>
           <button (click)="discard()" [disabled]="working()"
+            i18n="Throws away unapplied page changes@@pageOrganiser.discard"
             class="text-xs px-2 py-0.5 rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-40">
             Discard
           </button>
           <button (click)="apply()" [disabled]="working()"
             class="text-xs px-2 py-0.5 rounded bg-accent text-white hover:opacity-90 disabled:opacity-40">
-            {{ working() ? 'Applying...' : 'Apply' }}
+            {{ working() ? applyingLabel : applyLabel }}
           </button>
         </div>
       }
@@ -127,7 +143,7 @@ export interface DraftPage {
       <div class="flex-1 overflow-y-auto p-2 grid grid-cols-2 gap-2 content-start"
            cdkDropList cdkDropListOrientation="mixed" (cdkDropListDropped)="onDrop($event)">
         @if (draft().length === 0) {
-          <div class="col-span-2 text-center text-gray-400 text-xs py-8">Generating thumbnails...</div>
+          <div i18n="@@pageOrganiser.loadingThumbnails" class="col-span-2 text-center text-gray-400 text-xs py-8">Generating thumbnails...</div>
         }
         @for (page of draft(); track page.id; let index = $index) {
           <div cdkDrag class="page-card rounded border-2 transition-colors overflow-hidden"
@@ -135,12 +151,12 @@ export interface DraftPage {
               ? 'border-accent bg-blue-50'
               : 'border-gray-200 hover:border-gray-400 bg-white'">
 
-            <button (click)="toggle(page.id, $event)" class="block w-full text-left p-1">
+            <button (click)="toggle(page.id, $event)" class="block w-full text-start p-1">
               <div class="h-20 flex items-center justify-center overflow-hidden bg-white">
                 <img [src]="thumbnailFor(page.sourcePage)"
                      [style.transform]="'rotate(' + page.rotate + 'deg)'"
                      class="max-h-full max-w-full object-contain transition-transform"
-                     [alt]="'Page ' + page.sourcePage" />
+                     [alt]="pageThumbnailLabel(page.sourcePage)" />
               </div>
             </button>
 
@@ -148,11 +164,13 @@ export interface DraftPage {
               <!-- The grip owns the drag: starting it from the thumbnail
                    would fight with click-to-select. -->
               <span cdkDragHandle class="cursor-move text-gray-400 hover:text-gray-700 select-none"
+                    i18n-title="Tooltip on the grip that reorders a page. Reordering also works from the keyboard.@@pageOrganiser.dragHandle"
                     title="Drag to reorder">⠿</span>
               <span class="font-medium text-gray-700">{{ index + 1 }}</span>
               @if (page.rotate) { <span class="text-amber-600">{{ page.rotate }}°</span> }
               @if (page.sourcePage !== index + 1 || duplicated(page.sourcePage)) {
-                <span class="text-gray-400 truncate">was {{ page.sourcePage }}</span>
+                <span i18n="Shows where a page sat before it was moved or copied@@pageOrganiser.wasPage"
+                      class="text-gray-400 truncate">was {{ page.sourcePage }}</span>
               }
             </div>
           </div>
@@ -301,7 +319,13 @@ export class PageOrganiserComponent {
       },
       error: err => {
         this.working.set(false);
-        this.report(this.errorText(err, 'The pages could not be rearranged.'), true);
+        this.report(
+          this.errorText(
+            err,
+            $localize`:Fallback when applying page changes fails@@pageOrganiser.rearrangeFailed:The pages could not be rearranged.`,
+          ),
+          true,
+        );
       }
     });
   }
@@ -325,9 +349,17 @@ export class PageOrganiserComponent {
         next: documents => this.candidates.set(
           documents.filter(candidate =>
             candidate.id !== documentId && this.isPdf(candidate))),
-        error: () => this.report('Could not list the documents in this project.', true)
+        error: () =>
+          this.report(
+            $localize`:Shown when the list of documents to insert from cannot be read@@pageOrganiser.listFailed:Could not list the documents in this project.`,
+            true,
+          )
       }),
-      error: () => this.report('Could not identify this document\'s project.', true)
+      error: () =>
+        this.report(
+          $localize`:Shown when the document's project cannot be determined@@pageOrganiser.projectUnknown:Could not identify this document's project.`,
+          true,
+        )
     });
   }
 
@@ -346,7 +378,10 @@ export class PageOrganiserComponent {
       next: info => {
         if (!info.success || !info.pageCount) {
           this.working.set(false);
-          this.report('That document has no pages to insert.', true);
+          this.report(
+            $localize`:Shown when the chosen document turns out to be empty@@pageOrganiser.sourceEmpty:That document has no pages to insert.`,
+            true,
+          );
           return;
         }
         const pages = Array.from({ length: info.pageCount }, (_, index) => index + 1);
@@ -361,13 +396,25 @@ export class PageOrganiserComponent {
           },
           error: err => {
             this.working.set(false);
-            this.report(this.errorText(err, 'The pages could not be inserted.'), true);
+            this.report(
+              this.errorText(
+                err,
+                $localize`:Fallback when inserting pages fails@@pageOrganiser.insertFailed:The pages could not be inserted.`,
+              ),
+              true,
+            );
           }
         });
       },
       error: err => {
         this.working.set(false);
-        this.report(this.errorText(err, 'That document\'s pages could not be read.'), true);
+        this.report(
+          this.errorText(
+            err,
+            $localize`:Fallback when the source document cannot be read@@pageOrganiser.sourceUnreadable:That document's pages could not be read.`,
+          ),
+          true,
+        );
       }
     });
   }
@@ -383,8 +430,29 @@ export class PageOrganiserComponent {
 
   insertAtLabel(): string {
     const position = this.insertPosition();
-    return position === undefined ? 'at the end' : `before page ${position}`;
+    return position === undefined
+      ? $localize`:Completes "Inserted ..." when nothing is selected@@pageOrganiser.insertAtEnd:at the end`
+      : $localize`:Completes "Inserted ..." with the page it lands before@@pageOrganiser.insertBeforePage:before page ${position}:position:`;
   }
+
+  /** Alternative text for a page thumbnail. */
+  pageThumbnailLabel(sourcePage: number): string {
+    return $localize`:Alternative text on a page thumbnail@@pageOrganiser.pageThumbnail:Page ${sourcePage}:page:`;
+  }
+
+  /**
+   * Labels and tooltips that live in expressions, so `i18n` cannot mark them
+   * — see the note in login.component.ts.
+   */
+  readonly selectAllLabel = $localize`:Selects every page. Very short — it shares a row with six icon buttons.@@pageOrganiser.selectAll:All`;
+  readonly selectNoneLabel = $localize`:Clears the page selection. Very short — it shares a row with six icon buttons.@@pageOrganiser.selectNone:None`;
+  readonly applyLabel = $localize`:Commits the pending page changes to the document@@pageOrganiser.apply:Apply`;
+  readonly applyingLabel = $localize`:Apply button while the request is in flight@@pageOrganiser.applying:Applying...`;
+  readonly deleteHint = $localize`:Tooltip on the enabled delete-pages button@@pageOrganiser.deleteHint:Delete selected pages`;
+  readonly lastPageHint = $localize`:Tooltip explaining why pages cannot be deleted@@pageOrganiser.lastPageHint:A document must keep at least one page`;
+  readonly applyFirstHint = $localize`:Tooltip explaining why extract and insert are unavailable while changes are pending@@pageOrganiser.applyFirstHint:Apply or discard your changes first`;
+  readonly extractHint = $localize`:Tooltip on the enabled extract button@@pageOrganiser.extractHint:Copy selected pages into a new document`;
+  readonly insertHint = $localize`:Tooltip on the enabled insert button@@pageOrganiser.insertHint:Insert pages from another document`;
 
   private isPdf(candidate: { fileName?: string; fileType?: string }): boolean {
     return (candidate.fileType ?? '').toLowerCase().includes('pdf')
@@ -401,13 +469,22 @@ export class PageOrganiserComponent {
       next: result => {
         this.working.set(false);
         this.selection.set(new Set());
+        const name = result.name;
+        const pageCount = result.pageCount;
         this.report(
-          `Created "${result.name}" with ${result.pageCount} page(s). ` +
-          'It is in this project alongside the original.', false);
+          $localize`:Confirms an extraction, naming the new document and its size@@pageOrganiser.extracted:Created "${name}:name:" with ${pageCount}:pageCount: page(s). It is in this project alongside the original.`,
+          false,
+        );
       },
       error: err => {
         this.working.set(false);
-        this.report(this.errorText(err, 'The pages could not be extracted.'), true);
+        this.report(
+          this.errorText(
+            err,
+            $localize`:Fallback when extracting pages fails@@pageOrganiser.extractFailed:The pages could not be extracted.`,
+          ),
+          true,
+        );
       }
     });
   }
@@ -426,8 +503,10 @@ export class PageOrganiserComponent {
   pendingLabel(): string {
     const before = this.baseline.length;
     const after  = this.draft().length;
-    if (after === before) return 'Page changes not yet applied';
-    return `${after} page(s), was ${before} — not yet applied`;
+    if (after === before) {
+      return $localize`:Shown when pages were rotated or reordered but the count is unchanged@@pageOrganiser.pendingSameCount:Page changes not yet applied`;
+    }
+    return $localize`:Shown when the page count has changed and nothing is saved yet@@pageOrganiser.pendingCountChanged:${after}:after: pages, was ${before}:before: — not yet applied`;
   }
 
   // ── Internals ────────────────────────────────────────────────
@@ -462,7 +541,9 @@ export class PageOrganiserComponent {
   }
 
   private errorText(err: { status?: number; error?: { message?: string } }, fallback: string): string {
-    if (err.status === 503) return 'The document conversion service is not running.';
+    if (err.status === 503) {
+      return $localize`:Shown when the backend conversion service is unreachable@@pageOrganiser.converterDown:The document conversion service is not running.`;
+    }
     return problemMessage(err, fallback);
   }
 }

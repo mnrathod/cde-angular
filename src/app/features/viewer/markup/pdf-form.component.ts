@@ -26,14 +26,18 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
       <!-- ── Design ────────────────────────────────────────────── -->
       <details class="mb-3 border border-gray-200 rounded" [open]="state.formFieldDrafts().length > 0">
         <summary class="text-xs font-semibold text-gray-600 px-2 py-1.5 cursor-pointer select-none">
-          Design fields
+          <ng-container i18n="Expands the controls for adding new form fields to a PDF@@pdfForm.designHeading"
+            >Design fields</ng-container
+          >
           @if (state.formFieldDrafts().length) {
-            <span class="text-blue-600">({{ state.formFieldDrafts().length }} placed)</span>
+            <span i18n="How many new fields have been drawn but not yet added@@pdfForm.placedCount"
+                  class="text-blue-600">({{ state.formFieldDrafts().length }} placed)</span>
           }
         </summary>
 
         <div class="p-2 border-t border-gray-100">
-          <p class="text-xs text-gray-500 mb-2">
+          <p i18n="How to add a form field. The emphasised word must match the toolbar's Field label.@@pdfForm.designInstructions"
+             class="text-xs text-gray-500 mb-2">
             Pick the <span class="font-medium">Field</span> tool in the toolbar and draw a box on
             the page, then name it here.
           </p>
@@ -43,30 +47,36 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
               <div class="flex items-center gap-1 mb-1">
                 <input type="text" [ngModel]="draft.name"
                   (ngModelChange)="state.updateFormFieldDraft(draft.id, { name: $event })"
+                  i18n-placeholder="@@pdfForm.fieldNamePlaceholder"
                   placeholder="field name"
                   class="flex-1 min-w-0 text-xs border border-gray-300 rounded px-1.5 py-0.5" />
                 <span class="text-xs text-gray-400">p{{ draft.page }}</span>
                 <button (click)="state.removeFormFieldDraft(draft.id)"
-                  class="text-red-400 hover:text-red-600 text-xs" title="Discard">✕</button>
+                  class="text-red-400 hover:text-red-600 text-xs"
+                  i18n-title="Removes one drawn field before it is added@@pdfForm.discardDraft"
+                  title="Discard">✕</button>
               </div>
               <div class="flex items-center gap-1">
                 <select [ngModel]="draft.kind"
                   (ngModelChange)="state.updateFormFieldDraft(draft.id, { kind: $event })"
                   class="text-xs border border-gray-300 rounded px-1 py-0.5">
-                  <option value="TEXT">Text</option>
-                  <option value="TEXTAREA">Multi-line</option>
-                  <option value="CHECKBOX">Checkbox</option>
-                  <option value="DROPDOWN">Dropdown</option>
+                  <option value="TEXT" i18n="Form field kind — a single line of text@@formFieldKind.text">Text</option>
+                  <option value="TEXTAREA" i18n="Form field kind — several lines of text@@formFieldKind.textarea">Multi-line</option>
+                  <option value="CHECKBOX" i18n="Form field kind — a tick box@@formFieldKind.checkbox">Checkbox</option>
+                  <option value="DROPDOWN" i18n="Form field kind — a list to choose one value from@@formFieldKind.dropdown">Dropdown</option>
                 </select>
                 <label class="flex items-center gap-1 text-xs text-gray-600">
                   <input type="checkbox" [ngModel]="draft.required"
                     (ngModelChange)="state.updateFormFieldDraft(draft.id, { required: $event })" />
-                  Required
+                  <ng-container i18n="Marks a form field as one that must be filled in@@pdfForm.required"
+                    >Required</ng-container
+                  >
                 </label>
               </div>
               @if (draft.kind === 'DROPDOWN') {
                 <input type="text" [ngModel]="draft.options"
                   (ngModelChange)="state.updateFormFieldDraft(draft.id, { options: $event })"
+                  i18n-placeholder="The values a dropdown field offers@@pdfForm.optionsPlaceholder"
                   placeholder="options, comma separated"
                   class="w-full text-xs border border-gray-300 rounded px-1.5 py-0.5 mt-1" />
               }
@@ -76,13 +86,14 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
           @if (state.formFieldDrafts().length) {
             <div class="flex gap-1.5">
               <button (click)="state.clearFormFieldDrafts()" [disabled]="designing()"
+                i18n="Removes every drawn field before any are added@@pdfForm.discardAllDrafts"
                 class="flex-1 text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-40">
                 Discard all
               </button>
               <button (click)="addDrafts()" [disabled]="!draftsReady() || designing()"
-                [title]="draftsReady() ? 'Add these fields to the document' : 'Every field needs a name'"
+                [title]="draftsReady() ? addFieldsHint : unnamedFieldHint"
                 class="flex-1 text-xs px-2 py-1 rounded bg-accent text-white hover:opacity-90 disabled:opacity-40">
-                {{ designing() ? 'Adding...' : 'Add fields' }}
+                {{ designing() ? addingLabel : addFieldsLabel }}
               </button>
             </div>
           }
@@ -96,10 +107,11 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
         </div>
       </details>
 
-      <div class="text-sm font-semibold text-gray-800 mb-1">Form Fields</div>
+      <div i18n="Heading over the PDF's existing fillable fields@@pdfForm.heading"
+           class="text-sm font-semibold text-gray-800 mb-1">Form Fields</div>
 
       @if (loading()) {
-        <div class="text-xs text-gray-400 py-6 text-center">Reading form fields...</div>
+        <div i18n="@@pdfForm.loading" class="text-xs text-gray-400 py-6 text-center">Reading form fields...</div>
       }
 
       @if (!loading() && error()) {
@@ -109,20 +121,21 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
       }
 
       @if (!loading() && !error() && fields().length === 0) {
-        <div class="text-xs text-gray-400 py-6 text-center">
+        <div i18n="@@pdfForm.empty" class="text-xs text-gray-400 py-6 text-center">
           This PDF has no fillable form fields.
         </div>
       }
 
       @if (fields().length > 0) {
-        <p class="text-xs text-gray-500 mb-3">
-          {{ fields().length }} field(s). Filling commits a new version; the
-          previous one stays in the history.
+        <p i18n="How many fillable fields the document has, and what filling them does@@pdfForm.fieldCount"
+           class="text-xs text-gray-500 mb-3">
+          {fields().length, plural, =1 {1 field.} other {{{ fields().length }} fields.}} Filling commits a new version; the previous one stays in the history.
         </p>
 
         <form [formGroup]="form" (ngSubmit)="submit()">
           @for (page of pageNumbers(); track page) {
-            <div class="text-xs font-semibold text-gray-500 mt-3 mb-1.5 border-b border-gray-200 pb-1">
+            <div i18n="Groups the form fields that sit on one page@@pdfForm.pageHeading"
+                 class="text-xs font-semibold text-gray-500 mt-3 mb-1.5 border-b border-gray-200 pb-1">
               Page {{ page }}
             </div>
 
@@ -130,8 +143,11 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
               <div class="mb-2.5">
                 <label class="block text-xs text-gray-600 mb-0.5" [attr.for]="field.name">
                   {{ field.name }}
-                  @if (field.required) { <span class="text-red-500">*</span> }
-                  @if (field.readOnly) { <span class="text-gray-400">(read-only)</span> }
+                  @if (field.required) { <span class="text-red-500" aria-hidden="true">*</span> }
+                  @if (field.readOnly) {
+                    <span i18n="Marks a form field the document does not allow changing@@pdfForm.readOnly"
+                          class="text-gray-400">(read-only)</span>
+                  }
                 </label>
 
                 @switch (field.kind) {
@@ -171,7 +187,8 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
                     </select>
                   }
                   @case ('signature') {
-                    <div class="text-xs text-gray-400 italic">
+                    <div i18n="Shown in place of a signature field. The tab name must match the sidebar's Sign label.@@pdfForm.signatureField"
+                         class="text-xs text-gray-400 italic">
                       Signature field — use the Sign tab.
                     </div>
                   }
@@ -186,12 +203,14 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
                 }
 
                 @if (isInvalid(field.name)) {
-                  <div class="text-xs text-red-500 mt-0.5">
+                  <div i18n="Validation message naming the field that was left empty@@pdfForm.fieldRequired"
+                       class="text-xs text-red-500 mt-0.5">
                     {{ field.name }} is required.
                   </div>
                 }
                 @if (field.maxLength) {
-                  <div class="text-xs text-gray-400 mt-0.5">Max {{ field.maxLength }} characters</div>
+                  <div i18n="How many characters a field accepts@@pdfForm.maxLength"
+                       class="text-xs text-gray-400 mt-0.5">Max {{ field.maxLength }} characters</div>
                 }
               </div>
             }
@@ -199,13 +218,15 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
 
           <label class="flex items-center gap-1.5 mt-3 text-xs text-gray-600 cursor-pointer">
             <input type="checkbox" [formControl]="flattenControl" class="h-3.5 w-3.5" />
-            Flatten (bake values in, remove editable fields)
+            <ng-container i18n="Option to make the filled values permanent, so the form can no longer be edited@@pdfForm.flatten"
+              >Flatten (bake values in, remove editable fields)</ng-container
+            >
           </label>
 
           <button type="submit" [disabled]="submitting() || form.invalid"
             class="w-full mt-3 py-1.5 text-xs rounded bg-accent text-white font-semibold
                    hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed">
-            {{ submitting() ? 'Filling...' : 'Fill & Download' }}
+            {{ submitting() ? fillingLabel : fillAndDownloadLabel }}
           </button>
 
           @if (statusMessage()) {
@@ -273,8 +294,8 @@ export class PdfFormComponent implements OnInit {
       error: err => {
         this.loading.set(false);
         this.error.set(err.status === 503
-          ? 'The document converter service is not running.'
-          : 'Could not read form fields from this document.');
+          ? this.converterDownText()
+          : $localize`:Shown when a PDF's form fields cannot be read@@pdfForm.readFailed:Could not read form fields from this document.`);
       }
     });
   }
@@ -330,10 +351,34 @@ export class PdfFormComponent implements OnInit {
         this.designFailed.set(true);
         // The server names the offending field, which is more use than a
         // generic rejection when twenty boxes have been placed.
-        this.designMessage.set(problemMessage(err, 'The fields could not be added.'));
+        this.designMessage.set(
+          problemMessage(
+            err,
+            $localize`:Fallback when adding new form fields fails without a reason@@pdfForm.addFailed:The fields could not be added.`,
+          ),
+        );
       }
     });
   }
+
+  /**
+   * Said from two places, which is why it is a method rather than a field.
+   *
+   * <p>A 503 here means the out-of-process converter (§5.13.10) is down, not
+   * that the document is at fault — worth distinguishing, because one is a
+   * problem with the file and the other is a problem with the deployment.
+   */
+  private converterDownText(): string {
+    return $localize`:Shown when the backend document converter is unreachable@@pdfForm.converterDown:The document converter service is not running.`;
+  }
+
+  /** Labels and hints that live in expressions, so `i18n` cannot mark them. */
+  readonly addFieldsLabel = $localize`:Commits the drawn fields to the document@@pdfForm.addFieldsAction:Add fields`;
+  readonly addingLabel = $localize`:Add-fields button while the request is in flight@@pdfForm.addingAction:Adding...`;
+  readonly addFieldsHint = $localize`:Tooltip on the enabled Add fields button@@pdfForm.addFieldsHint:Add these fields to the document`;
+  readonly unnamedFieldHint = $localize`:Tooltip explaining why Add fields is unavailable@@pdfForm.unnamedFieldHint:Every field needs a name`;
+  readonly fillAndDownloadLabel = $localize`:Saves the entered values and downloads the result@@pdfForm.fillAction:Fill & Download`;
+  readonly fillingLabel = $localize`:Fill button while the request is in flight@@pdfForm.fillingAction:Filling...`;
 
   isInvalid(name: string): boolean {
     const control = this.form.get(name);
@@ -353,7 +398,11 @@ export class PdfFormComponent implements OnInit {
       next: result => {
         this.submitting.set(false);
         this.statusIsError.set(false);
-        this.statusMessage.set(`Saved as version ${result.version} — ${result.summary}`);
+        const version = result.version;
+        const summary = result.summary;
+        this.statusMessage.set(
+          $localize`:Confirms a filled form was saved, naming the new version@@pdfForm.saved:Saved as version ${version}:version: — ${summary}:summary:`,
+        );
         // Reload so the viewer shows the filled document; the next operation
         // then runs against these values rather than the empty form.
         this.state.applyVersionCommit(result.version, result.summary);
@@ -365,8 +414,11 @@ export class PdfFormComponent implements OnInit {
         this.submitting.set(false);
         this.statusIsError.set(true);
         this.statusMessage.set(err.status === 503
-          ? 'The document converter service is not running.'
-          : problemMessage(err, 'Filling the form failed.'));
+          ? this.converterDownText()
+          : problemMessage(
+              err,
+              $localize`:Fallback when filling a form fails without a reason@@pdfForm.fillFailed:Filling the form failed.`,
+            ));
       }
     });
   }

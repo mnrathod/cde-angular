@@ -219,6 +219,51 @@ describe('PageOrganiserComponent', () => {
     });
   });
 
+  /**
+   * The two sentences that tell someone what is about to happen to their
+   * document. Both are easy to get subtly wrong and both are read at exactly
+   * the moment when being wrong is expensive.
+   */
+  describe('describing what is pending', () => {
+    it('says nothing has changed in count when pages were only rotated', () => {
+      loadPages(3);
+      organiser.selectAll();
+      organiser.rotateSelection(90);
+
+      expect(organiser.pendingLabel()).toContain('not yet applied');
+      expect(organiser.pendingLabel()).not.toContain('was 3');
+    });
+
+    it('names both counts when pages were added or removed', () => {
+      // The number a user checks before committing: "3 pages, was 2" is the
+      // difference between a duplicate they meant and one they did not.
+      loadPages(2);
+      organiser.toggle(idAt(0), click);
+      organiser.duplicateSelection();
+
+      const label = organiser.pendingLabel();
+      expect(label).toContain('3');
+      expect(label).toContain('2');
+    });
+
+    it('inserts at the end when nothing is selected', () => {
+      loadPages(3);
+
+      expect(organiser.insertAtLabel()).toBe('at the end');
+    });
+
+    it('inserts after the last selected page, not the first', () => {
+      // Selecting pages 1 and 2 and inserting must land after 2. Taking the
+      // first selected page instead would bury the inserted pages inside the
+      // selection, which is the opposite of what the gesture means.
+      loadPages(4);
+      organiser.toggle(idAt(0), click);
+      organiser.toggle(idAt(1), ctrlClick);
+
+      expect(organiser.insertAtLabel()).toContain('3');
+    });
+  });
+
   describe('applying', () => {
     it('sends the whole layout, including rotations, as one request', () => {
       loadPages(3);

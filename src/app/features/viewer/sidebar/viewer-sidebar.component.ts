@@ -55,7 +55,8 @@ import { Annotation } from '../../../core/models';
       @if (state.sidebarTab() === 'annotations') {
         <div class="flex-1 overflow-y-auto">
           @if (state.annotations().length === 0 && state.shapes().length === 0) {
-            <div class="text-center text-gray-400 text-xs py-10 px-3">
+            <div i18n="Empty state for the markup panel. The line break separates the statement from the next action.@@sidebar.noAnnotations"
+                 class="text-center text-gray-400 text-xs py-10 px-3">
               No annotations yet.<br>Use the toolbar to add markup.
             </div>
           }
@@ -64,8 +65,10 @@ import { Annotation } from '../../../core/models';
           @if (state.dirty() && state.shapes().length > 0) {
             <div class="px-3 pt-2">
               <div class="text-xs font-semibold text-amber-600 mb-1.5 flex items-center gap-1">
-                <span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
-                Unsaved ({{ state.shapes().length }})
+                <span class="w-2 h-2 rounded-full bg-amber-400 inline-block" aria-hidden="true"></span>
+                <ng-container i18n="Heading over markup drawn but not yet saved, with how many@@sidebar.unsavedCount"
+                  >Unsaved ({{ state.shapes().length }})</ng-container
+                >
               </div>
               @for (s of state.shapes(); track s.id) {
                 <div class="flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 group mb-1">
@@ -73,7 +76,9 @@ import { Annotation } from '../../../core/models';
                   <span class="text-xs text-gray-600 flex-1 capitalize">{{ s.tool }}{{ s.text ? ': ' + s.text : '' }}</span>
                   <span class="text-xs text-gray-400">p{{ s.pageNumber }}</span>
                   <button (click)="state.removeShape(s.id)"
-                    class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs ml-1">✕</button>
+                    i18n-aria-label="@@sidebar.removeShape"
+                    aria-label="Remove this markup"
+                    class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs ms-1">✕</button>
                 </div>
               }
             </div>
@@ -82,7 +87,8 @@ import { Annotation } from '../../../core/models';
           <!-- Saved annotations -->
           @if (state.annotations().length > 0) {
             <div class="px-3 pt-2">
-              <div class="text-xs font-semibold text-gray-500 mb-1.5">
+              <div i18n="Heading over markup already saved to the server, with how many@@sidebar.savedCount"
+                   class="text-xs font-semibold text-gray-500 mb-1.5">
                 Saved ({{ state.annotations().length }})
               </div>
               @for (ann of state.annotations(); track ann.id) {
@@ -105,7 +111,11 @@ import { Annotation } from '../../../core/models';
                     </span>
                     @if (ann.status === 'OPEN') {
                       <button (click)="resolve(ann); $event.stopPropagation()"
-                        class="text-xs text-green-600 hover:text-green-700">✓ Resolve</button>
+                        class="text-xs text-green-600 hover:text-green-700"
+                        ><span aria-hidden="true">✓</span>
+                        <ng-container i18n="Closes an annotation as dealt with@@sidebar.resolve"
+                          >Resolve</ng-container
+                        ></button>
                     }
                   </div>
                 </div>
@@ -143,9 +153,10 @@ import { Annotation } from '../../../core/models';
       @if (state.sidebarTab() === 'measure') {
         <div class="flex-1 overflow-y-auto p-3">
           <div class="flex items-center justify-between mb-1">
-            <span class="text-sm font-semibold text-gray-800">Measurements</span>
+            <span i18n="@@sidebar.measurementsHeading" class="text-sm font-semibold text-gray-800">Measurements</span>
             @if (state.measurements().length > 0) {
               <button (click)="state.clearMeasurements()"
+                i18n="Discards every measurement in the list@@sidebar.clearMeasurements"
                 class="text-xs text-red-500 hover:text-red-700">Clear</button>
             }
           </div>
@@ -154,23 +165,23 @@ import { Annotation } from '../../../core/models';
                [class]="state.isCalibrated()
                  ? 'bg-green-50 border-green-200 text-green-800'
                  : 'bg-amber-50 border-amber-200 text-amber-800'">
-            <span>Scale</span>
+            <span i18n="How many real-world units one screen pixel represents@@sidebar.scaleLabel">Scale</span>
             <span class="font-mono">
-              {{ state.isCalibrated()
-                   ? '1px = ' + state.measurementScale().unitsPerPixel.toFixed(5) + ' ' + state.measurementScale().unit
-                   : 'uncalibrated' }}
+              {{ state.isCalibrated() ? calibratedScale() : uncalibratedLabel }}
             </span>
           </div>
 
           @if (!state.isCalibrated()) {
-            <p class="text-xs text-gray-500 mb-3">
+            <p i18n="Explains why measurements are in pixels. The emphasised word must match the toolbar's Calibrate label.@@sidebar.calibrateHint"
+               class="text-xs text-gray-500 mb-3">
               Results are in pixels. Use <span class="font-medium">Calibrate</span> in the
               toolbar and draw a line over a known distance to read real units.
             </p>
           }
 
           @if (state.measurements().length === 0) {
-            <div class="text-center text-gray-400 text-xs py-6">
+            <div i18n="Empty state for the measurements panel. The three names must match the toolbar's tool labels.@@sidebar.noMeasurements"
+                 class="text-center text-gray-400 text-xs py-6">
               No measurements yet. Use Measure, Area or Radius.
             </div>
           } @else {
@@ -183,6 +194,7 @@ import { Annotation } from '../../../core/models';
                   </div>
                   <button (click)="state.removeMeasurement(m.id)"
                     class="opacity-0 group-hover:opacity-100 text-xs text-gray-400 hover:text-red-600"
+                    i18n-title="@@sidebar.removeMeasurement"
                     title="Remove from list">✕</button>
                 </div>
               </div>
@@ -226,14 +238,17 @@ import { Annotation } from '../../../core/models';
                 [ngModel]="state.searchQuery()"
                 (ngModelChange)="state.searchQuery.set($event)"
                 (keydown.enter)="doSearch()"
+                i18n-placeholder="@@sidebar.searchPlaceholder"
                 placeholder="Search document..."
                 class="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-accent" />
               <button (click)="doSearch()"
+                i18n="Runs the document search. Very short — it sits beside the search box.@@sidebar.searchGo"
                 class="px-2 py-1.5 text-xs bg-accent text-white rounded hover:bg-blue-700">Go</button>
             </div>
             @if (state.searchResults().length > 0) {
-              <div class="text-xs text-gray-500 mt-1">
-                {{ state.searchResults().length }} matches
+              <div i18n="How many search hits were found@@sidebar.searchMatchCount"
+                   class="text-xs text-gray-500 mt-1">
+                {state.searchResults().length, plural, =1 {1 match} other {{{ state.searchResults().length }} matches}}
               </div>
             }
           </div>
@@ -243,9 +258,10 @@ import { Annotation } from '../../../core/models';
                    Keyboard users search more than most, and a result list that
                    cannot be reached by Tab makes search itself unusable. -->
               <button type="button" (click)="goToSearchResult(result)"
-                class="w-full text-left px-3 py-2 text-xs border-b border-gray-100 cursor-pointer hover:bg-blue-50">
+                class="w-full text-start px-3 py-2 text-xs border-b border-gray-100 cursor-pointer hover:bg-blue-50">
                 @if (state.totalPages() > 1) {
-                  <div class="font-medium text-gray-600 mb-0.5">Page {{ result.pageIndex }}</div>
+                  <div i18n="Which page a search hit is on@@sidebar.searchResultPage"
+                       class="font-medium text-gray-600 mb-0.5">Page {{ result.pageIndex }}</div>
                 }
                 <div class="text-gray-500">{{ snippetOf(result) }}</div>
               </button>
@@ -258,9 +274,11 @@ import { Annotation } from '../../../core/models';
             -->
             @if (state.searchQuery() && state.searchResults().length === 0) {
               @if (state.searchable()) {
-                <div class="text-center text-gray-400 text-xs py-8">No matches found</div>
+                <div i18n="Search found nothing, in a document that does have searchable text@@sidebar.noMatches"
+                     class="text-center text-gray-400 text-xs py-8">No matches found</div>
               } @else {
-                <div class="text-center text-gray-400 text-xs py-8 px-4">
+                <div i18n="Search is impossible — a scan or a drawing with no text layer@@sidebar.notSearchable"
+                     class="text-center text-gray-400 text-xs py-8 px-4">
                   This document has no text to search.
                 </div>
               }
@@ -277,18 +295,44 @@ export class ViewerSidebarComponent {
 
   @Output() pageSelected = new EventEmitter<number>();
 
+  /**
+   * The sidebar panels, in the order they appear.
+   *
+   * <p>`$localize` rather than plain strings: these are in a lookup table, so
+   * the template markup guard cannot see them, and each label is also the
+   * tab's tooltip and its accessible name. They render in a cell about seven
+   * characters wide and truncate past that, which is why the descriptions say
+   * to keep the translation short.
+   */
   readonly tabs: ReadonlyArray<{ id: SidebarTab; icon: IconName; label: string }> = [
-    { id: 'annotations', icon: 'pen',        label: 'Notes' },
-    { id: 'threads',     icon: 'comment',    label: 'Threads' },
-    { id: 'signatures',  icon: 'signature',  label: 'Sign' },
-    { id: 'redact',      icon: 'redact',     label: 'Redact' },
-    { id: 'form',        icon: 'form-field', label: 'Form' },
-    { id: 'measure',     icon: 'length',     label: 'Measure' },
-    { id: 'thumbnails',  icon: 'pages',      label: 'Pages' },
-    { id: 'search',      icon: 'search',     label: 'Search' },
-    { id: 'outline',     icon: 'outline',    label: 'Outline' },
-    { id: 'versions',    icon: 'history',    label: 'History' },
+    { id: 'annotations', icon: 'pen',        label: $localize`:Sidebar tab — markup notes on the document. Very short; truncates past about seven characters.@@sidebarTab.annotations:Notes` },
+    { id: 'threads',     icon: 'comment',    label: $localize`:Sidebar tab — comment conversations. Very short; truncates past about seven characters.@@sidebarTab.threads:Threads` },
+    { id: 'signatures',  icon: 'signature',  label: $localize`:Sidebar tab — digital signatures. Very short; truncates past about seven characters.@@sidebarTab.signatures:Sign` },
+    { id: 'redact',      icon: 'redact',     label: $localize`:Sidebar tab — permanently removing content. Very short; truncates past about seven characters.@@sidebarTab.redact:Redact` },
+    { id: 'form',        icon: 'form-field', label: $localize`:Sidebar tab — PDF form fields. Very short; truncates past about seven characters.@@sidebarTab.form:Form` },
+    { id: 'measure',     icon: 'length',     label: $localize`:Sidebar tab — distance and area measurement. Very short; truncates past about seven characters.@@sidebarTab.measure:Measure` },
+    { id: 'thumbnails',  icon: 'pages',      label: $localize`:Sidebar tab — page thumbnails and reordering. Very short; truncates past about seven characters.@@sidebarTab.thumbnails:Pages` },
+    { id: 'search',      icon: 'search',     label: $localize`:Sidebar tab — full-text search. Very short; truncates past about seven characters.@@sidebarTab.search:Search` },
+    { id: 'outline',     icon: 'outline',    label: $localize`:Sidebar tab — the document's bookmarks. Very short; truncates past about seven characters.@@sidebarTab.outline:Outline` },
+    { id: 'versions',    icon: 'history',    label: $localize`:Sidebar tab — version history. Very short; truncates past about seven characters.@@sidebarTab.versions:History` },
   ];
+
+  /**
+   * The measurement scale, as shown beside the "Scale" label.
+   *
+   * <p>In a method rather than in the template because it is an expression,
+   * which `i18n` cannot mark. The number is formatted before it reaches the
+   * message so a translator never has to reason about decimal places.
+   */
+  calibratedScale(): string {
+    const scale = this.state.measurementScale();
+    const ratio = scale.unitsPerPixel.toFixed(5);
+    const unit = scale.unit;
+    return $localize`:How much one screen pixel is worth, e.g. "1px = 0.00423 m"@@sidebar.scaleValue:1px = ${ratio}:ratio: ${unit}:unit:`;
+  }
+
+  /** Shown in place of a scale until someone calibrates against a known distance. */
+  readonly uncalibratedLabel = $localize`:Shown where the measurement scale would be, before calibration@@sidebar.uncalibrated:uncalibrated`;
 
   goToPage(page: number) {
     this.state.navigateTo(page);
