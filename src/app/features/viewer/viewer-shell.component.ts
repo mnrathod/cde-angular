@@ -8,6 +8,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
 import { ViewerStateService } from '../../../viewer-core/viewer-state.service';
+import { DocumentOperationsService } from './toolbar/document-operations.service';
 import { PdfEngineService } from '../../../viewer-core/pdf-engine.service';
 import { AnnotationService } from '../../core/services/viewer/annotation.service';
 import { ViewerService } from '../../core/services/viewer.service';
@@ -30,7 +31,9 @@ import { DrawingSearchService } from '../../../viewer-core/drawing-search.servic
   standalone: true,
   // Scoped to this component, not singletons: leaving the document must tear
   // the socket down, not leave it announcing a presence that has gone.
-  providers: [ViewerStateService, CollaborationService],
+  // Alongside the viewer state, because the in-flight flags on the
+  // operations belong to one open document.
+  providers: [ViewerStateService, CollaborationService, DocumentOperationsService],
   imports: [
     CommonModule,
     MarkupToolbarComponent,

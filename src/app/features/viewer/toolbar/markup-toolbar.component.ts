@@ -1,23 +1,14 @@
 import {
   Component, inject, Output, EventEmitter, ChangeDetectionStrategy, signal,
-  computed, effect
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ViewerStateService, MarkupTool } from '../../../../viewer-core/viewer-state.service';
-import { FlattenService } from '../../../core/services/viewer/flatten.service';
-import { AnnotationService } from '../../../core/services/viewer/annotation.service';
-import { RedactionService } from '../../../core/services/redaction.service';
-import { OcrService } from '../../../core/services/ocr.service';
-import {
-  MeasurementService, MeasurementUnit, MEASUREMENT_UNITS
-} from '../../../../viewer-core/measurement.service';
-import { MarkupEngineService } from '../../../../viewer-core/markup-engine.service';
+import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 import { IconComponent } from '../../../../viewer-core/icon.component';
-import {
-  allTools, toolForKey, MEASUREMENT_TOOLS, usesStrokeStyle
-} from '../../../../viewer-core/tool-catalog';
-import { problemMessage } from '../../../core/handlers/problem-detail';
+import { toolForKey } from '../../../../viewer-core/tool-catalog';
+import { DocumentOperationsService } from './document-operations.service';
+import { MarkupContextBarComponent } from './markup-context-bar.component';
+import { ScaleCalibrationComponent } from './scale-calibration.component';
 
 /**
  * The command bar above the document, and the context bar beneath it.
@@ -33,7 +24,10 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
 @Component({
   selector: 'app-markup-toolbar',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent],
+  imports: [
+    CommonModule, FormsModule, IconComponent,
+    MarkupContextBarComponent, ScaleCalibrationComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)' },
   template: `
@@ -110,7 +104,7 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
 
         <div [class]="divider"></div>
 
-        <button type="button" (click)="exportXfdf()"
+        <button type="button" (click)="operations.exportXfdf()"
           i18n-title="Tooltip on export. XFDF is a format name; the three products named are other software and keep their own names.@@toolbar.exportHint"
           title="Export annotations as XFDF (opens in Bluebeam, Acrobat and Procore)"
           [class]="labelledButton">
@@ -122,35 +116,35 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
           [class]="labelledButton + ' cursor-pointer'">
           <app-icon name="import" [size]="16" />
           <span i18n="Short toolbar label@@toolbar.import">Import</span>
-          <input type="file" accept=".xfdf" class="hidden" (change)="importXfdf($event)" />
+          <input type="file" accept=".xfdf" class="hidden" (change)="onXfdfChosen($event)" />
         </label>
 
         <div [class]="divider"></div>
 
-        <button type="button" (click)="flattenPdf()" [disabled]="!isPdf() || flattening()"
-          [title]="isPdf() ? flattenHint : flattenUnavailableHint"
+        <button type="button" (click)="flattenToPage()" [disabled]="!operations.isPdf() || operations.flattening()"
+          [title]="operations.isPdf() ? flattenHint : flattenUnavailableHint"
           [class]="labelledButton">
           <app-icon name="flatten" [size]="16" />
-          <span>{{ flattening() ? flatteningLabel : flattenLabel }}</span>
+          <span>{{ operations.flattening() ? flatteningLabel : flattenLabel }}</span>
         </button>
-        <button type="button" (click)="runOcr()" [disabled]="!isPdf() || ocrRunning()"
-          [title]="isPdf() ? ocrHint : ocrUnavailableHint"
+        <button type="button" (click)="operations.runOcr()" [disabled]="!operations.isPdf() || operations.ocrRunning()"
+          [title]="operations.isPdf() ? ocrHint : ocrUnavailableHint"
           [class]="labelledButton">
           <app-icon name="ocr" [size]="16" />
-          <span>{{ ocrRunning() ? ocrRunningLabel : ocrLabel }}</span>
+          <span>{{ operations.ocrRunning() ? ocrRunningLabel : ocrLabel }}</span>
         </button>
 
         <!-- Right-aligned: things that are only sometimes true. -->
         <div class="ms-auto flex items-center gap-1.5 ps-2">
           @if (state.redactionRegions().length > 0) {
-            <button type="button" (click)="applyRedaction()" [disabled]="redacting()"
+            <button type="button" (click)="operations.applyRedaction()" [disabled]="operations.redacting()"
               i18n-title="@@toolbar.applyRedactionHint"
               title="Permanently destroy the content under these regions and commit a new version"
               class="h-7 px-2.5 inline-flex items-center gap-1.5 text-xs font-medium rounded-md
                      bg-red-50 text-red-700 border border-red-200 hover:bg-red-100
                      disabled:opacity-40">
               <app-icon name="redact" [size]="15" />
-              <span>{{ redacting() ? redactingLabel : applyRedactionLabel(state.redactionRegions().length) }}</span>
+              <span>{{ operations.redacting() ? redactingLabel : applyRedactionLabel(state.redactionRegions().length) }}</span>
             </button>
           }
 
@@ -168,146 +162,18 @@ import { problemMessage } from '../../../core/handlers/problem-detail';
         </div>
       </div>
 
-      <!-- ── Context bar ──────────────────────────────────────────
-           Present only when the active tool has options or an instruction.
-           Pan and Select have neither, so the bar disappears and the
-           document gets the height back. -->
-      @if (showContextBar()) {
-        <div class="flex items-center h-9 px-3 gap-3 border-t border-gray-200 bg-gray-50/80">
+      <app-markup-context-bar />
 
-          <span class="text-xs font-semibold text-gray-700">{{ activeToolLabel() }}</span>
-
-          @if (usesStrokeStyle(state.activeTool())) {
-            <div [class]="contextDivider"></div>
-
-            <label class="flex items-center gap-1.5 cursor-pointer"
-                   i18n-title="@@toolbar.strokeColourHint" title="Stroke colour">
-              <span i18n="Colour of the line a markup tool draws. Short — it sits in a crowded strip.@@toolbar.strokeColour"
-                    class="text-xs text-gray-500">Colour</span>
-              <input type="color" [ngModel]="state.strokeColor()"
-                (ngModelChange)="state.strokeColor.set($event)"
-                i18n-aria-label="@@toolbar.strokeColourLabel" aria-label="Stroke colour"
-                class="h-6 w-8 rounded border border-gray-300 cursor-pointer p-0.5 bg-white" />
-            </label>
-
-            <label class="flex items-center gap-1.5"
-                   i18n-title="@@toolbar.strokeWidthHint" title="Line width">
-              <span i18n="Thickness of the line a markup tool draws. Short — it sits in a crowded strip.@@toolbar.strokeWidth"
-                    class="text-xs text-gray-500">Width</span>
-              <select [ngModel]="state.strokeWidth()"
-                (ngModelChange)="state.strokeWidth.set(+$event)"
-                i18n-aria-label="@@toolbar.strokeWidthLabel" aria-label="Line width"
-                class="h-6 w-16 text-xs border border-gray-300 rounded px-1.5 bg-white">
-                @for (width of strokeWidths; track width) {
-                  <option [value]="width">{{ width }} px</option>
-                }
-              </select>
-            </label>
-          }
-
-          @if (isMeasurementTool(state.activeTool())) {
-            <div [class]="contextDivider"></div>
-
-            @if (state.isCalibrated()) {
-              <span i18n="The drawing scale currently in force@@toolbar.scale"
-                    class="text-xs text-gray-600">
-                Scale <span class="font-mono font-medium">{{ scaleLabel() }}</span>
-              </span>
-              <button type="button" (click)="startCalibration()"
-                i18n="Sets the drawing scale again@@toolbar.recalibrate"
-                class="text-xs text-accent hover:underline">Recalibrate</button>
-            } @else {
-              <button type="button" (click)="startCalibration()"
-                i18n-title="@@toolbar.calibrateHint"
-                title="Draw a line over a known distance to set the drawing's scale"
-                class="h-6 px-2 inline-flex items-center gap-1.5 text-xs font-medium rounded
-                       bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100">
-                <app-icon name="calibrate" [size]="14" />
-                <span i18n="Prompt to calibrate, shown while measurements have no real-world units@@toolbar.setScale"
-                  >Set scale — readings are in pixels until you do</span
-                >
-              </button>
-            }
-          }
-
-          @if (completionHint()) {
-            <span class="ms-auto text-xs text-gray-500">{{ completionHint() }}</span>
-          }
-        </div>
-      }
-
-      <!-- Calibration dialog: opens once the reference line has been drawn -->
-      @if (state.pendingCalibrationPixels() > 0) {
-        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[600] flex items-center justify-center">
-          <div class="bg-white rounded-lg shadow-2xl p-6 w-80">
-            <h3 class="font-semibold text-gray-800 mb-1 flex items-center gap-2">
-              <app-icon name="calibrate" [size]="18" />
-              <ng-container i18n="Heading of the dialog that sets a drawing's scale@@toolbar.calibrationHeading"
-                >Set drawing scale</ng-container
-              >
-            </h3>
-            <p i18n="Asks what real-world distance the drawn reference line represents. The emphasised value is its length on screen in pixels.@@toolbar.calibrationQuestion"
-               class="text-xs text-gray-500 mb-4">
-              The line you drew is
-              <span class="font-mono font-semibold">{{ state.pendingCalibrationPixels().toFixed(1) }} px</span>.
-              What is that distance on the drawing?
-            </p>
-
-            <div class="flex gap-2 mb-3">
-              <input type="number" [(ngModel)]="calibrationValue" name="calibrationValue"
-                min="0" step="any"
-                i18n-placeholder="Example of a distance@@toolbar.calibrationValuePlaceholder" placeholder="e.g. 5"
-                i18n-aria-label="The real-world distance the drawn line represents@@toolbar.calibrationValueLabel"
-                aria-label="Known distance"
-                class="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded
-                       focus:outline-none focus:ring-2 focus:ring-accent" />
-              <select [(ngModel)]="calibrationUnit" name="calibrationUnit"
-                i18n-aria-label="The unit the known distance is given in@@toolbar.calibrationUnitLabel"
-                aria-label="Unit"
-                class="px-2 py-1.5 text-sm border border-gray-300 rounded
-                       focus:outline-none focus:ring-2 focus:ring-accent">
-                @for (unit of units; track unit) { <option [value]="unit">{{ unit }}</option> }
-              </select>
-            </div>
-
-            @if (calibrationError()) {
-              <div class="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2 mb-3">
-                {{ calibrationError() }}
-              </div>
-            }
-
-            <div class="flex gap-2 justify-end">
-              <button type="button" (click)="cancelCalibration()"
-                i18n="@@toolbar.calibrationCancel"
-                class="px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
-              <button type="button" (click)="applyCalibration()"
-                i18n="Confirms the entered scale@@toolbar.calibrationApply"
-                class="px-3 py-1.5 text-xs bg-accent text-white rounded hover:bg-blue-700 font-semibold">
-                Apply
-              </button>
-            </div>
-          </div>
-        </div>
-      }
+      <app-scale-calibration />
     </div>
   `
 })
 export class MarkupToolbarComponent {
   readonly state            = inject(ViewerStateService);
-  private readonly annService       = inject(AnnotationService);
-  private readonly flattenService   = inject(FlattenService);
-  private readonly redactionService = inject(RedactionService);
-  private readonly ocrService       = inject(OcrService);
-  private readonly measure          = inject(MeasurementService);
-  private readonly engine           = inject(MarkupEngineService);
+  readonly operations       = inject(DocumentOperationsService);
 
-  // Signals, not plain fields: this component is OnPush, so a bare field
-  // mutated from an async HTTP callback never re-renders — the button would
-  // stay stuck on "Redacting"/"Reading" after the call finished.
-  readonly saving     = signal(false);
-  readonly redacting  = signal(false);
-  readonly ocrRunning = signal(false);
-  readonly flattening = signal(false);
+  /** Saving is the viewer's own, not one of the document operations. */
+  readonly saving = signal(false);
 
   @Output() saveRequested  = new EventEmitter<void>();
   @Output() printRequested = new EventEmitter<void>();
@@ -331,55 +197,7 @@ export class MarkupToolbarComponent {
     'disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed';
 
   readonly divider        = 'w-px h-5 bg-gray-200 mx-1.5';
-  readonly contextDivider = 'w-px h-4 bg-gray-300';
 
-  readonly strokeWidths = [1, 2, 3, 5];
-
-  constructor() {
-    // Clear anything left from a previous attempt as the dialog opens, rather
-    // than when the tool is picked: the reference line is drawn in between, so
-    // resetting at selection time left a stale error visible on screen while
-    // the user was still drawing.
-    effect(() => {
-      if (this.state.pendingCalibrationPixels() > 0) {
-        this.calibrationValue = null;
-        this.calibrationError.set('');
-      }
-    });
-  }
-
-  // ── Context bar ──────────────────────────────────────────────
-  private readonly toolsByRail = allTools();
-
-  readonly activeToolLabel = computed(() => {
-    const active = this.state.activeTool();
-    return this.toolsByRail.find(tool => tool.id === active)?.label ?? '';
-  });
-
-  // The engine returns a finished sentence now, so there is nothing to
-  // capitalise here — doing so worked in English and was wrong anywhere the
-  // casing rules differ.
-  readonly completionHint = computed(() =>
-    this.engine.completionHint(this.state.activeTool()));
-
-  /**
-   * Whether the active tool has anything to show. Pan and Select carry no
-   * options and need no instruction, so the bar is hidden rather than drawn
-   * empty — an always-present bar with nothing in it is the kind of detail
-   * that makes chrome feel arbitrary.
-   */
-  readonly showContextBar = computed(() => {
-    const active = this.state.activeTool();
-    return usesStrokeStyle(active)
-        || this.isMeasurementTool(active)
-        || !!this.engine.completionHint(active);
-  });
-
-  usesStrokeStyle = usesStrokeStyle;
-
-  isMeasurementTool(tool: MarkupTool): boolean {
-    return MEASUREMENT_TOOLS.includes(tool);
-  }
 
   rotateHint(): string {
     const rotation = this.state.rotation();
@@ -412,10 +230,6 @@ export class MarkupToolbarComponent {
     return $localize`:Button that permanently destroys the drawn regions, naming how many@@toolbar.applyRedaction:Apply redaction (${regionCount}:count:)`;
   }
 
-  isPdf(): boolean {
-    return this.state.viewerData()?.type === 'pdf';
-  }
-
   /**
    * Discarding every annotation on the document is not undoable past the
    * undo stack's depth, so it asks first — the button sits beside undo and
@@ -428,131 +242,6 @@ export class MarkupToolbarComponent {
     const question = $localize`:Confirmation before discarding every annotation on the document@@toolbar.confirmClearAll:Delete all ${count}:count: markup item(s) on this document?`;
     if (!confirm(question)) return;
     this.state.clearAll();
-  }
-
-  /**
-   * Burn the marked regions out of the document. The result becomes the
-   * document's current version, so the removed content is gone for every
-   * later reader and every later operation — not just in a copy the person
-   * who ran it happens to hold.
-   */
-  applyRedaction() {
-    const regions = this.state.redactionRegions();
-    if (!regions.length) return;
-
-    this.redacting.set(true);
-    this.redactionService.redact(this.state.documentId(), regions).subscribe({
-      next: result => {
-        this.redacting.set(false);
-        this.state.clearRedactionRegions();
-        this.state.applyVersionCommit(result.version, result.summary);
-      },
-      error: err => {
-        this.redacting.set(false);
-        this.state.processingMessage.set(this.failureMessage(err, {
-          whenConverterDown: $localize`:Redaction failed because the backend converter is unreachable@@toolbar.redactionConverterDown:Redaction failed — the document converter service is not running.`,
-          otherwise: $localize`:Fallback when redaction fails without a reason@@toolbar.redactionFailed:Redaction failed.`,
-        }));
-      }
-    });
-  }
-
-  /**
-   * Turn a scanned PDF into a searchable one by adding an invisible text
-   * layer. Committed as a new version, so the text is available to search,
-   * selection and any later processing rather than living in a side copy.
-   */
-  runOcr() {
-    if (!this.isPdf()) return;
-
-    this.ocrRunning.set(true);
-    this.ocrService.makeSearchable(this.state.documentId()).subscribe({
-      next: result => {
-        this.ocrRunning.set(false);
-        this.state.applyVersionCommit(result.version, result.summary);
-      },
-      error: err => {
-        this.ocrRunning.set(false);
-        this.state.processingMessage.set(this.failureMessage(err, {
-          whenConverterDown: $localize`:Text recognition failed because the backend converter is unreachable@@toolbar.ocrConverterDown:OCR failed — the document converter service is not running.`,
-          otherwise: $localize`:Fallback when text recognition fails without a reason@@toolbar.ocrFailed:OCR failed.`,
-        }));
-      }
-    });
-  }
-
-  /**
-   * Server error text is authored by the backend for display; anything else
-   * gets a generic line naming the likely cause rather than the exception.
-   *
-   * <p>`${action} failed.` is reached only when the response carried no
-   * problem document at all, so it must not be the answer for a request that
-   * never arrived — see `problemMessage`, which separates that case out.
-   */
-  /**
-   * Turns a failed request into something a person can act on.
-   *
-   * <p>Takes two complete messages rather than a noun to interpolate into
-   * "{action} failed." — a sentence assembled from an English noun and an
-   * English verb cannot be translated, because neither the word order nor the
-   * agreement carries over.
-   */
-  private failureMessage(
-    err: { status?: number; error?: { message?: string } },
-    messages: { whenConverterDown: string; otherwise: string },
-  ): string {
-    if (err.status === 503) return messages.whenConverterDown;
-    return problemMessage(err, messages.otherwise);
-  }
-
-  // ── Scale calibration ────────────────────────────────────────
-  readonly units = MEASUREMENT_UNITS;
-  calibrationValue: number | null = null;
-  calibrationUnit: MeasurementUnit = 'm';
-  readonly calibrationError = signal('');
-
-  /** Short readout for the context bar, e.g. "1px = 0.025 m". */
-  scaleLabel(): string {
-    const scale = this.state.measurementScale();
-    return `1px = ${Number(scale.unitsPerPixel.toFixed(5))} ${scale.unit}`;
-  }
-
-  /**
-   * Selecting the tool is the whole action — the dialog opens by itself once
-   * the reference line has been drawn.
-   */
-  startCalibration() {
-    this.state.activeTool.set('calibrate');
-  }
-
-  applyCalibration() {
-    const scale = this.measure.calibrate(
-      this.state.pendingCalibrationPixels(),
-      Number(this.calibrationValue),
-      this.calibrationUnit
-    );
-    if (!scale) {
-      this.calibrationError.set(
-        $localize`:Validation message in the scale dialog@@toolbar.calibrationInvalid:Enter a distance greater than zero.`,
-      );
-      return;
-    }
-    this.state.setScale(scale);
-    this.state.pendingCalibrationPixels.set(0);
-    this.state.activeTool.set('pan');
-  }
-
-  cancelCalibration() {
-    this.state.pendingCalibrationPixels.set(0);
-    this.calibrationError.set('');
-    this.state.activeTool.set('pan');
-  }
-
-  private downloadBlob(blob: Blob, filename: string) {
-    const url = URL.createObjectURL(blob);
-    const a   = document.createElement('a');
-    a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
   }
 
   onKey(e: KeyboardEvent) {
@@ -572,91 +261,26 @@ export class MarkupToolbarComponent {
     // than failing loudly.
     const match = toolForKey(e.key);
     if (!match) return;
-    if (match.pdfOnly && !this.isPdf()) return;
+    if (match.pdfOnly && !this.operations.isPdf()) return;
     this.state.activeTool.set(match.id);
   }
 
   saveMarkup() { this.saveRequested.emit(); }
   print()      { this.printRequested.emit(); }
 
-  /**
-   * Bake the markup into the page itself, server-side, and commit the result
-   * as a new version.
-   *
-   * Flattening is destructive by definition: once the shapes are page content
-   * they are no longer editable annotations, so the annotation records that
-   * produced them are removed to stop the overlay drawing a second copy on
-   * top of the baked-in one. The pre-flatten file stays in the version
-   * history, so the document itself can be restored.
-   */
-  flattenPdf() {
-    const shapes = this.state.shapes();
-    if (!this.isPdf() || !shapes.length) {
-      this.state.processingMessage.set(
-        $localize`:Shown when flatten is used on a document with no markup@@toolbar.nothingToFlatten:There are no annotations to flatten.`,
-      );
-      return;
-    }
-    const shapeCount = shapes.length;
-    const question = $localize`:Confirmation before making markup a permanent part of the page@@toolbar.confirmFlattenQuestion:Flatten ${shapeCount}:count: annotation(s) into the page?`;
-    const consequence = $localize`:Second paragraph of the flatten confirmation@@toolbar.confirmFlattenConsequence:They become permanent page content and will no longer be editable. The current version stays in the history and can be restored.`;
-    if (!confirm(`${question}\n\n${consequence}`)) return;
-
-    this.flattening.set(true);
-    this.flattenService.flattenToPdf({
-      documentId: this.state.documentId(),
-      shapes,
-      quality: 'print'
-    }).subscribe({
-      next: result => {
-        this.flattening.set(false);
-        this.discardFlattenedAnnotations();
-        this.state.applyVersionCommit(result.version, result.summary);
-      },
-      error: err => {
-        this.flattening.set(false);
-        this.state.processingMessage.set(this.failureMessage(err, {
-          whenConverterDown: $localize`:Flattening failed because the backend converter is unreachable@@toolbar.flattenConverterDown:Flatten failed — the document converter service is not running.`,
-          otherwise: $localize`:Fallback when flattening fails without a reason@@toolbar.flattenFailed:Flatten failed.`,
-        }));
-      }
-    });
+  /** Flattening cannot be undone, so it asks before it starts. */
+  flattenToPage() {
+    this.operations.flattenToPage((question) => confirm(question));
   }
 
-  /**
-   * Drops the annotations now living in the page content, locally and on the
-   * server. Without this they reload on the next open and render on top of
-   * the flattened copy of themselves.
-   */
-  private discardFlattenedAnnotations() {
-    const saved = this.state.annotations();
-    this.state.shapes.set([]);
-    this.state.annotations.set([]);
-    this.state.dirty.set(false);
-    saved.forEach(annotation =>
-      this.annService.deleteAnnotation(annotation.id).subscribe({
-        error: () => { /* the flatten already succeeded; a stale record is cosmetic */ }
-      })
-    );
-  }
-
-  exportXfdf() {
-    const docId = this.state.documentId();
-    this.annService.exportXfdf(docId).subscribe(blob =>
-      this.downloadBlob(blob, `annotations-doc-${docId}.xfdf`)
-    );
-  }
-
-  importXfdf(event: Event) {
-    const file = (event.target as HTMLInputElement).files?.[0];
+  onXfdfChosen(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return;
-    this.annService.importXfdf(this.state.documentId(), file).subscribe({
-      next: anns => {
-        this.state.setAnnotationsSaved(anns);
-        const shapes = this.annService.annotationsToShapes(anns);
-        shapes.forEach(s => this.state.shapes.update(all => [...all, s]));
-      },
-      error: err => console.error('XFDF import failed', err)
-    });
+    this.operations.importXfdf(file);
+    // Cleared so choosing the same file twice raises a change event the
+    // second time; without this a failed import cannot be retried.
+    input.value = '';
   }
+
 }
