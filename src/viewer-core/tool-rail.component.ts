@@ -30,7 +30,7 @@ import { TOOL_SECTIONS, Tool } from './tool-catalog';
     -->
     <nav i18n-aria-label="@@toolRail.label" aria-label="Markup tools"
          class="flex flex-col w-11 flex-shrink-0 min-h-0 overflow-y-auto overflow-x-hidden
-                border-r border-gray-200 bg-white py-1">
+                border-e border-gray-200 bg-white py-1">
 
       @for (section of sections; track section.name; let last = $last) {
         <div role="group" [attr.aria-label]="section.name"

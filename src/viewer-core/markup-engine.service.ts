@@ -474,7 +474,15 @@ export class MarkupEngineService {
     }
   }
 
-  // ── Render all shapes for a page to an SVG string ───────────
+  /**
+   * Renders every shape on a page as one SVG overlay.
+   *
+   * <p>`left:0` is physical on purpose, not `inset-inline-start`. This
+   * overlay sits on the document's own coordinate system — every annotation
+   * is stored against a point on the page, and the page does not flip when
+   * the interface does. Making this logical would move the whole markup layer
+   * off its document in a right-to-left locale.
+   */
   shapesToSvgContent(shapes: ShapeData[], width: number, height: number): string {
     const svgShapes = shapes.map(s => this.shapeToSvg(s)).join('\n');
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"

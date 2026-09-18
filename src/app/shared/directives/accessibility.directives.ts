@@ -110,7 +110,7 @@ export class SkipLinkDirective implements OnInit {
   ngOnInit() {
     const a = this.el.nativeElement;
     a.style.cssText = `
-      position: absolute; top: -100%; left: 0; z-index: 99999;
+      position: absolute; top: -100%; inset-inline-start: 0; z-index: 99999;
       background: var(--accent); color: #fff; padding: 8px 16px;
       font-size: 14px; border-radius: 0 0 4px 0;
       transition: top .2s;

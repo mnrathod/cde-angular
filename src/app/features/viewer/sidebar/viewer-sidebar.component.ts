@@ -25,7 +25,7 @@ import { Annotation } from '../../../core/models';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="w-60 bg-white border-l border-gray-200 flex flex-col flex-shrink-0">
+    <div class="w-60 bg-white border-s border-gray-200 flex flex-col flex-shrink-0">
 
       <!--
         A fixed 5-column grid rather than flex-wrap. Wrapping flex items sized
@@ -92,8 +92,8 @@ import { Annotation } from '../../../core/models';
                 Saved ({{ state.annotations().length }})
               </div>
               @for (ann of state.annotations(); track ann.id) {
-                <div class="p-2 rounded border-l-2 mb-1.5 text-xs hover:bg-gray-50 cursor-pointer"
-                     [style.border-left-color]="getAnnotationColor(ann)"
+                <div class="p-2 rounded border-s-2 mb-1.5 text-xs hover:bg-gray-50 cursor-pointer"
+                     [style.border-inline-start-color]="getAnnotationColor(ann)"
                      (click)="goToPage(ann.pageNumber)">
                   <div class="flex items-center justify-between gap-1">
                     <span class="font-medium text-gray-700">{{ ann.authorName }}</span>

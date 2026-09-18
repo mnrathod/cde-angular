@@ -28,7 +28,7 @@ export interface IfcNode {
   imports: [CommonModule, FormsModule, IfcPropertiesComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex flex-col h-full bg-white border-l border-gray-200" style="min-width:240px;max-width:280px">
+    <div class="flex flex-col h-full bg-white border-s border-gray-200" style="min-width:240px;max-width:280px">
 
       <!-- Header -->
       <div class="p-3 border-b border-gray-200 flex-shrink-0">
@@ -77,7 +77,7 @@ export interface IfcNode {
           [attr.aria-label]="rowLabel(row.node)"
           [attr.aria-selected]="row.node.selected"
           [attr.aria-expanded]="hasChildren(row.node) ? row.node.expanded : null"
-          [style.padding-left.px]="8 + (row.level - 1) * 12"
+          [style.padding-inline-start.px]="8 + (row.level - 1) * 12"
           [class.bg-blue-50]="row.node.selected"
           [class.text-accent]="row.node.selected"
           (focus)="focusedId.set(row.node.id)"

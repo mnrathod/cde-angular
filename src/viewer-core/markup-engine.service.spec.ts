@@ -323,6 +323,58 @@ describe('MarkupEngineService', () => {
     });
   });
 
+  /**
+   * The SVG overlay that goes on top of a page.
+   *
+   * <p>Untested until a stray HTML comment was pasted into the middle of the
+   * opening `<svg>` tag and the whole suite stayed green. A string that is
+   * built as markup and never parsed is a string nobody is checking, and this
+   * one ends up printed and flattened into documents.
+   */
+  describe('shapesToSvgContent', () => {
+    const rectangle: ShapeData = {
+      id: 's1', tool: 'rect', pageNumber: 1, color: '#F00', strokeWidth: 2,
+      opacity: 1, x: 10, y: 20, width: 30, height: 40,
+    };
+
+    /** Parses the output, failing the test if it is not well-formed XML. */
+    function parsed(svg: string): Document {
+      const document = new DOMParser().parseFromString(svg, 'image/svg+xml');
+      const failure = document.querySelector('parsererror');
+      expect(failure?.textContent ?? '').toBe('');
+      return document;
+    }
+
+    it('produces well-formed SVG', () => {
+      const root = parsed(service.shapesToSvgContent([rectangle], 800, 600)).documentElement;
+
+      expect(root.nodeName).toBe('svg');
+    });
+
+    it('is still well-formed with nothing to draw', () => {
+      // An empty page is the common case, not an edge one.
+      const root = parsed(service.shapesToSvgContent([], 800, 600)).documentElement;
+
+      expect(root.nodeName).toBe('svg');
+    });
+
+    it('sizes the overlay to the page it covers', () => {
+      // A mismatch here does not fail, it silently puts every annotation in
+      // the wrong place.
+      const root = parsed(service.shapesToSvgContent([rectangle], 800, 600)).documentElement;
+
+      expect(root.getAttribute('width')).toBe('800');
+      expect(root.getAttribute('height')).toBe('600');
+      expect(root.getAttribute('viewBox')).toBe('0 0 800 600');
+    });
+
+    it('draws one element per shape', () => {
+      const svg = service.shapesToSvgContent([rectangle, { ...rectangle, id: 's2' }], 800, 600);
+
+      expect(parsed(svg).documentElement.children.length).toBe(2);
+    });
+  });
+
   describe('canFinish', () => {
     it('requires three points for an area and two for a line', () => {
       const at = (tool: MarkupTool, count: number): ShapeData => ({

@@ -80,7 +80,7 @@ export interface CadLayer {
       </div>
 
       <!-- Layer panel -->
-      <div class="w-56 bg-white border-l border-gray-200 flex flex-col flex-shrink-0">
+      <div class="w-56 bg-white border-s border-gray-200 flex flex-col flex-shrink-0">
         <div class="p-3 border-b border-gray-200 flex items-center justify-between">
           <span i18n="Heading of the CAD drawing's layer panel@@cadViewer.layersHeading"
                 class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Layers</span>

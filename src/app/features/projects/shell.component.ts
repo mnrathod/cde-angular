@@ -70,7 +70,7 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
       <div class="flex flex-1 overflow-hidden">
         <!-- Sidebar -->
         <aside
-          class="w-52 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 shadow-sm"
+          class="w-52 bg-white border-e border-gray-200 flex flex-col flex-shrink-0 shadow-sm"
         >
           <div
             class="p-3 border-b border-gray-200 flex items-center justify-between"

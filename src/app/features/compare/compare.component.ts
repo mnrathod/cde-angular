@@ -92,12 +92,12 @@ import { parseComparisonReport } from "./comparison-report";
         <!-- A button, not a div with a click handler: this is the control that
              chooses a file, so it needs to be reachable by Tab and operable by
              Enter and Space without a directive re-implementing what the
-             element already does (1A.2). text-left because a button centres
+             element already does (1A.2). text-start because a button centres
              its content by default and this one holds a left-aligned card. -->
         <button
           type="button"
           (click)="pickFile(1)"
-          class="flex-1 border-2 rounded-lg p-3 cursor-pointer transition-all min-w-0 text-left"
+          class="flex-1 border-2 rounded-lg p-3 cursor-pointer transition-all min-w-0 text-start"
           [class]="
             doc1()
               ? 'border-accent bg-blue-50'
@@ -134,12 +134,12 @@ import { parseComparisonReport } from "./comparison-report";
         <!-- A button, not a div with a click handler: this is the control that
              chooses a file, so it needs to be reachable by Tab and operable by
              Enter and Space without a directive re-implementing what the
-             element already does (1A.2). text-left because a button centres
+             element already does (1A.2). text-start because a button centres
              its content by default and this one holds a left-aligned card. -->
         <button
           type="button"
           (click)="pickFile(2)"
-          class="flex-1 border-2 rounded-lg p-3 cursor-pointer transition-all min-w-0 text-left"
+          class="flex-1 border-2 rounded-lg p-3 cursor-pointer transition-all min-w-0 text-start"
           [class]="
             doc2()
               ? 'border-accent bg-blue-50'
@@ -270,10 +270,10 @@ import { parseComparisonReport } from "./comparison-report";
                         class="flex items-start gap-3 p-2.5 rounded-md text-sm"
                         [class]="
                           c.type === 'added'
-                            ? 'bg-green-50 border-l-2 border-green-500'
+                            ? 'bg-green-50 border-s-2 border-green-500'
                             : c.type === 'removed'
-                              ? 'bg-red-50 border-l-2 border-red-500'
-                              : 'bg-amber-50 border-l-2 border-amber-500'
+                              ? 'bg-red-50 border-s-2 border-red-500'
+                              : 'bg-amber-50 border-s-2 border-amber-500'
                         "
                       >
                         <span class="text-base flex-shrink-0">{{
@@ -312,7 +312,7 @@ import { parseComparisonReport } from "./comparison-report";
 
         <!-- AI Sidebar (600px) -->
         <div
-          class="border-l border-gray-200 bg-white flex flex-col flex-shrink-0"
+          class="border-s border-gray-200 bg-white flex flex-col flex-shrink-0"
           style="width:600px"
         >
           <div
@@ -357,7 +357,7 @@ import { parseComparisonReport } from "./comparison-report";
                     }
                     @case ("request") {
                       <div
-                        class="my-1 py-1.5 px-2.5 rounded-sm text-xs bg-amber-50 border-l-4 border-amber-500"
+                        class="my-1 py-1.5 px-2.5 rounded-sm text-xs bg-amber-50 border-s-4 border-amber-500"
                       >
                         <strong class="text-amber-700">{{ line.reference }}</strong
                         >@if (line.detail) { — {{ line.detail }} }
@@ -432,7 +432,7 @@ import { parseComparisonReport } from "./comparison-report";
               <button
                 type="button"
                 (click)="selectDoc(doc)"
-                class="w-full text-left flex items-center gap-3 p-2.5 rounded-md cursor-pointer hover:bg-gray-50 transition-colors"
+                class="w-full text-start flex items-center gap-3 p-2.5 rounded-md cursor-pointer hover:bg-gray-50 transition-colors"
               >
                 <span class="text-xl flex-shrink-0">{{
                   docService.getFileIcon(doc)
