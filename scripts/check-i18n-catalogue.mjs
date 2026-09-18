@@ -12,7 +12,7 @@
  * a difference, and print the diff so the fix is obvious. The fix is always
  * `npm run i18n:extract`.
  */
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -30,11 +30,31 @@ function readCatalogue(path) {
 
 const scratch = mkdtempSync(join(tmpdir(), 'i18n-catalogue-'));
 try {
-  execFileSync(
+  // stderr is captured rather than inherited because the extractor reports
+  // duplicate message IDs there and exits 0 regardless. Two different source
+  // strings sharing an ID is not a warning in any useful sense: the extractor
+  // keeps one of them arbitrarily, so the other ships the wrong words in
+  // every translated language, and nothing downstream would ever notice.
+  const extraction = spawnSync(
     'npx',
     ['ng', 'extract-i18n', '--output-path', scratch, '--out-file', 'messages.json'],
-    { stdio: ['ignore', 'ignore', 'inherit'] },
+    { stdio: ['ignore', 'ignore', 'pipe'], encoding: 'utf8' },
   );
+  if (extraction.status !== 0) {
+    console.error(extraction.stderr ?? 'Extraction failed with no diagnostics.');
+    process.exit(1);
+  }
+
+  const diagnostics = extraction.stderr ?? '';
+  if (diagnostics.includes('Duplicate messages')) {
+    console.error('Two different messages share an ID:\n');
+    console.error(diagnostics.trim());
+    console.error(
+      '\nGive them separate @@ids. The extractor keeps one and discards the ' +
+        'other, so the discarded one ships untranslated everywhere.',
+    );
+    process.exit(1);
+  }
 
   const fresh = readCatalogue(join(scratch, 'messages.json'));
   const committed = readCatalogue(COMMITTED);

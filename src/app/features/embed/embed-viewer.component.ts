@@ -127,12 +127,18 @@ export class EmbedViewerComponent implements OnInit, OnDestroy {
    * invisible to the template markup guard, which is exactly where
    * untranslated text hides until someone opens the product in another
    * language.
+   *
+   * <p>Their IDs are `embedTool.*` rather than the full viewer's
+   * `markupTool.*` because the embedded toolbar is narrower and abbreviates —
+   * "Box" where the full rail says "Rectangle". Sharing an ID between two
+   * different source strings makes the extractor pick one arbitrarily, so
+   * one of the two ships the wrong words in every translated language.
    */
   readonly tools = [
-    { id: 'pan', label: $localize`:Markup tool that moves the page rather than drawing@@markupTool.pan:Pan` },
-    { id: 'rect', label: $localize`:Markup tool that draws a rectangle@@markupTool.rect:Box` },
-    { id: 'cloud', label: $localize`:Markup tool that draws a revision cloud@@markupTool.cloud:Cloud` },
-    { id: 'arrow', label: $localize`:Markup tool that draws an arrow@@markupTool.arrow:Arrow` },
+    { id: 'pan', label: $localize`:Embedded-viewer markup tool that moves the page rather than drawing. Short — the embedded toolbar is narrower than the full one.@@embedTool.pan:Pan` },
+    { id: 'rect', label: $localize`:Embedded-viewer markup tool that draws a rectangle. Short — the embedded toolbar is narrower than the full one.@@embedTool.rect:Box` },
+    { id: 'cloud', label: $localize`:Embedded-viewer markup tool that draws a revision cloud, the scalloped outline used on drawings to ring a change. Short — the embedded toolbar is narrower than the full one.@@embedTool.cloud:Cloud` },
+    { id: 'arrow', label: $localize`:Embedded-viewer markup tool that draws an arrow. Short — the embedded toolbar is narrower than the full one.@@embedTool.arrow:Arrow` },
   ] as const;
 
   readonly pageNumbers = computed(() =>
