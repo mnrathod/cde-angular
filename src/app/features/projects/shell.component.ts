@@ -1,200 +1,89 @@
+/**
+ * The project workspace: a list of projects beside the documents in the one
+ * that is selected.
+ *
+ * <p>This component is the layout and the routing between its parts. The
+ * sidebar, the grid and each of the three dialogs own their own behaviour;
+ * what is left here is which dialog is open and what the user is taken to
+ * when they open a document.
+ */
 import {
+  ChangeDetectionStrategy,
   Component,
-  signal,
-  inject,
   OnInit,
   effect,
-  computed,
-  ChangeDetectionStrategy,
+  inject,
+  signal,
 } from "@angular/core";
 import { Router } from "@angular/router";
-import { CommonModule } from "@angular/common";
-import { FormsModule } from "@angular/forms";
-import { AuthService } from "../../core/services/auth.service";
-import { ProjectService } from "../../core/services/project.service";
+
+import { Document, Project } from "../../core/models";
 import { DocumentService } from "../../core/services/document.service";
-import {
-  Project,
-  Document,
-  DocumentType,
-  DocumentStatus,
-  ProjectPhase,
-} from "../../core/models";
-import { SkeletonComponent } from "../../shared/components/skeleton.component";
-import { HasPermissionDirective } from "../../shared/directives/has-permission.directive";
+import { ProjectService } from "../../core/services/project.service";
 import { RoleService } from "../../core/services/role.service";
-import { ChunkedUploadService } from "../../core/services/chunked-upload.service";
+import {
+  DeleteConfirmationComponent,
+  DeletionTarget,
+} from "./delete-confirmation.component";
+import { DocumentGridComponent } from "./document-grid.component";
+import { DocumentUploadDialogComponent } from "./document-upload-dialog.component";
+import { ProjectDialogComponent } from "./project-dialog.component";
+import { ProjectListComponent } from "./project-list.component";
+import { WorkspaceHeaderComponent } from "./workspace-header.component";
+
+/** Which dialog is open, if any. Only one can be at a time. */
+type OpenDialog =
+  | { kind: "none" }
+  | { kind: "project"; editing: Project | null }
+  | { kind: "upload" }
+  | { kind: "delete"; target: DeletionTarget };
 
 @Component({
   selector: "app-shell",
   standalone: true,
-  imports: [CommonModule, FormsModule, SkeletonComponent],
+  imports: [
+    WorkspaceHeaderComponent,
+    ProjectListComponent,
+    DocumentGridComponent,
+    ProjectDialogComponent,
+    DocumentUploadDialogComponent,
+    DeleteConfirmationComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <div class="flex flex-col h-screen overflow-hidden">
-      <!-- ── Top Navigation Bar ─────────────────────────────────── -->
-      <header
-        class="flex items-center h-11 px-4 gap-3 flex-shrink-0"
-        style="background:var(--nav);box-shadow:0 2px 4px rgba(0,0,0,.15)"
-      >
-        <div class="flex items-center gap-2">
-          <div
-            class="w-7 h-7 bg-white rounded flex items-center justify-center text-accent font-black text-xs"
-          >
-            <ng-container i18n="Product mark in the top bar. A brand name: leave it as-is in Latin-script languages, transliterate it where the script differs.@@shell.brandMark"
-              >CDE</ng-container
-            >
-          </div>
-          <span i18n="@@shell.brandName" class="text-white font-bold text-sm tracking-wide"
-            >Platform</span
-          >
-        </div>
-        <div class="flex-1"></div>
-        <div class="flex items-center gap-2">
-          <div
-            class="w-7 h-7 rounded-full bg-blue-400 flex items-center justify-center text-white font-bold text-xs border-2 border-white/30"
-          >
-            {{ avatarInitial() }}
-          </div>
-          <span class="text-white/85 text-xs">{{ auth.username() }}</span>
-          <button
-            (click)="auth.logout()"
-            class="text-xs px-3 py-1 rounded border border-white/30 bg-white/10 text-white/90 hover:bg-white/20 transition-colors"
-          >
-            <ng-container i18n="Ends the session@@shell.signOut">Sign Out</ng-container>
-          </button>
-        </div>
-      </header>
+      <app-workspace-header />
 
-      <!-- ── Body ───────────────────────────────────────────────── -->
       <div class="flex flex-1 overflow-hidden">
-        <!-- Sidebar -->
-        <aside
-          class="w-52 bg-white border-e border-gray-200 flex flex-col flex-shrink-0 shadow-sm"
-        >
-          <div
-            class="p-3 border-b border-gray-200 flex items-center justify-between"
-          >
-            <span
-              i18n="Heading of the project list in the sidebar@@shell.projectsHeading"
-              class="text-xs font-semibold uppercase tracking-wider text-gray-400"
-              >Projects</span
-            >
-            @if (roleService.can("canCreateProject")) {
-              <button
-                (click)="openProjectDialog()"
-                i18n-title="@@shell.newProjectHint" title="New project"
-                class="text-xs px-1.5 py-0.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
-              >
-                <span aria-hidden="true">+</span>
-                <ng-container i18n="Creates a project. Very short — it shares a narrow row with the heading.@@shell.newProject"
-                  >New</ng-container
-                >
-              </button>
-            }
-          </div>
-          <div class="flex-1 overflow-y-auto p-2">
-            @for (p of projectService.projects(); track p.id) {
-              <!-- data-testid, not a styling class: the end-to-end tests used to
-                   select this row by a class name that no longer exists, and a
-                   selector that matches nothing fails silently rather than
-                   loudly. A hook that carries no style survives restyling. -->
-              <!-- The row keeps its click for pointer convenience, but the
-                   keyboard path goes through the name button below. The row
-                   cannot itself be a button because it contains one, and a
-                   button inside a button is invalid HTML that browsers recover
-                   from in different ways. -->
-              <div
-                (click)="selectProject(p)"
-                data-testid="project-item"
-                class="group px-3 py-2 rounded cursor-pointer mb-0.5 transition-all text-sm"
-                [class]="
-                  selectedProject()?.id === p.id
-                    ? 'bg-blue-50 border border-blue-200 text-accent'
-                    : 'hover:bg-gray-50 text-gray-700'
-                "
-              >
-                <div class="flex items-center gap-1">
-                  <button
-                    type="button"
-                    (click)="selectProject(p); $event.stopPropagation()"
-                    class="font-medium truncate flex-1 text-start bg-transparent border-0 p-0 cursor-pointer"
-                    [attr.aria-current]="
-                      selectedProject()?.id === p.id ? 'true' : null
-                    "
-                  >
-                    {{ p.name }}
-                  </button>
-                  @if (roleService.can("canCreateProject")) {
-                    <button
-                      (click)="openProjectDialog(p); $event.stopPropagation()"
-                      i18n-title="@@shell.editProjectHint" title="Edit project"
-                      class="opacity-0 group-hover:opacity-100 text-xs text-gray-400 hover:text-accent"
-                    >
-                      ✎
-                    </button>
-                  }
-                  @if (roleService.can("canDelete")) {
-                    <button
-                      (click)="
-                        confirmDeleteProject(p); $event.stopPropagation()
-                      "
-                      i18n-title="@@shell.deleteProjectHint" title="Delete project"
-                      class="opacity-0 group-hover:opacity-100 text-xs text-gray-400 hover:text-red-600"
-                    >
-                      🗑
-                    </button>
-                  }
-                </div>
-                <div class="flex items-center gap-1.5 mt-0.5">
-                  <span
-                    class="text-xs px-1.5 py-0.5 rounded font-semibold"
-                    [style]="phaseStyle(p.phase)"
-                    >{{ phaseLabel(p.phase) }}</span
-                  >
-                  <span i18n="How many documents a project holds. Very short — it sits under the project name.@@shell.documentCount"
-                        class="text-xs text-gray-400"
-                    >{p.documentCount || 0, plural, =1 {1 doc} other {{{ p.documentCount || 0 }} docs}}</span
-                  >
-                </div>
-              </div>
-            }
-            @if (
-              projectService.projects().length === 0 &&
-              !projectService.loading()
-            ) {
-              <div i18n="Empty state for the project list@@shell.noProjects"
-                   class="text-xs text-gray-400 text-center py-6">
-                No projects yet.
-              </div>
-            }
-          </div>
-        </aside>
+        <app-project-list
+          (createRequested)="openProjectDialog(null)"
+          (editRequested)="openProjectDialog($event)"
+          (deleteRequested)="confirmDeleteProject($event)"
+        />
 
-        <!-- Main content -->
         <main class="flex-1 flex flex-col overflow-hidden bg-gray-50">
-          <!-- Content header -->
           <div
             class="flex items-center h-11 px-5 border-b border-gray-200 bg-white flex-shrink-0"
           >
-            <h2 class="text-sm font-semibold text-gray-800">
-              {{ selectedProject() ? selectedProject()!.name : selectProjectLabel }}
-            </h2>
+            <h1 class="text-sm font-semibold text-gray-800">
+              {{ projects.selected()?.name ?? noProjectChosenLabel }}
+            </h1>
             <div class="flex-1"></div>
-            @if (selectedProject()) {
+            @if (projects.selected()) {
               <div class="flex items-center gap-2">
                 <button
                   (click)="openCompare()"
                   class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded bg-white hover:bg-gray-50 text-gray-600 transition-colors"
                 >
                   <span aria-hidden="true">🔍</span>
-                  <ng-container i18n="Opens the document comparison page@@shell.compare"
+                  <ng-container
+                    i18n="Opens the document comparison page@@shell.compare"
                     >Compare</ng-container
                   >
                 </button>
-                @if (roleService.can("canUpload")) {
+                @if (roles.can("canUpload")) {
                   <button
-                    (click)="showUpload.set(true)"
+                    (click)="dialog.set({ kind: 'upload' })"
                     class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-accent hover:bg-blue-700 text-white rounded transition-colors"
                   >
                     <span aria-hidden="true">📤</span>
@@ -207,706 +96,88 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
             }
           </div>
 
-          <!-- Document grid -->
-          <div class="flex-1 overflow-y-auto p-5">
-            @if (!selectedProject()) {
-              <div
-                class="flex flex-col items-center justify-center h-full text-gray-400"
-              >
-                <div class="text-5xl mb-3" aria-hidden="true">📁</div>
-                <div i18n="Empty state shown before a project is chosen@@shell.noProjectSelected"
-                     class="text-sm">Select a project to see its documents</div>
-              </div>
-            } @else if (documentService.loading()) {
-              <app-skeleton type="card" [count]="6" />
-            } @else if (documentService.documents().length === 0) {
-              <div
-                class="flex flex-col items-center justify-center h-48 text-gray-400"
-              >
-                <div class="text-4xl mb-3" aria-hidden="true">📄</div>
-                <div i18n="Empty state for a project with no documents. The named control must match the Upload button.@@shell.noDocuments"
-                     class="text-sm">
-                  No documents yet. Click Upload to add files.
-                </div>
-              </div>
-            } @else {
-              <div
-                class="grid gap-3"
-                style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))"
-              >
-                @for (doc of documentService.documents(); track doc.id) {
-                  <!-- As above: the card holds a delete button, so the card is
-                       not itself a button. The document name carries the
-                       keyboard-reachable open action. -->
-                  <div
-                    (click)="openDocument(doc)"
-                    data-testid="document-card"
-                    class="group bg-white rounded border border-gray-200 shadow-sm cursor-pointer hover:border-accent hover:-translate-y-0.5 hover:shadow-md transition-all overflow-hidden relative"
-                  >
-                    @if (roleService.can("canDelete")) {
-                      <button
-                        (click)="
-                          confirmDeleteDocument(doc); $event.stopPropagation()
-                        "
-                        i18n-title="@@shell.deleteDocumentHint" title="Delete document"
-                        class="absolute top-1.5 end-1.5 z-10 opacity-0 group-hover:opacity-100
-                               w-6 h-6 rounded bg-white/90 border border-gray-200 text-xs
-                               text-gray-400 hover:text-red-600 hover:border-red-300 transition-opacity"
-                      >
-                        🗑
-                      </button>
-                    }
-                    <div
-                      class="h-24 bg-blue-50 border-b border-gray-200 flex items-center justify-center text-3xl"
-                    >
-                      {{ documentService.getFileIcon(doc) }}
-                    </div>
-                    <div class="p-2.5">
-                      <button
-                        type="button"
-                        (click)="openDocument(doc); $event.stopPropagation()"
-                        class="text-xs font-semibold text-gray-800 truncate w-full text-start bg-transparent border-0 p-0 cursor-pointer"
-                      >
-                        {{ doc.name }}
-                      </button>
-                      <div class="text-xs text-gray-500 mt-0.5 truncate">
-                        {{ doc.drawingNumber || doc.documentType
-                        }}{{ doc.revision ? " · Rev " + doc.revision : "" }}
-                      </div>
-                      <div
-                        class="flex items-center justify-between mt-1.5 gap-1"
-                      >
-                        @if (roleService.can("canApprove")) {
-                          <!-- Editable inline: status changes are routine review
-                               actions, not worth a dialog. -->
-                          <select
-                            [value]="doc.status"
-                            (click)="$event.stopPropagation()"
-                            (change)="changeStatus(doc, $event)"
-                            [disabled]="statusUpdatingId() === doc.id"
-                            i18n-title="@@shell.changeStatusHint" title="Change status"
-                            class="text-xs px-1 py-0.5 rounded font-semibold border-0 cursor-pointer
-                                   focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
-                            [style]="statusStyle(doc.status)"
-                          >
-                            @for (status of documentStatuses; track status) {
-                              <option [value]="status">
-                                {{ statusLabel(status) }}
-                              </option>
-                            }
-                          </select>
-                        } @else {
-                          <span
-                            class="text-xs px-1.5 py-0.5 rounded font-semibold"
-                            [style]="statusStyle(doc.status)"
-                            >{{ statusLabel(doc.status) }}</span
-                          >
-                        }
-                      </div>
-                    </div>
-                  </div>
-                }
-              </div>
-            }
-          </div>
+          <app-document-grid
+            (openRequested)="openDocument($event)"
+            (deleteRequested)="confirmDeleteDocument($event)"
+          />
         </main>
       </div>
     </div>
 
-    <!-- ── Project Create / Edit Modal ──────────────────────────── -->
-    @if (showProjectDialog()) {
-      <div
-        class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
-      >
-        <div class="bg-white rounded-lg shadow-2xl p-7 w-96">
-          <h3 class="font-semibold text-gray-800 mb-5">
-            {{ editingProject() ? editProjectTitle : newProjectTitle }}
-          </h3>
-
-          <div class="space-y-3 mb-5">
-            <div>
-              <label i18n="The asterisk marks the field as required@@shell.projectNameLabel"
-                     class="block text-xs font-medium text-gray-600 mb-1"
-                >Project Name *</label
-              >
-              <input
-                [(ngModel)]="projectForm.name"
-                name="projectName"
-                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-            </div>
-            <div>
-              <label i18n="@@shell.projectDescriptionLabel"
-                     class="block text-xs font-medium text-gray-600 mb-1"
-                >Description</label
-              >
-              <textarea
-                [(ngModel)]="projectForm.description"
-                name="projectDescription"
-                rows="2"
-                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              ></textarea>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label i18n="Which stage of its life a construction project is in@@shell.projectPhaseLabel"
-                       class="block text-xs font-medium text-gray-600 mb-1"
-                  >Phase</label
-                >
-                <select
-                  [(ngModel)]="projectForm.phase"
-                  name="projectPhase"
-                  class="w-full px-2 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                >
-                  @for (phase of projectPhases; track phase) {
-                    <option [value]="phase">{{ phaseLabel(phase) }}</option>
-                  }
-                </select>
-              </div>
-              <div>
-                <label i18n="Where the project is being built@@shell.projectLocationLabel"
-                       class="block text-xs font-medium text-gray-600 mb-1"
-                  >Location</label
-                >
-                <input
-                  [(ngModel)]="projectForm.location"
-                  name="projectLocation"
-                  i18n-placeholder="Example of a place name — replace with one familiar in the target locale@@shell.projectLocationPlaceholder"
-                  placeholder="Manchester"
-                  class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-              </div>
-            </div>
-          </div>
-
-          @if (projectError()) {
-            <div
-              class="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2 mb-3"
-            >
-              {{ projectError() }}
-            </div>
-          }
-
-          <div class="flex gap-2 justify-end">
-            <button
-              (click)="closeProjectDialog()"
-              i18n="@@shell.cancelProjectDialog"
-              class="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              (click)="saveProject()"
-              [disabled]="savingProject()"
-              class="px-4 py-2 text-sm bg-accent text-white rounded hover:bg-blue-700 disabled:opacity-50 font-semibold"
-            >
-              {{
-                savingProject()
-                  ? savingProjectLabel
-                  : editingProject()
-                    ? saveChangesLabel
-                    : createProjectLabel
-              }}
-            </button>
-          </div>
-        </div>
-      </div>
-    }
-
-    <!-- ── Delete Confirmation ──────────────────────────────────── -->
-    @if (pendingDelete(); as target) {
-      <div
-        class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
-      >
-        <div class="bg-white rounded-lg shadow-2xl p-7 w-96">
-          <h3 class="font-semibold text-gray-800 mb-2">
-            {{ deleteTitle(target.kind) }}
-          </h3>
-          <p i18n="Names the thing about to be deleted@@shell.deleteWarning"
-             class="text-sm text-gray-600 mb-1">
-            <span class="font-medium">{{ target.name }}</span> will be
-            permanently deleted.
-          </p>
-          @if (target.kind === "project") {
-            <p
-              class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-4"
-            >
-              <ng-container i18n="Extra warning when deleting a project rather than one document@@shell.deleteProjectCascade"
-                >Documents belonging to this project are deleted with it.</ng-container
-              >
-            </p>
-          } @else {
-            <p i18n="@@shell.deleteIrreversible" class="text-xs text-gray-500 mb-4">This cannot be undone.</p>
-          }
-
-          @if (deleteError()) {
-            <div
-              class="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2 mb-3"
-            >
-              {{ deleteError() }}
-            </div>
-          }
-
-          <div class="flex gap-2 justify-end">
-            <button
-              (click)="cancelDelete()"
-              i18n="@@shell.cancelDelete"
-              class="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              (click)="confirmDelete()"
-              [disabled]="deleting()"
-              class="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 font-semibold"
-            >
-              {{ deleting() ? deletingLabel : deleteLabel }}
-            </button>
-          </div>
-        </div>
-      </div>
-    }
-
-    <!-- ── Upload Modal ─────────────────────────────────────────── -->
-    @if (showUpload()) {
-      <div
-        class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
-      >
-        <div class="bg-white rounded-lg shadow-2xl p-7 w-96">
-          <h3 class="font-semibold text-gray-800 mb-5">
-            <span aria-hidden="true">📂</span>
-            <ng-container i18n="Heading of the upload dialog@@shell.uploadHeading"
-              >Upload Document</ng-container
-            >
-          </h3>
-
-          <!-- Drop zone -->
-          <!-- A button wrapping the drop target, so choosing a file works from
-               the keyboard. Drag and drop stays as the pointer affordance; SC
-               2.5.7 requires a single-pointer alternative to any drag, and
-               clicking through to the file input is that alternative. -->
-          <button
-            type="button"
-            (click)="fileInput.click()"
-            (dragover)="$event.preventDefault()"
-            (drop)="onDrop($event)"
-            class="w-full border-2 border-dashed border-gray-300 rounded-md p-6 text-center text-gray-500 text-sm cursor-pointer hover:border-accent hover:bg-blue-50 transition-colors mb-4"
-          >
-            <div class="text-2xl mb-2" aria-hidden="true">📄</div>
-            @if (selectedFile()) {
-              <div class="text-accent font-medium">
-                <span aria-hidden="true">📎</span> {{ selectedFile()!.name }}
-              </div>
-            } @else {
-              <ng-container i18n="Prompt inside the file drop zone. Both routes work — clicking opens a file picker, and dragging is the pointer shortcut.@@shell.dropZonePrompt"
-                >Click to browse or drag &amp; drop</ng-container
-              >
-            }
-          </button>
-          <input
-            #fileInput
-            type="file"
-            class="hidden"
-            accept=".pdf,.dxf,.dwg,.ifc,.glb,.gltf,.obj,.stl,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.svg"
-            (change)="onFileSelect($event)"
+    @if (dialog(); as open) {
+      @switch (open.kind) {
+        @case ("project") {
+          <app-project-dialog
+            [editing]="open.editing"
+            (closed)="closeDialog()"
           />
-
-          <div class="space-y-3 mb-5">
-            <div>
-              <label i18n="The asterisk marks the field as required@@shell.documentNameLabel"
-                     class="block text-xs font-medium text-gray-600 mb-1"
-                >Document Name *</label
-              >
-              <input
-                [(ngModel)]="uploadMeta.name"
-                data-testid="upload-name"
-                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label i18n="What kind of document is being uploaded@@shell.documentTypeLabel"
-                       class="block text-xs font-medium text-gray-600 mb-1"
-                  >Type</label
-                >
-                <select
-                  [(ngModel)]="uploadMeta.documentType"
-                  class="w-full px-2 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                >
-                  <option value="BIM_MODEL" i18n="Document type — a three-dimensional building information model. BIM is an industry term and usually stays as it is.@@documentType.bimModel">BIM Model</option>
-                  <option value="DRAWING" i18n="Document type — a technical drawing@@documentType.drawing">Drawing</option>
-                  <option value="SPECIFICATION" i18n="Document type — a written specification@@documentType.specification">Specification</option>
-                  <option value="REPORT" i18n="Document type — a report@@documentType.report">Report</option>
-                  <option value="SCHEDULE" i18n="Document type — a tabulated list, such as a door or window schedule. Not a timetable.@@documentType.schedule">Schedule</option>
-                  <option value="OTHER" i18n="Document type — anything not covered by the other options@@documentType.other">Other</option>
-                </select>
-              </div>
-              <div>
-                <label i18n="Which revision of the document this upload is@@shell.revisionLabel"
-                       class="block text-xs font-medium text-gray-600 mb-1"
-                  >Revision</label
-                >
-                <input
-                  [(ngModel)]="uploadMeta.revision"
-                  i18n-placeholder="Example revision identifier — revisions are commonly lettered@@shell.revisionPlaceholder"
-                  placeholder="A"
-                  class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div class="flex gap-2 justify-end">
-            <button
-              (click)="closeUpload()"
-              i18n="@@shell.cancelUpload"
-              class="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              (click)="doUpload()"
-              [disabled]="!selectedFile() || uploading()"
-              class="px-4 py-2 text-sm bg-accent text-white rounded hover:bg-blue-700 disabled:opacity-50 font-semibold"
-            >
-              {{ uploading() ? uploadingLabel : uploadLabel }}
-            </button>
-          </div>
-        </div>
-      </div>
+        }
+        @case ("upload") {
+          <app-document-upload-dialog
+            [projectId]="projects.selected()!.id"
+            (closed)="closeDialog()"
+          />
+        }
+        @case ("delete") {
+          <app-delete-confirmation
+            [target]="open.target"
+            (closed)="closeDialog()"
+          />
+        }
+      }
     }
   `,
 })
 export class ShellComponent implements OnInit {
-  auth = inject(AuthService);
+  roles = inject(RoleService);
+  projects = inject(ProjectService);
 
-  /**
-   * First letter of the signed-in username, for the avatar bubble.
-   *
-   * Computed here rather than in the template because Angular's template
-   * compiler does not carry a `?.` short-circuit across the rest of the
-   * chain the way TypeScript does: `username()?.charAt(0).toUpperCase()`
-   * type-checks in a .ts file but fails template checking, and would throw
-   * at runtime for a user with no username.
-   */
-  avatarInitial = computed(
-    () => this.auth.username()?.charAt(0)?.toUpperCase() ?? "",
-  );
-  roleService = inject(RoleService);
-  uploadService = inject(ChunkedUploadService);
-  projectService = inject(ProjectService);
-  documentService = inject(DocumentService);
+  private documents = inject(DocumentService);
   private router = inject(Router);
 
-  selectedProject = this.projectService.selected;
-  showUpload = signal(false);
-  uploading = signal(false);
-  selectedFile = signal<File | null>(null);
-  uploadMeta: Partial<Document> = { documentType: "DRAWING" };
+  dialog = signal<OpenDialog>({ kind: "none" });
 
-  /**
-   * Display names for the two enumerations the interface shows.
-   *
-   * <p>The server stores `IN_REVIEW` and `CONSTRUCTION`; the interface used to
-   * render them by swapping the underscore for a space, which is legible in
-   * English and meaningless anywhere else. These are what a user reads, so
-   * they are messages.
-   *
-   * <p>Falling back to the raw value matters: the server may add a phase or a
-   * status before this table knows about it, and showing `HANDOVER` is far
-   * better than showing a blank chip.
-   */
-  private readonly phaseLabels: Record<string, string> = {
-    CONCEPT: $localize`:Project phase — early ideas, before design proper@@projectPhase.concept:Concept`,
-    DESIGN: $localize`:Project phase — the design is being produced@@projectPhase.design:Design`,
-    CONSTRUCTION: $localize`:Project phase — the asset is being built@@projectPhase.construction:Construction`,
-    HANDOVER: $localize`:Project phase — the finished asset is being handed to its owner@@projectPhase.handover:Handover`,
-    OPERATION: $localize`:Project phase — the asset is in use and being maintained@@projectPhase.operation:Operation`,
-  };
-
-  private readonly statusLabels: Record<string, string> = {
-    DRAFT: $localize`:Document status — not yet issued for review@@documentStatus.draft:Draft`,
-    IN_REVIEW: $localize`:Document status — issued and being reviewed@@documentStatus.inReview:In review`,
-    APPROVED: $localize`:Document status — reviewed and authorised for use@@documentStatus.approved:Approved`,
-    SUPERSEDED: $localize`:Document status — replaced by a later revision@@documentStatus.superseded:Superseded`,
-  };
-
-  phaseLabel(phase: string): string {
-    return this.phaseLabels[phase] ?? phase;
-  }
-
-  statusLabel(status: string): string {
-    return this.statusLabels[status] ?? status;
-  }
-
-  /** Heading of the delete dialog, which differs by what is being deleted. */
-  deleteTitle(kind: "project" | "document"): string {
-    // Two whole messages rather than "Delete {kind}?" with the English noun
-    // interpolated: gender and article agreement do not survive that, and the
-    // translator never sees the word that lands in the gap.
-    return kind === "project"
-      ? $localize`:Heading of the confirmation before deleting a project@@shell.deleteProjectTitle:Delete project?`
-      : $localize`:Heading of the confirmation before deleting a document@@shell.deleteDocumentTitle:Delete document?`;
-  }
-
-  /** Dialog titles and button labels, which live in expressions. */
-  readonly newProjectTitle = $localize`:Heading of the dialog for creating a project@@shell.newProjectTitle:📁 New Project`;
-  readonly editProjectTitle = $localize`:Heading of the dialog for editing a project@@shell.editProjectTitle:✎ Edit Project`;
-  readonly createProjectLabel = $localize`:Creates the project@@shell.createProject:Create`;
-  readonly saveChangesLabel = $localize`:Saves edits to an existing project@@shell.saveChanges:Save Changes`;
-  readonly savingProjectLabel = $localize`:Project dialog's submit button while the request is in flight@@shell.savingProject:Saving...`;
-  readonly deleteLabel = $localize`:Confirms the deletion@@shell.delete:Delete`;
-  readonly deletingLabel = $localize`:Delete button while the request is in flight@@shell.deleting:Deleting...`;
-  readonly uploadLabel = $localize`:Starts the upload@@shell.uploadAction:Upload`;
-  readonly uploadingLabel = $localize`:Upload button while the file is being sent@@shell.uploading:Uploading...`;
-  readonly selectProjectLabel = $localize`:Stands in for the project name before one is chosen@@shell.selectProject:Select a project`;
-
-  readonly projectPhases: ProjectPhase[] = [
-    "CONCEPT",
-    "DESIGN",
-    "CONSTRUCTION",
-    "HANDOVER",
-    "OPERATION",
-  ];
-  readonly documentStatuses: DocumentStatus[] = [
-    "DRAFT",
-    "IN_REVIEW",
-    "APPROVED",
-    "SUPERSEDED",
-  ];
-
-  // ── Project create / edit ────────────────────────────────────
-  showProjectDialog = signal(false);
-  /** null while creating, the project being edited otherwise. */
-  editingProject = signal<Project | null>(null);
-  savingProject = signal(false);
-  projectError = signal("");
-  projectForm: Partial<Project> = {};
-
-  // ── Deletion ─────────────────────────────────────────────────
-  pendingDelete = signal<{
-    kind: "project" | "document";
-    id: number;
-    name: string;
-  } | null>(null);
-  deleting = signal(false);
-  deleteError = signal("");
-
-  statusUpdatingId = signal<number | null>(null);
+  readonly noProjectChosenLabel = $localize`:Stands in for the project name before one is chosen@@shell.selectProject:Select a project`;
 
   constructor() {
-    // Auto-load docs when project changes
     effect(() => {
-      const p = this.selectedProject();
-      if (p) this.documentService.loadByProject(p.id).subscribe();
+      const project = this.projects.selected();
+      if (project) this.documents.loadByProject(project.id).subscribe();
     });
   }
 
-  ngOnInit() {
-    this.projectService.load().subscribe();
+  ngOnInit(): void {
+    this.projects.load().subscribe();
   }
 
-  selectProject(p: Project) {
-    this.projectService.select(p);
+  openProjectDialog(project: Project | null): void {
+    this.dialog.set({ kind: "project", editing: project });
   }
 
-  openDocument(doc: Document) {
-    if (this.documentService.is3D(doc)) {
-      this.router.navigate(["/viewer3d", doc.id]);
-    } else {
-      this.router.navigate(["/viewer", doc.id]);
-    }
+  confirmDeleteProject(project: Project): void {
+    this.dialog.set({
+      kind: "delete",
+      target: { kind: "project", id: project.id, name: project.name },
+    });
   }
 
-  openCompare() {
+  confirmDeleteDocument(doc: Document): void {
+    this.dialog.set({
+      kind: "delete",
+      target: { kind: "document", id: doc.id, name: doc.name },
+    });
+  }
+
+  closeDialog(): void {
+    this.dialog.set({ kind: "none" });
+  }
+
+  openDocument(doc: Document): void {
+    const route = this.documents.is3D(doc) ? "/viewer3d" : "/viewer";
+    this.router.navigate([route, doc.id]);
+  }
+
+  openCompare(): void {
     this.router.navigate(["/compare"]);
-  }
-
-  // ── Project create / edit ────────────────────────────────────
-  openProjectDialog(project?: Project) {
-    this.editingProject.set(project ?? null);
-    // Copy rather than bind the live object, so cancelling leaves the
-    // sidebar entry untouched.
-    this.projectForm = project
-      ? {
-          name: project.name,
-          description: project.description,
-          phase: project.phase,
-          location: project.location,
-        }
-      : { phase: "DESIGN" };
-    this.projectError.set("");
-    this.showProjectDialog.set(true);
-  }
-
-  closeProjectDialog() {
-    this.showProjectDialog.set(false);
-    this.editingProject.set(null);
-    this.projectForm = {};
-    this.projectError.set("");
-  }
-
-  saveProject() {
-    const name = this.projectForm.name?.trim();
-    if (!name) {
-      this.projectError.set(
-        $localize`:Validation message in the project dialog@@shell.projectNameRequired:Project name is required.`,
-      );
-      return;
-    }
-
-    const existing = this.editingProject();
-    const payload = { ...this.projectForm, name };
-
-    this.savingProject.set(true);
-    this.projectError.set("");
-    const request = existing
-      ? this.projectService.update(existing.id, payload)
-      : this.projectService.create(payload);
-
-    request.subscribe({
-      next: () => {
-        this.savingProject.set(false);
-        this.closeProjectDialog();
-      },
-      error: (err) => {
-        this.savingProject.set(false);
-        this.projectError.set(
-          typeof err.error === "string" && err.error.trim()
-            ? err.error
-            : existing
-              ? $localize`:Fallback when saving edits to a project fails@@shell.updateProjectFailed:Could not update the project.`
-              : $localize`:Fallback when creating a project fails@@shell.createProjectFailed:Could not create the project.`,
-        );
-      },
-    });
-  }
-
-  // ── Deletion ─────────────────────────────────────────────────
-  confirmDeleteProject(project: Project) {
-    this.deleteError.set("");
-    this.pendingDelete.set({
-      kind: "project",
-      id: project.id,
-      name: project.name,
-    });
-  }
-
-  confirmDeleteDocument(doc: Document) {
-    this.deleteError.set("");
-    this.pendingDelete.set({ kind: "document", id: doc.id, name: doc.name });
-  }
-
-  cancelDelete() {
-    this.pendingDelete.set(null);
-    this.deleteError.set("");
-  }
-
-  confirmDelete() {
-    const target = this.pendingDelete();
-    if (!target) return;
-
-    this.deleting.set(true);
-    this.deleteError.set("");
-    const request =
-      target.kind === "project"
-        ? this.projectService.remove(target.id)
-        : this.documentService.delete(target.id);
-
-    request.subscribe({
-      next: () => {
-        this.deleting.set(false);
-        this.pendingDelete.set(null);
-      },
-      error: () => {
-        this.deleting.set(false);
-        this.deleteError.set(
-          target.kind === "project"
-            ? $localize`:Fallback when deleting a project fails@@shell.deleteProjectFailed:Could not delete the project.`
-            : $localize`:Fallback when deleting a document fails@@shell.deleteDocumentFailed:Could not delete the document.`,
-        );
-      },
-    });
-  }
-
-  // ── Document status ──────────────────────────────────────────
-  changeStatus(doc: Document, event: Event) {
-    const select = event.target as HTMLSelectElement;
-    const status = select.value as DocumentStatus;
-    if (status === doc.status) return;
-
-    this.statusUpdatingId.set(doc.id);
-    this.documentService.updateStatus(doc.id, status).subscribe({
-      next: () => this.statusUpdatingId.set(null),
-      error: () => {
-        this.statusUpdatingId.set(null);
-        // Put the control back where it was — the document itself did not
-        // change, so leaving the select showing the new value would lie.
-        select.value = doc.status;
-      },
-    });
-  }
-
-  onFileSelect(e: Event) {
-    const f = (e.target as HTMLInputElement).files?.[0];
-    if (!f) return;
-    this.selectedFile.set(f);
-    this.uploadMeta.name = f.name.replace(/\.[^.]+$/, "");
-  }
-
-  onDrop(e: DragEvent) {
-    e.preventDefault();
-    const f = e.dataTransfer?.files?.[0];
-    if (f) {
-      this.selectedFile.set(f);
-      this.uploadMeta.name = f.name.replace(/\.[^.]+$/, "");
-    }
-  }
-
-  closeUpload() {
-    this.showUpload.set(false);
-    this.selectedFile.set(null);
-    this.uploadMeta = { documentType: "DRAWING" };
-  }
-
-  doUpload() {
-    const file = this.selectedFile();
-    const pid = this.selectedProject()?.id;
-    if (!file || !pid) return;
-    this.uploading.set(true);
-    const meta: Record<string, string> = {
-      name: this.uploadMeta.name || file.name.replace(/\.[^.]+$/, ""),
-      documentType: this.uploadMeta.documentType || "DRAWING",
-      drawingNumber: this.uploadMeta.drawingNumber || "",
-      revision: this.uploadMeta.revision || "",
-    };
-    this.uploadService.upload(file, pid, meta).subscribe({
-      next: () => {
-        this.uploading.set(false);
-        this.closeUpload();
-      },
-      error: () => this.uploading.set(false),
-    });
-  }
-
-  phaseStyle(phase: string): string {
-    const map: Record<string, string> = {
-      DESIGN: "background:#dbeafe;color:#1d4ed8",
-      CONSTRUCTION: "background:#fef3c7;color:#b45309",
-      CONCEPT: "background:#ede9fe;color:#6d28d9",
-      HANDOVER: "background:#dcfce7;color:#15803d",
-      OPERATION: "background:#f1f5f9;color:#475569",
-    };
-    return map[phase] || "background:#f1f5f9;color:#475569";
-  }
-
-  statusStyle(status: string): string {
-    const map: Record<string, string> = {
-      DRAFT: "background:#f1f5f9;color:#64748b",
-      IN_REVIEW: "background:#fef3c7;color:#b45309",
-      APPROVED: "background:#dcfce7;color:#15803d",
-      SUPERSEDED: "background:#fee2e2;color:#b91c1c",
-    };
-    return map[status] || "background:#f1f5f9;color:#64748b";
   }
 }

@@ -118,4 +118,27 @@ describe('findUnmarkedStrings', () => {
       /did not parse/,
     );
   });
+
+  it('flags an unmarked label on a component that takes one', () => {
+    // `label` is not a native attribute here — it is an input on a form-field
+    // component, and the text lands in front of the user either way. The
+    // compiler sees a component input and says nothing about it.
+    const found = findUnmarkedStrings(
+      '<app-labelled-field for="name" label="Project Name" />',
+      'labelled.ts',
+    );
+
+    expect(found).toEqual([
+      expect.objectContaining({ attribute: 'label', text: 'Project Name' }),
+    ]);
+  });
+
+  it('accepts a label carrying its own i18n-label', () => {
+    const found = findUnmarkedStrings(
+      '<app-labelled-field for="name" i18n-label="@@f.name" label="Project Name" />',
+      'labelled.ts',
+    );
+
+    expect(found).toEqual([]);
+  });
 });

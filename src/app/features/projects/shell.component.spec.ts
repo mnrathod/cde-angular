@@ -1,61 +1,145 @@
 /**
- * How the shell turns stored values into words a person reads.
+ * What the shell is left owning once the sidebar, the grid and the three
+ * dialogs became components of their own: which dialog is open, and where
+ * opening a document takes you.
  *
- * <p>Project phases and document statuses arrive from the server as
- * `IN_REVIEW` and `CONSTRUCTION`. The shell used to render them by swapping
- * the underscore for a space — legible in English, meaningless anywhere else —
- * and they are now looked up in a table of translated messages.
- *
- * <p>The behaviour worth guarding is the fallback. The server can add a phase
- * or a status before this table knows about it, and the two possible failures
- * are very different: showing `HANDOVER` is untidy, showing an empty chip
- * looks like missing data.
+ * <p>The labels this file used to test moved to `project-vocabulary.spec.ts`
+ * and the delete heading to the confirmation dialog, which is where the
+ * behaviour now lives.
  */
-import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { provideHttpClient } from "@angular/common/http";
+import { provideHttpClientTesting } from "@angular/common/http/testing";
+import { TestBed } from "@angular/core/testing";
+import { Router, provideRouter } from "@angular/router";
 
-import { ShellComponent } from './shell.component';
+import { Document, Project } from "../../core/models";
+import { DocumentService } from "../../core/services/document.service";
+import { ShellComponent } from "./shell.component";
 
-describe('ShellComponent labels', () => {
+/** A project with only the fields the shell reads. */
+function project(overrides: Partial<Project> = {}): Project {
+  return {
+    id: 7,
+    name: "Northern Depot",
+    description: "",
+    phase: "DESIGN",
+    location: "",
+    createdAt: "2026-01-01T00:00:00Z",
+    ...overrides,
+  };
+}
+
+/** A document with only the fields the shell reads. */
+function document(overrides: Partial<Document> = {}): Document {
+  return {
+    id: 42,
+    name: "Site plan",
+    fileName: "site-plan.pdf",
+    fileType: "application/pdf",
+    fileSize: 1024,
+    documentType: "DRAWING",
+    status: "DRAFT",
+    drawingNumber: "A-100",
+    revision: "A",
+    projectId: 7,
+    createdAt: "2026-01-01T00:00:00Z",
+    ...overrides,
+  };
+}
+
+describe("ShellComponent", () => {
   let shell: ShellComponent;
+  let router: Router;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+      ],
     });
     shell = TestBed.createComponent(ShellComponent).componentInstance;
+    router = TestBed.inject(Router);
   });
 
-  it('gives every phase it knows a word rather than a stored value', () => {
-    expect(shell.phaseLabel('CONSTRUCTION')).toBe('Construction');
-    expect(shell.phaseLabel('HANDOVER')).toBe('Handover');
+  describe("choosing which dialog is open", () => {
+    it("opens no dialog until something asks for one", () => {
+      expect(shell.dialog().kind).toBe("none");
+    });
+
+    it("opens the project dialog with nothing to edit when creating", () => {
+      shell.openProjectDialog(null);
+
+      expect(shell.dialog()).toEqual({ kind: "project", editing: null });
+    });
+
+    it("opens the project dialog on the project being edited", () => {
+      const existing = project({ name: "Southern Yard" });
+
+      shell.openProjectDialog(existing);
+
+      expect(shell.dialog()).toEqual({ kind: "project", editing: existing });
+    });
+
+    it("names the project in the delete confirmation", () => {
+      // The name is what the dialog shows back. Carrying the id alone would
+      // leave the user confirming a deletion they cannot identify.
+      shell.confirmDeleteProject(project({ id: 3, name: "Northern Depot" }));
+
+      expect(shell.dialog()).toEqual({
+        kind: "delete",
+        target: { kind: "project", id: 3, name: "Northern Depot" },
+      });
+    });
+
+    it("names the document in the delete confirmation", () => {
+      shell.confirmDeleteDocument(document({ id: 9, name: "Site plan" }));
+
+      expect(shell.dialog()).toEqual({
+        kind: "delete",
+        target: { kind: "document", id: 9, name: "Site plan" },
+      });
+    });
+
+    it("closes whatever was open", () => {
+      shell.confirmDeleteProject(project());
+
+      shell.closeDialog();
+
+      expect(shell.dialog().kind).toBe("none");
+    });
+
+    it("replaces the open dialog rather than stacking a second one", () => {
+      // Two modals at once would trap focus in the one underneath.
+      shell.openProjectDialog(null);
+      shell.confirmDeleteProject(project());
+
+      expect(shell.dialog().kind).toBe("delete");
+    });
   });
 
-  it('gives every status it knows a word rather than a stored value', () => {
-    // The one that matters most: IN_REVIEW rendered by replacing the
-    // underscore reads "IN REVIEW", which is not a sentence in any language.
-    expect(shell.statusLabel('IN_REVIEW')).toBe('In review');
-    expect(shell.statusLabel('SUPERSEDED')).toBe('Superseded');
-  });
+  describe("opening a document", () => {
+    it("sends a model to the 3D viewer", () => {
+      const model = document({ id: 11, documentType: "BIM_MODEL" });
+      vi.spyOn(TestBed.inject(DocumentService), "is3D").mockReturnValue(true);
+      const navigate = vi.spyOn(router, "navigate").mockResolvedValue(true);
 
-  it('shows an unrecognised phase rather than nothing', () => {
-    // The server may add one before this table does. An untidy chip beats an
-    // empty one, which reads as missing data.
-    expect(shell.phaseLabel('DECOMMISSIONING')).toBe('DECOMMISSIONING');
-  });
+      shell.openDocument(model);
 
-  it('shows an unrecognised status rather than nothing', () => {
-    expect(shell.statusLabel('WITHDRAWN')).toBe('WITHDRAWN');
-  });
+      expect(navigate).toHaveBeenCalledWith(["/viewer3d", 11]);
+    });
 
-  it('asks about the right thing when deleting', () => {
-    // Two whole messages rather than "Delete {kind}?" with an English noun
-    // dropped into the gap — gender and article agreement do not survive
-    // that, and the translator never sees the word that lands there.
-    expect(shell.deleteTitle('project')).toContain('project');
-    expect(shell.deleteTitle('document')).toContain('document');
-    expect(shell.deleteTitle('project')).not.toBe(shell.deleteTitle('document'));
+    it("sends a drawing to the flat viewer", () => {
+      // The two viewers cannot render each other's documents, so picking the
+      // wrong one shows an empty canvas rather than an error.
+      const drawing = document({ id: 12, documentType: "DRAWING" });
+      vi.spyOn(TestBed.inject(DocumentService), "is3D").mockReturnValue(false);
+      const navigate = vi.spyOn(router, "navigate").mockResolvedValue(true);
+
+      shell.openDocument(drawing);
+
+      expect(navigate).toHaveBeenCalledWith(["/viewer", 12]);
+    });
   });
 });

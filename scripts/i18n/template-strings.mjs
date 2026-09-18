@@ -28,6 +28,10 @@ const TRANSLATABLE_ATTRIBUTES = [
   'aria-placeholder',
   'aria-roledescription',
   'aria-valuetext',
+  // Not just <option label> and <track label>: a component that takes a
+  // `label` input renders it to the user like any other, and the compiler
+  // cannot tell the two apart from the attribute alone.
+  'label',
   'placeholder',
   'title',
 ];
