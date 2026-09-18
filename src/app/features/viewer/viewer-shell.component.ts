@@ -24,6 +24,7 @@ import { CadViewerComponent } from '../../../viewer-core/cad-viewer.component';
 import { PdfPageComponent } from './pdf-viewer/pdf-page.component';
 import { ViewerData } from '../../core/models';
 import { CollaborationService, CollaborationEvent } from '../../core/services/collaboration.service';
+import { ViewerTopBarComponent } from './viewer-top-bar.component';
 import { DrawingSearchService } from '../../../viewer-core/drawing-search.service';
 
 @Component({
@@ -36,6 +37,7 @@ import { DrawingSearchService } from '../../../viewer-core/drawing-search.servic
   providers: [ViewerStateService, CollaborationService, DocumentOperationsService],
   imports: [
     CommonModule,
+    ViewerTopBarComponent,
     MarkupToolbarComponent,
     ToolRailComponent,
     ViewerSidebarComponent,
@@ -47,79 +49,7 @@ import { DrawingSearchService } from '../../../viewer-core/drawing-search.servic
   template: `
     <div class="fixed inset-0 flex flex-col" style="z-index:500">
 
-      <!-- ── Top bar ────────────────────────────────────────────── -->
-      <div class="flex items-center h-11 px-3 gap-2 flex-shrink-0 text-white"
-           style="background:var(--nav);box-shadow:0 2px 4px rgba(0,0,0,.15)">
-        <button type="button" (click)="goBack()"
-          i18n-title="@@viewerShell.backHint" title="Back to documents"
-          class="h-7 px-2.5 inline-flex items-center gap-1.5 text-xs rounded-md
-                 bg-white/10 hover:bg-white/20 transition-colors">
-          <app-icon name="arrow-left" [size]="15" />
-          <span i18n="Leaves the viewer and returns to the document list@@viewerShell.back">Back</span>
-        </button>
-
-        <div class="flex items-center gap-2 flex-1 min-w-0">
-          <span class="font-semibold text-sm truncate">{{ state.viewerData()?.name || loadingLabel }}</span>
-          @if (state.viewerData()?.revision) {
-            <span i18n="The document's revision identifier, abbreviated to fit the title bar@@viewerShell.revision"
-                  class="text-xs px-2 py-0.5 rounded bg-white/20">Rev {{ state.viewerData()?.revision }}</span>
-          }
-          @if (state.viewerData()?.drawingNumber) {
-            <span class="text-xs text-white/70">{{ state.viewerData()?.drawingNumber }}</span>
-          }
-        </div>
-
-        <!-- Who else is viewing this document -->
-        @if (collaboration.others().length) {
-          <div class="flex items-center -space-x-1.5 me-1"
-               [title]="presenceTitle()">
-            @for (participant of collaboration.others(); track participant.username) {
-              <span class="w-6 h-6 rounded-full flex items-center justify-center
-                           text-[10px] font-bold text-white border-2 border-white/70"
-                    [style.background]="participant.colour">
-                {{ initialsOf(participant.username) }}
-              </span>
-            }
-          </div>
-        }
-        @if (collaboration.connected()) {
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 me-1"
-                i18n-title="Tooltip on the indicator that real-time collaboration is connected@@viewerShell.liveHint"
-                title="Live — changes from others appear as they happen"></span>
-        }
-
-        <!-- Page navigation (PDF only) -->
-        @if (state.totalPages() > 1) {
-          <div class="flex items-center gap-1 text-xs">
-            <button type="button" (click)="state.navigateTo(state.currentPage()-1)"
-              [disabled]="state.currentPage() <= 1"
-              i18n-title="@@viewerShell.previousPage" title="Previous page"
-              i18n-aria-label="@@viewerShell.previousPageLabel" aria-label="Previous page"
-              class="w-7 h-7 inline-flex items-center justify-center rounded-md
-                     bg-white/10 hover:bg-white/20 disabled:opacity-30">
-              <app-icon name="chevron-left" [size]="15" />
-            </button>
-            <span class="w-20 text-center tabular-nums">{{ state.currentPage() }} / {{ state.totalPages() }}</span>
-            <button type="button" (click)="state.navigateTo(state.currentPage()+1)"
-              [disabled]="state.currentPage() >= state.totalPages()"
-              i18n-title="@@viewerShell.nextPage" title="Next page"
-              i18n-aria-label="@@viewerShell.nextPageLabel" aria-label="Next page"
-              class="w-7 h-7 inline-flex items-center justify-center rounded-md
-                     bg-white/10 hover:bg-white/20 disabled:opacity-30">
-              <app-icon name="chevron-right" [size]="15" />
-            </button>
-          </div>
-        }
-
-        <!-- Toggle sidebar -->
-        <button type="button" (click)="state.sidebarOpen.update(v => !v)"
-          [title]="state.sidebarOpen() ? hideSidebarHint : showSidebarHint"
-          [attr.aria-pressed]="state.sidebarOpen()"
-          class="w-7 h-7 inline-flex items-center justify-center rounded-md
-                 bg-white/10 hover:bg-white/20">
-          <app-icon name="panel" [size]="15" />
-        </button>
-      </div>
+      <app-viewer-top-bar (backRequested)="goBack()" />
 
       <!-- ── Loading / Error ─────────────────────────────────────── -->
       @if (state.loading()) {
@@ -291,32 +221,34 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
         // The bytes this viewer is showing have been replaced. Reload, and
         // say who did it — the page changing underneath you with no
         // explanation is alarming.
-        this.state.processingMessage.set(
-          `v${event.version} by ${event.actor} — ${event.summary ?? 'document updated'}`);
+        this.state.processingMessage.set(this.versionNotice(event));
         this.state.applyVersionCommit(event.version ?? this.state.currentVersion());
         break;
     }
   }
 
-  presenceTitle(): string {
-    const names = this.collaboration.others()
-      .map(participant => participant.username)
-      .join(', ');
-    return $localize`:Tooltip listing the other people with this document open@@viewerShell.alsoViewing:${names}:names: also viewing`;
+  /**
+   * Says who replaced the document under you, and what they did.
+   *
+   * <p>One message with placeholders. It was three fragments joined with a
+   * dash — hardcoded English in a .ts file, which the template sweep cannot
+   * see — and the word order does not survive translation.
+   */
+  private versionNotice(event: CollaborationEvent): string {
+    const version = event.version ?? this.state.currentVersion();
+    const actor = event.actor ?? '';
+    const summary =
+      event.summary ??
+      $localize`:Stands in for a change summary the server did not send@@viewerShell.documentUpdated:document updated`;
+    return $localize`:Says who committed a new version of the document while it was open, and what changed@@viewerShell.versionCommitted:v${version}:version: by ${actor}:actor: — ${summary}:summary:`;
   }
 
   /**
    * Labels that live in expressions, so `i18n` cannot mark them — see the
    * note in login.component.ts.
    */
-  readonly loadingLabel = $localize`:Stands in for the document title until it has loaded@@viewerShell.loadingTitle:Loading...`;
-  readonly hideSidebarHint = $localize`:Tooltip on the control that closes the side panel@@viewerShell.hideSidebar:Hide side panel`;
-  readonly showSidebarHint = $localize`:Tooltip on the control that opens the side panel@@viewerShell.showSidebar:Show side panel`;
   readonly untitledDocumentLabel = $localize`:Alternative text for an image whose document has no name@@viewerShell.untitledDocument:Document`;
 
-  initialsOf(username: string): string {
-    return username.slice(0, 2).toUpperCase();
-  }
 
   private async loadDocument(id: number) {
     this.state.loading.set(true);

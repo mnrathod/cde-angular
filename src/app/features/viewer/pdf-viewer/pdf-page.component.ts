@@ -1,24 +1,25 @@
 import {
-  Component, Input, Output, EventEmitter, signal, computed, inject,
-  OnInit, AfterViewInit, OnDestroy, OnChanges, SimpleChanges,
+  Component, Input, signal, computed, inject,
+  AfterViewInit, OnDestroy, OnChanges, SimpleChanges,
   ElementRef, ViewChild, ChangeDetectionStrategy, HostListener
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { PdfEngineService } from '../../../../viewer-core/pdf-engine.service';
-import { MarkupEngineService, PointerPoint } from '../../../../viewer-core/markup-engine.service';
-import { ViewerStateService, ShapeData, MarkupTool } from '../../../../viewer-core/viewer-state.service';
-import { MeasurementService } from '../../../../viewer-core/measurement.service';
+import { MarkupEngineService } from '../../../../viewer-core/markup-engine.service';
+import { ViewerStateService, ShapeData } from '../../../../viewer-core/viewer-state.service';
 import { CollaborationService } from '../../../core/services/collaboration.service';
 import { RemoteCursorsComponent } from '../markup/remote-cursors.component';
 import { PageLinksComponent } from '../../../../viewer-core/page-links.component';
 import { MarkupShapesComponent } from '../../../../viewer-core/markup-shapes.component';
 import { MarkupDrawingSession, MarkupSurface } from '../../../../viewer-core/markup-drawing-session';
+import {
+  formFieldDraftFrom, redactionFrom, toScreenRect,
+} from './pdf-page-geometry';
 import { pageLabel } from '../../../../viewer-core/page-labels';
 
 @Component({
   selector: 'app-pdf-page',
   standalone: true,
-  imports: [CommonModule, RemoteCursorsComponent, PageLinksComponent, MarkupShapesComponent],
+  imports: [RemoteCursorsComponent, PageLinksComponent, MarkupShapesComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [MarkupDrawingSession],
   template: `
@@ -173,7 +174,7 @@ import { pageLabel } from '../../../../viewer-core/page-labels';
   `]
 })
 export class PdfPageComponent
-  implements OnInit, AfterViewInit, OnChanges, OnDestroy, MarkupSurface {
+  implements AfterViewInit, OnChanges, OnDestroy, MarkupSurface {
   pageLabel = pageLabel;
 
   @Input({ required: true }) pdfDoc!:    any;
@@ -196,7 +197,6 @@ export class PdfPageComponent
   engine  = inject(PdfEngineService);
   markup  = inject(MarkupEngineService);
   session = inject(MarkupDrawingSession);
-  measure = inject(MeasurementService);
   private collaboration = inject(CollaborationService);
 
   pageWidth  = signal(0);
@@ -220,12 +220,10 @@ export class PdfPageComponent
     }
   };
 
-  ngOnInit() { /* first render happens in ngAfterViewInit — see below */ }
-
   // @ViewChild('pageCanvas') isn't populated until after the view is
-  // initialized, so the *first* render has to happen here, not in
-  // ngOnInit/ngOnChanges — calling render() before this silently no-ops
-  // on its `!this.canvas` guard, which is why pages never painted.
+  // initialized, so the *first* render has to happen here rather than in an
+  // ngOnInit — calling render() before this silently no-ops on its
+  // `!this.canvas` guard, which is why pages never painted.
   ngAfterViewInit() {
     // After the view exists, because the session measures against the markup
     // overlay and reads it through the getter above.
@@ -291,11 +289,6 @@ export class PdfPageComponent
   readonly shapesOnPage = computed(() =>
     this.state.shapes().filter((shape) => shape.pageNumber === this.pageNumber));
 
-  // ── Committed redaction regions for this page, converted from the
-  //    canonical PDF-point storage back into this page's current screen
-  //    pixels. Recomputes whenever pageWidth/pageHeight change (i.e. on
-  //    zoom), so — unlike ShapeData — redaction boxes stay correctly
-  //    positioned across zoom changes instead of drifting. ─────────────
   // ── View rotation ────────────────────────────────────────────
   rotationTransform = computed(() => {
     const degrees = this.state.rotation();
@@ -310,19 +303,13 @@ export class PdfPageComponent
   outerWidth  = computed(() => this.state.isQuarterTurned() ? this.pageHeight() : this.pageWidth());
   outerHeight = computed(() => this.state.isQuarterTurned() ? this.pageWidth()  : this.pageHeight());
 
-  redactionRegionsOnPage = computed(() => {
-    const zoom         = this.zoom;
-    const nativeHeight = this.pageHeight() / zoom;
-    return this.state.redactionRegions()
-      .filter(r => r.page === this.pageNumber)
-      .map(r => ({
-        id:           r.id,
-        screenX:      r.x * zoom,
-        screenY:      (nativeHeight - r.y - r.height) * zoom,
-        screenWidth:  r.width  * zoom,
-        screenHeight: r.height * zoom
-      }));
-  });
+  redactionRegionsOnPage = computed(() =>
+    this.state.redactionRegions()
+      .filter(region => region.page === this.pageNumber)
+      .map(region => ({
+        id: region.id,
+        ...toScreenRect(region, this.zoom, this.pageHeight()),
+      })));
 
   /**
    * The gesture that draws a shape lives in the session, shared with the CAD
@@ -374,84 +361,35 @@ export class PdfPageComponent
     });
   }
 
-  // Convert a drawn rect (screen pixels, top-left origin, current zoom)
-  // into the backend's coordinate system (PDF points, origin bottom-left).
   private commitRedactionRegion(shape: ShapeData) {
-    this.state.addRedactionRegion({
-      id: this.markup.newId(),
-      page: this.pageNumber,
-      ...this.toPdfRect(shape)
-    });
+    this.state.addRedactionRegion(
+      redactionFrom(this.markup.newId(), this.pageNumber, shape, this.zoom,
+                    this.pageHeight()));
   }
 
-  /**
-   * Screen pixels at the current zoom, top-left origin, converted to PDF
-   * points with a bottom-left origin — the space the server works in, and
-   * the reason these stay correct when the zoom changes.
-   */
-  private toPdfRect(shape: ShapeData): { x: number; y: number; width: number; height: number } {
-    const zoom         = this.zoom;
-    const nativeHeight = this.pageHeight() / zoom;
-    const width        = (shape.width  || 0) / zoom;
-    const height       = (shape.height || 0) / zoom;
-    return {
-      x:      (shape.x || 0) / zoom,
-      y:      nativeHeight - ((shape.y || 0) / zoom) - height,
-      width,
-      height
-    };
-  }
-
-  /**
-   * Turns a drawn rectangle into an unnamed field draft.
-   *
-   * <p>Named in the Form panel rather than here: a prompt for every box would
-   * make laying out a form of twenty fields twenty interruptions.
-   */
   private commitFormFieldDraft(shape: ShapeData) {
-    const box = this.toPdfRect(shape);
-    this.state.addFormFieldDraft({
-      id: this.markup.newId(),
-      page: this.pageNumber,
-      ...box,
-      name: '',
-      kind: 'TEXT',
-      required: false,
-      options: ''
-    });
+    this.state.addFormFieldDraft(
+      formFieldDraftFrom(this.markup.newId(), this.pageNumber, shape, this.zoom,
+                         this.pageHeight()));
   }
 
   /** Field drafts on this page, in current screen pixels. */
-  formFieldDraftsOnPage = computed(() => {
-    const zoom         = this.zoom;
-    const nativeHeight = this.pageHeight() / zoom;
-    return this.state.formFieldDrafts()
+  formFieldDraftsOnPage = computed(() =>
+    this.state.formFieldDrafts()
       .filter(draft => draft.page === this.pageNumber)
       .map(draft => ({
         ...draft,
-        screenX:      draft.x * zoom,
-        screenY:      (nativeHeight - draft.y - draft.height) * zoom,
-        screenWidth:  draft.width * zoom,
-        screenHeight: draft.height * zoom
-      }));
-  });
+        ...toScreenRect(draft, this.zoom, this.pageHeight()),
+      })));
 
   // ── Build the text layer and mark search matches ─────────────
   private async highlightSearch() {
     if (!this.textLayer || !this.pdfDoc || !this.viewport || !this.active) return;
 
-    const el    = this.textLayer.nativeElement;
-    const divs  = await this.engine.renderTextLayer(
-      this.pdfDoc, this.pageNumber, el, this.viewport
+    const elements = await this.engine.renderTextLayer(
+      this.pdfDoc, this.pageNumber, this.textLayer.nativeElement, this.viewport
     );
-
-    const query = this.searchQuery.trim().toLowerCase();
-    if (!query) return;
-    for (const div of divs) {
-      if ((div.textContent ?? '').toLowerCase().includes(query)) {
-        div.classList.add('cde-search-match');
-      }
-    }
+    this.engine.markMatches(elements, this.searchQuery);
   }
 
   // ── Export this page's markup as SVG string (for print) ─────

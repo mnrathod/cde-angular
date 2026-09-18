@@ -169,6 +169,24 @@ export class PdfEngineService {
   // corrected for font ascent before it means anything in CSS pixels.
   // TextLayer already does all of that, including rotation and per-glyph
   // horizontal scaling.
+  /**
+   * Marks the text-layer elements containing a search term.
+   *
+   * <p>Here rather than in the page component because this service is what
+   * builds the layer: the matching is against the same elements it just
+   * produced, and splitting the two leaves the caller reaching into a
+   * structure it did not make.
+   */
+  markMatches(elements: readonly HTMLElement[], query: string): void {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return;
+    for (const element of elements) {
+      if ((element.textContent ?? '').toLowerCase().includes(needle)) {
+        element.classList.add('cde-search-match');
+      }
+    }
+  }
+
   async renderTextLayer(
     pdfDoc:    any,
     pageNum:   number,
