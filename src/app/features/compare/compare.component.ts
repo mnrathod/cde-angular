@@ -34,30 +34,38 @@ import { parseComparisonReport } from "./comparison-report";
           (click)="goBack()"
           class="text-xs px-3 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20 transition-colors"
         >
-          ← Back
+          <span aria-hidden="true">←</span>
+          <ng-container i18n="Leaves the comparison page@@compare.back">Back</ng-container>
         </button>
         <div class="flex items-center gap-2 flex-1">
-          <span class="text-lg">🔍</span>
-          <span class="font-semibold text-sm">Compare Documents</span>
+          <span class="text-lg" aria-hidden="true">🔍</span>
+          <span i18n="Title of the document comparison page@@compare.heading"
+                class="font-semibold text-sm">Compare Documents</span>
         </div>
         <button
           type="button"
           (click)="openVisualCompare()"
           [disabled]="!doc1() || !doc2()"
-          aria-label="Visual compare"
+          i18n-aria-label="@@compare.visualLabel" aria-label="Visual compare"
           class="text-xs px-3 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20 disabled:opacity-40"
-          title="Open visual overlay comparison"
+          i18n-title="@@compare.visualHint" title="Open visual overlay comparison"
         >
-          👁 Visual
+          <span aria-hidden="true">👁</span>
+          <ng-container i18n="Opens the drawings side by side. Very short — it sits in a crowded bar.@@compare.visual"
+            >Visual</ng-container
+          >
         </button>
         <button
           type="button"
           (click)="swapFiles()"
-          aria-label="Swap files"
-          title="Swap the two files"
+          i18n-aria-label="@@compare.swapLabel" aria-label="Swap files"
+          i18n-title="@@compare.swapHint" title="Swap the two files"
           class="text-xs px-3 py-1 rounded border border-white/30 bg-white/10 hover:bg-white/20"
         >
-          ⇄ Swap
+          <span aria-hidden="true">⇄</span>
+          <ng-container i18n="Exchanges which document is the original and which the revision. Very short.@@compare.swap"
+            >Swap</ng-container
+          >
         </button>
         <!--
           aria-label rather than relying on the visible text: the label carries a
@@ -68,12 +76,12 @@ import { parseComparisonReport } from "./comparison-report";
           type="button"
           (click)="runCompare()"
           [disabled]="!doc1() || !doc2() || comparing()"
-          aria-label="Compare"
-          title="Compare the two selected files"
+          i18n-aria-label="@@compare.runLabel" aria-label="Compare"
+          i18n-title="@@compare.runHint" title="Compare the two selected files"
           class="text-xs px-4 py-1.5 rounded font-semibold transition-colors disabled:opacity-40"
           style="background:#fff;color:var(--accent)"
         >
-          {{ comparing() ? "⏳ Analysing..." : "🔍 Compare" }}
+          {{ comparing() ? analysingLabel : compareLabel }}
         </button>
       </div>
 
@@ -99,15 +107,18 @@ import { parseComparisonReport } from "./comparison-report";
           <div
             class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1"
           >
-            📄 File 1 — Original
+            <span aria-hidden="true">📄</span>
+            <ng-container i18n="Labels the first slot — the earlier document@@compare.file1Heading"
+              >File 1 — Original</ng-container
+            >
           </div>
           <div class="font-medium text-sm truncate">
-            {{ doc1()?.name || "Click to select" }}
+            {{ doc1()?.name || chooseFileLabel }}
           </div>
           @if (doc1()) {
             <div class="text-xs text-gray-500 mt-0.5">
               {{ doc1()!.fileName }}
-              {{ doc1()!.revision ? "· Rev " + doc1()!.revision : "" }}
+              {{ doc1()!.revision ? revisionSuffix(doc1()!.revision!) : "" }}
             </div>
           }
         </button>
@@ -115,7 +126,9 @@ import { parseComparisonReport } from "./comparison-report";
         <div
           class="text-xs font-bold text-gray-500 px-2 py-1 bg-gray-100 rounded-full flex-shrink-0"
         >
-          VS
+          <ng-container i18n="Separates the two documents being compared. Very short — it sits in a small pill between them.@@compare.versus"
+            >VS</ng-container
+          >
         </div>
 
         <!-- A button, not a div with a click handler: this is the control that
@@ -136,15 +149,18 @@ import { parseComparisonReport } from "./comparison-report";
           <div
             class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1"
           >
-            📄 File 2 — Revised
+            <span aria-hidden="true">📄</span>
+            <ng-container i18n="Labels the second slot — the later document@@compare.file2Heading"
+              >File 2 — Revised</ng-container
+            >
           </div>
           <div class="font-medium text-sm truncate">
-            {{ doc2()?.name || "Click to select" }}
+            {{ doc2()?.name || chooseFileLabel }}
           </div>
           @if (doc2()) {
             <div class="text-xs text-gray-500 mt-0.5">
               {{ doc2()!.fileName }}
-              {{ doc2()!.revision ? "· Rev " + doc2()!.revision : "" }}
+              {{ doc2()!.revision ? revisionSuffix(doc2()!.revision!) : "" }}
             </div>
           }
         </button>
@@ -158,11 +174,13 @@ import { parseComparisonReport } from "./comparison-report";
             <div
               class="flex flex-col items-center justify-center h-full text-gray-400"
             >
-              <div class="text-5xl mb-4">🔍</div>
-              <div class="font-semibold mb-1">
+              <div class="text-5xl mb-4" aria-hidden="true">🔍</div>
+              <div i18n="Empty state for the comparison page@@compare.empty"
+                   class="font-semibold mb-1">
                 Select two documents to compare
               </div>
-              <div class="text-sm">
+              <div i18n="Which file kinds can be compared. The names are file formats and stay as they are.@@compare.supportedFormats"
+                   class="text-sm">
                 Supports DXF · DWG · IFC · PDF · Office · Images
               </div>
             </div>
@@ -189,11 +207,7 @@ import { parseComparisonReport } from "./comparison-report";
               }}</span>
               <div>
                 <div class="font-semibold text-sm">
-                  {{
-                    r.overall === "identical"
-                      ? "Files are identical"
-                      : "Changes detected"
-                  }}
+                  {{ r.overall === "identical" ? identicalLabel : changedLabel }}
                 </div>
                 <div class="text-xs text-gray-500">
                   {{ r.doc1Name }} vs {{ r.doc2Name }} · {{ r.fileType }}
@@ -219,7 +233,8 @@ import { parseComparisonReport } from "./comparison-report";
                   <div class="text-xl font-bold font-mono text-accent">
                     {{ r.totalChanges }}
                   </div>
-                  <div class="text-xs text-gray-500">Total</div>
+                  <div i18n="How many differences were found altogether. Very short — it labels a number in a small tile.@@compare.totalChanges"
+                       class="text-xs text-gray-500">Total</div>
                 </div>
                 <div
                   class="bg-white rounded border border-gray-200 px-4 py-2 text-center min-w-16"
@@ -227,7 +242,8 @@ import { parseComparisonReport } from "./comparison-report";
                   <div class="text-xl font-bold font-mono text-green-600">
                     +{{ r.added }}
                   </div>
-                  <div class="text-xs text-gray-500">Added</div>
+                  <div i18n="How many things exist in the revision but not the original. Very short — it labels a number in a small tile.@@compare.addedChanges"
+                       class="text-xs text-gray-500">Added</div>
                 </div>
                 <div
                   class="bg-white rounded border border-gray-200 px-4 py-2 text-center min-w-16"
@@ -235,7 +251,8 @@ import { parseComparisonReport } from "./comparison-report";
                   <div class="text-xl font-bold font-mono text-red-600">
                     -{{ r.removed }}
                   </div>
-                  <div class="text-xs text-gray-500">Removed</div>
+                  <div i18n="How many things existed in the original but not the revision. Very short — it labels a number in a small tile.@@compare.removedChanges"
+                       class="text-xs text-gray-500">Removed</div>
                 </div>
               </div>
 
@@ -301,8 +318,9 @@ import { parseComparisonReport } from "./comparison-report";
           <div
             class="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0"
           >
-            <span>✨</span>
-            <span class="font-semibold text-sm flex-1">AI Summary</span>
+            <span aria-hidden="true">✨</span>
+            <span i18n="Heading of the panel holding a model-written review of the differences@@compare.aiHeading"
+                  class="font-semibold text-sm flex-1">AI Summary</span>
             @if (aiLoading()) {
               <div
                 class="w-4 h-4 border-2 border-blue-200 border-t-accent rounded-full animate-spin"
@@ -315,8 +333,9 @@ import { parseComparisonReport } from "./comparison-report";
               <div
                 class="flex flex-col items-center justify-center h-full text-gray-400 p-6 text-center"
               >
-                <div class="text-4xl mb-3">🤖</div>
-                <div class="text-sm">
+                <div class="text-4xl mb-3" aria-hidden="true">🤖</div>
+                <div i18n="Empty state for the AI panel, before any comparison has been run@@compare.aiBeforeCompare"
+                     class="text-sm">
                   Run a comparison then generate an AI-powered engineering
                   review.
                 </div>
@@ -363,8 +382,9 @@ import { parseComparisonReport } from "./comparison-report";
               <div
                 class="flex flex-col items-center justify-center h-full text-gray-400 p-6 text-center"
               >
-                <div class="text-3xl mb-3">🤖</div>
-                <div class="text-sm mb-4">
+                <div class="text-3xl mb-3" aria-hidden="true">🤖</div>
+                <div i18n="Offers the AI review once a comparison exists. An RFI is a Request For Information, a formal query raised on a construction project.@@compare.aiOffer"
+                     class="text-sm mb-4">
                   Generate an AI-powered review with revision summary, impacted
                   disciplines, review comments and RFIs.
                 </div>
@@ -450,6 +470,21 @@ export class CompareComponent implements OnInit {
   /** The report as lines to render; empty until one has been generated. */
   reportLines = computed(() => parseComparisonReport(this.aiText()));
   docs = this.docService.documents;
+
+  /**
+   * Labels that live in expressions, so `i18n` cannot mark them — see the
+   * note in login.component.ts.
+   */
+  readonly compareLabel = $localize`:Runs the comparison@@compare.runAction:🔍 Compare`;
+  readonly analysingLabel = $localize`:Compare button while the two files are being analysed@@compare.analysing:⏳ Analysing...`;
+  readonly chooseFileLabel = $localize`:Prompt inside an empty file slot@@compare.chooseFile:Click to select`;
+  readonly identicalLabel = $localize`:Result banner when the two documents match@@compare.identical:Files are identical`;
+  readonly changedLabel = $localize`:Result banner when the two documents differ@@compare.changed:Changes detected`;
+
+  /** The revision suffix shown under a chosen file, e.g. "· Rev B". */
+  revisionSuffix(revision: string): string {
+    return $localize`:Appended after a file name to show its revision@@compare.revisionSuffix:· Rev ${revision}:revision:`;
+  }
 
   groupedChanges = computed(() => {
     const r = this.result();

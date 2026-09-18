@@ -41,9 +41,11 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
           <div
             class="w-7 h-7 bg-white rounded flex items-center justify-center text-accent font-black text-xs"
           >
-            CDE
+            <ng-container i18n="Product mark in the top bar. A brand name: leave it as-is in Latin-script languages, transliterate it where the script differs.@@shell.brandMark"
+              >CDE</ng-container
+            >
           </div>
-          <span class="text-white font-bold text-sm tracking-wide"
+          <span i18n="@@shell.brandName" class="text-white font-bold text-sm tracking-wide"
             >Platform</span
           >
         </div>
@@ -59,7 +61,7 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
             (click)="auth.logout()"
             class="text-xs px-3 py-1 rounded border border-white/30 bg-white/10 text-white/90 hover:bg-white/20 transition-colors"
           >
-            Sign Out
+            <ng-container i18n="Ends the session@@shell.signOut">Sign Out</ng-container>
           </button>
         </div>
       </header>
@@ -74,16 +76,20 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
             class="p-3 border-b border-gray-200 flex items-center justify-between"
           >
             <span
+              i18n="Heading of the project list in the sidebar@@shell.projectsHeading"
               class="text-xs font-semibold uppercase tracking-wider text-gray-400"
               >Projects</span
             >
             @if (roleService.can("canCreateProject")) {
               <button
                 (click)="openProjectDialog()"
-                title="New project"
+                i18n-title="@@shell.newProjectHint" title="New project"
                 class="text-xs px-1.5 py-0.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
               >
-                + New
+                <span aria-hidden="true">+</span>
+                <ng-container i18n="Creates a project. Very short — it shares a narrow row with the heading.@@shell.newProject"
+                  >New</ng-container
+                >
               </button>
             }
           </div>
@@ -112,7 +118,7 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
                   <button
                     type="button"
                     (click)="selectProject(p); $event.stopPropagation()"
-                    class="font-medium truncate flex-1 text-left bg-transparent border-0 p-0 cursor-pointer"
+                    class="font-medium truncate flex-1 text-start bg-transparent border-0 p-0 cursor-pointer"
                     [attr.aria-current]="
                       selectedProject()?.id === p.id ? 'true' : null
                     "
@@ -122,7 +128,7 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
                   @if (roleService.can("canCreateProject")) {
                     <button
                       (click)="openProjectDialog(p); $event.stopPropagation()"
-                      title="Edit project"
+                      i18n-title="@@shell.editProjectHint" title="Edit project"
                       class="opacity-0 group-hover:opacity-100 text-xs text-gray-400 hover:text-accent"
                     >
                       ✎
@@ -133,7 +139,7 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
                       (click)="
                         confirmDeleteProject(p); $event.stopPropagation()
                       "
-                      title="Delete project"
+                      i18n-title="@@shell.deleteProjectHint" title="Delete project"
                       class="opacity-0 group-hover:opacity-100 text-xs text-gray-400 hover:text-red-600"
                     >
                       🗑
@@ -144,10 +150,11 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
                   <span
                     class="text-xs px-1.5 py-0.5 rounded font-semibold"
                     [style]="phaseStyle(p.phase)"
-                    >{{ p.phase }}</span
+                    >{{ phaseLabel(p.phase) }}</span
                   >
-                  <span class="text-xs text-gray-400"
-                    >{{ p.documentCount || 0 }} docs</span
+                  <span i18n="How many documents a project holds. Very short — it sits under the project name.@@shell.documentCount"
+                        class="text-xs text-gray-400"
+                    >{p.documentCount || 0, plural, =1 {1 doc} other {{{ p.documentCount || 0 }} docs}}</span
                   >
                 </div>
               </div>
@@ -156,7 +163,8 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
               projectService.projects().length === 0 &&
               !projectService.loading()
             ) {
-              <div class="text-xs text-gray-400 text-center py-6">
+              <div i18n="Empty state for the project list@@shell.noProjects"
+                   class="text-xs text-gray-400 text-center py-6">
                 No projects yet.
               </div>
             }
@@ -170,9 +178,7 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
             class="flex items-center h-11 px-5 border-b border-gray-200 bg-white flex-shrink-0"
           >
             <h2 class="text-sm font-semibold text-gray-800">
-              {{
-                selectedProject() ? selectedProject()!.name : "Select a project"
-              }}
+              {{ selectedProject() ? selectedProject()!.name : selectProjectLabel }}
             </h2>
             <div class="flex-1"></div>
             @if (selectedProject()) {
@@ -181,14 +187,20 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
                   (click)="openCompare()"
                   class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded bg-white hover:bg-gray-50 text-gray-600 transition-colors"
                 >
-                  🔍 Compare
+                  <span aria-hidden="true">🔍</span>
+                  <ng-container i18n="Opens the document comparison page@@shell.compare"
+                    >Compare</ng-container
+                  >
                 </button>
                 @if (roleService.can("canUpload")) {
                   <button
                     (click)="showUpload.set(true)"
                     class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-accent hover:bg-blue-700 text-white rounded transition-colors"
                   >
-                    📤 Upload
+                    <span aria-hidden="true">📤</span>
+                    <ng-container i18n="Opens the upload dialog@@shell.upload"
+                      >Upload</ng-container
+                    >
                   </button>
                 }
               </div>
@@ -201,8 +213,9 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
               <div
                 class="flex flex-col items-center justify-center h-full text-gray-400"
               >
-                <div class="text-5xl mb-3">📁</div>
-                <div class="text-sm">Select a project to see its documents</div>
+                <div class="text-5xl mb-3" aria-hidden="true">📁</div>
+                <div i18n="Empty state shown before a project is chosen@@shell.noProjectSelected"
+                     class="text-sm">Select a project to see its documents</div>
               </div>
             } @else if (documentService.loading()) {
               <app-skeleton type="card" [count]="6" />
@@ -210,8 +223,9 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
               <div
                 class="flex flex-col items-center justify-center h-48 text-gray-400"
               >
-                <div class="text-4xl mb-3">📄</div>
-                <div class="text-sm">
+                <div class="text-4xl mb-3" aria-hidden="true">📄</div>
+                <div i18n="Empty state for a project with no documents. The named control must match the Upload button.@@shell.noDocuments"
+                     class="text-sm">
                   No documents yet. Click Upload to add files.
                 </div>
               </div>
@@ -234,8 +248,8 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
                         (click)="
                           confirmDeleteDocument(doc); $event.stopPropagation()
                         "
-                        title="Delete document"
-                        class="absolute top-1.5 right-1.5 z-10 opacity-0 group-hover:opacity-100
+                        i18n-title="@@shell.deleteDocumentHint" title="Delete document"
+                        class="absolute top-1.5 end-1.5 z-10 opacity-0 group-hover:opacity-100
                                w-6 h-6 rounded bg-white/90 border border-gray-200 text-xs
                                text-gray-400 hover:text-red-600 hover:border-red-300 transition-opacity"
                       >
@@ -251,7 +265,7 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
                       <button
                         type="button"
                         (click)="openDocument(doc); $event.stopPropagation()"
-                        class="text-xs font-semibold text-gray-800 truncate w-full text-left bg-transparent border-0 p-0 cursor-pointer"
+                        class="text-xs font-semibold text-gray-800 truncate w-full text-start bg-transparent border-0 p-0 cursor-pointer"
                       >
                         {{ doc.name }}
                       </button>
@@ -270,14 +284,14 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
                             (click)="$event.stopPropagation()"
                             (change)="changeStatus(doc, $event)"
                             [disabled]="statusUpdatingId() === doc.id"
-                            title="Change status"
+                            i18n-title="@@shell.changeStatusHint" title="Change status"
                             class="text-xs px-1 py-0.5 rounded font-semibold border-0 cursor-pointer
                                    focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
                             [style]="statusStyle(doc.status)"
                           >
                             @for (status of documentStatuses; track status) {
                               <option [value]="status">
-                                {{ status.replace("_", " ") }}
+                                {{ statusLabel(status) }}
                               </option>
                             }
                           </select>
@@ -285,7 +299,7 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
                           <span
                             class="text-xs px-1.5 py-0.5 rounded font-semibold"
                             [style]="statusStyle(doc.status)"
-                            >{{ doc.status.replace("_", " ") }}</span
+                            >{{ statusLabel(doc.status) }}</span
                           >
                         }
                       </div>
@@ -306,12 +320,13 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
       >
         <div class="bg-white rounded-lg shadow-2xl p-7 w-96">
           <h3 class="font-semibold text-gray-800 mb-5">
-            {{ editingProject() ? "✎ Edit Project" : "📁 New Project" }}
+            {{ editingProject() ? editProjectTitle : newProjectTitle }}
           </h3>
 
           <div class="space-y-3 mb-5">
             <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1"
+              <label i18n="The asterisk marks the field as required@@shell.projectNameLabel"
+                     class="block text-xs font-medium text-gray-600 mb-1"
                 >Project Name *</label
               >
               <input
@@ -321,7 +336,8 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
               />
             </div>
             <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1"
+              <label i18n="@@shell.projectDescriptionLabel"
+                     class="block text-xs font-medium text-gray-600 mb-1"
                 >Description</label
               >
               <textarea
@@ -333,7 +349,8 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
             </div>
             <div class="grid grid-cols-2 gap-2">
               <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1"
+                <label i18n="Which stage of its life a construction project is in@@shell.projectPhaseLabel"
+                       class="block text-xs font-medium text-gray-600 mb-1"
                   >Phase</label
                 >
                 <select
@@ -342,17 +359,19 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
                   class="w-full px-2 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 >
                   @for (phase of projectPhases; track phase) {
-                    <option [value]="phase">{{ phase }}</option>
+                    <option [value]="phase">{{ phaseLabel(phase) }}</option>
                   }
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1"
+                <label i18n="Where the project is being built@@shell.projectLocationLabel"
+                       class="block text-xs font-medium text-gray-600 mb-1"
                   >Location</label
                 >
                 <input
                   [(ngModel)]="projectForm.location"
                   name="projectLocation"
+                  i18n-placeholder="Example of a place name — replace with one familiar in the target locale@@shell.projectLocationPlaceholder"
                   placeholder="Manchester"
                   class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 />
@@ -371,6 +390,7 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
           <div class="flex gap-2 justify-end">
             <button
               (click)="closeProjectDialog()"
+              i18n="@@shell.cancelProjectDialog"
               class="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
             >
               Cancel
@@ -382,10 +402,10 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
             >
               {{
                 savingProject()
-                  ? "Saving..."
+                  ? savingProjectLabel
                   : editingProject()
-                    ? "Save Changes"
-                    : "Create"
+                    ? saveChangesLabel
+                    : createProjectLabel
               }}
             </button>
           </div>
@@ -400,9 +420,10 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
       >
         <div class="bg-white rounded-lg shadow-2xl p-7 w-96">
           <h3 class="font-semibold text-gray-800 mb-2">
-            Delete {{ target.kind }}?
+            {{ deleteTitle(target.kind) }}
           </h3>
-          <p class="text-sm text-gray-600 mb-1">
+          <p i18n="Names the thing about to be deleted@@shell.deleteWarning"
+             class="text-sm text-gray-600 mb-1">
             <span class="font-medium">{{ target.name }}</span> will be
             permanently deleted.
           </p>
@@ -410,10 +431,12 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
             <p
               class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-4"
             >
-              Documents belonging to this project are deleted with it.
+              <ng-container i18n="Extra warning when deleting a project rather than one document@@shell.deleteProjectCascade"
+                >Documents belonging to this project are deleted with it.</ng-container
+              >
             </p>
           } @else {
-            <p class="text-xs text-gray-500 mb-4">This cannot be undone.</p>
+            <p i18n="@@shell.deleteIrreversible" class="text-xs text-gray-500 mb-4">This cannot be undone.</p>
           }
 
           @if (deleteError()) {
@@ -427,6 +450,7 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
           <div class="flex gap-2 justify-end">
             <button
               (click)="cancelDelete()"
+              i18n="@@shell.cancelDelete"
               class="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
             >
               Cancel
@@ -436,7 +460,7 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
               [disabled]="deleting()"
               class="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 font-semibold"
             >
-              {{ deleting() ? "Deleting..." : "Delete" }}
+              {{ deleting() ? deletingLabel : deleteLabel }}
             </button>
           </div>
         </div>
@@ -449,7 +473,12 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
         class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
       >
         <div class="bg-white rounded-lg shadow-2xl p-7 w-96">
-          <h3 class="font-semibold text-gray-800 mb-5">📂 Upload Document</h3>
+          <h3 class="font-semibold text-gray-800 mb-5">
+            <span aria-hidden="true">📂</span>
+            <ng-container i18n="Heading of the upload dialog@@shell.uploadHeading"
+              >Upload Document</ng-container
+            >
+          </h3>
 
           <!-- Drop zone -->
           <!-- A button wrapping the drop target, so choosing a file works from
@@ -463,13 +492,15 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
             (drop)="onDrop($event)"
             class="w-full border-2 border-dashed border-gray-300 rounded-md p-6 text-center text-gray-500 text-sm cursor-pointer hover:border-accent hover:bg-blue-50 transition-colors mb-4"
           >
-            <div class="text-2xl mb-2">📄</div>
+            <div class="text-2xl mb-2" aria-hidden="true">📄</div>
             @if (selectedFile()) {
               <div class="text-accent font-medium">
-                📎 {{ selectedFile()!.name }}
+                <span aria-hidden="true">📎</span> {{ selectedFile()!.name }}
               </div>
             } @else {
-              Click to browse or drag & drop
+              <ng-container i18n="Prompt inside the file drop zone. Both routes work — clicking opens a file picker, and dragging is the pointer shortcut.@@shell.dropZonePrompt"
+                >Click to browse or drag &amp; drop</ng-container
+              >
             }
           </button>
           <input
@@ -482,7 +513,8 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
 
           <div class="space-y-3 mb-5">
             <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1"
+              <label i18n="The asterisk marks the field as required@@shell.documentNameLabel"
+                     class="block text-xs font-medium text-gray-600 mb-1"
                 >Document Name *</label
               >
               <input
@@ -493,27 +525,30 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
             </div>
             <div class="grid grid-cols-2 gap-2">
               <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1"
+                <label i18n="What kind of document is being uploaded@@shell.documentTypeLabel"
+                       class="block text-xs font-medium text-gray-600 mb-1"
                   >Type</label
                 >
                 <select
                   [(ngModel)]="uploadMeta.documentType"
                   class="w-full px-2 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 >
-                  <option value="BIM_MODEL">BIM Model</option>
-                  <option value="DRAWING">Drawing</option>
-                  <option value="SPECIFICATION">Specification</option>
-                  <option value="REPORT">Report</option>
-                  <option value="SCHEDULE">Schedule</option>
-                  <option value="OTHER">Other</option>
+                  <option value="BIM_MODEL" i18n="Document type — a three-dimensional building information model. BIM is an industry term and usually stays as it is.@@documentType.bimModel">BIM Model</option>
+                  <option value="DRAWING" i18n="Document type — a technical drawing@@documentType.drawing">Drawing</option>
+                  <option value="SPECIFICATION" i18n="Document type — a written specification@@documentType.specification">Specification</option>
+                  <option value="REPORT" i18n="Document type — a report@@documentType.report">Report</option>
+                  <option value="SCHEDULE" i18n="Document type — a tabulated list, such as a door or window schedule. Not a timetable.@@documentType.schedule">Schedule</option>
+                  <option value="OTHER" i18n="Document type — anything not covered by the other options@@documentType.other">Other</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1"
+                <label i18n="Which revision of the document this upload is@@shell.revisionLabel"
+                       class="block text-xs font-medium text-gray-600 mb-1"
                   >Revision</label
                 >
                 <input
                   [(ngModel)]="uploadMeta.revision"
+                  i18n-placeholder="Example revision identifier — revisions are commonly lettered@@shell.revisionPlaceholder"
                   placeholder="A"
                   class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 />
@@ -524,6 +559,7 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
           <div class="flex gap-2 justify-end">
             <button
               (click)="closeUpload()"
+              i18n="@@shell.cancelUpload"
               class="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
             >
               Cancel
@@ -533,7 +569,7 @@ import { ChunkedUploadService } from "../../core/services/chunked-upload.service
               [disabled]="!selectedFile() || uploading()"
               class="px-4 py-2 text-sm bg-accent text-white rounded hover:bg-blue-700 disabled:opacity-50 font-semibold"
             >
-              {{ uploading() ? "Uploading..." : "Upload" }}
+              {{ uploading() ? uploadingLabel : uploadLabel }}
             </button>
           </div>
         </div>
@@ -567,6 +603,63 @@ export class ShellComponent implements OnInit {
   uploading = signal(false);
   selectedFile = signal<File | null>(null);
   uploadMeta: Partial<Document> = { documentType: "DRAWING" };
+
+  /**
+   * Display names for the two enumerations the interface shows.
+   *
+   * <p>The server stores `IN_REVIEW` and `CONSTRUCTION`; the interface used to
+   * render them by swapping the underscore for a space, which is legible in
+   * English and meaningless anywhere else. These are what a user reads, so
+   * they are messages.
+   *
+   * <p>Falling back to the raw value matters: the server may add a phase or a
+   * status before this table knows about it, and showing `HANDOVER` is far
+   * better than showing a blank chip.
+   */
+  private readonly phaseLabels: Record<string, string> = {
+    CONCEPT: $localize`:Project phase — early ideas, before design proper@@projectPhase.concept:Concept`,
+    DESIGN: $localize`:Project phase — the design is being produced@@projectPhase.design:Design`,
+    CONSTRUCTION: $localize`:Project phase — the asset is being built@@projectPhase.construction:Construction`,
+    HANDOVER: $localize`:Project phase — the finished asset is being handed to its owner@@projectPhase.handover:Handover`,
+    OPERATION: $localize`:Project phase — the asset is in use and being maintained@@projectPhase.operation:Operation`,
+  };
+
+  private readonly statusLabels: Record<string, string> = {
+    DRAFT: $localize`:Document status — not yet issued for review@@documentStatus.draft:Draft`,
+    IN_REVIEW: $localize`:Document status — issued and being reviewed@@documentStatus.inReview:In review`,
+    APPROVED: $localize`:Document status — reviewed and authorised for use@@documentStatus.approved:Approved`,
+    SUPERSEDED: $localize`:Document status — replaced by a later revision@@documentStatus.superseded:Superseded`,
+  };
+
+  phaseLabel(phase: string): string {
+    return this.phaseLabels[phase] ?? phase;
+  }
+
+  statusLabel(status: string): string {
+    return this.statusLabels[status] ?? status;
+  }
+
+  /** Heading of the delete dialog, which differs by what is being deleted. */
+  deleteTitle(kind: "project" | "document"): string {
+    // Two whole messages rather than "Delete {kind}?" with the English noun
+    // interpolated: gender and article agreement do not survive that, and the
+    // translator never sees the word that lands in the gap.
+    return kind === "project"
+      ? $localize`:Heading of the confirmation before deleting a project@@shell.deleteProjectTitle:Delete project?`
+      : $localize`:Heading of the confirmation before deleting a document@@shell.deleteDocumentTitle:Delete document?`;
+  }
+
+  /** Dialog titles and button labels, which live in expressions. */
+  readonly newProjectTitle = $localize`:Heading of the dialog for creating a project@@shell.newProjectTitle:📁 New Project`;
+  readonly editProjectTitle = $localize`:Heading of the dialog for editing a project@@shell.editProjectTitle:✎ Edit Project`;
+  readonly createProjectLabel = $localize`:Creates the project@@shell.createProject:Create`;
+  readonly saveChangesLabel = $localize`:Saves edits to an existing project@@shell.saveChanges:Save Changes`;
+  readonly savingProjectLabel = $localize`:Project dialog's submit button while the request is in flight@@shell.savingProject:Saving...`;
+  readonly deleteLabel = $localize`:Confirms the deletion@@shell.delete:Delete`;
+  readonly deletingLabel = $localize`:Delete button while the request is in flight@@shell.deleting:Deleting...`;
+  readonly uploadLabel = $localize`:Starts the upload@@shell.uploadAction:Upload`;
+  readonly uploadingLabel = $localize`:Upload button while the file is being sent@@shell.uploading:Uploading...`;
+  readonly selectProjectLabel = $localize`:Stands in for the project name before one is chosen@@shell.selectProject:Select a project`;
 
   readonly projectPhases: ProjectPhase[] = [
     "CONCEPT",
@@ -656,7 +749,9 @@ export class ShellComponent implements OnInit {
   saveProject() {
     const name = this.projectForm.name?.trim();
     if (!name) {
-      this.projectError.set("Project name is required.");
+      this.projectError.set(
+        $localize`:Validation message in the project dialog@@shell.projectNameRequired:Project name is required.`,
+      );
       return;
     }
 
@@ -679,7 +774,9 @@ export class ShellComponent implements OnInit {
         this.projectError.set(
           typeof err.error === "string" && err.error.trim()
             ? err.error
-            : `Could not ${existing ? "update" : "create"} the project.`,
+            : existing
+              ? $localize`:Fallback when saving edits to a project fails@@shell.updateProjectFailed:Could not update the project.`
+              : $localize`:Fallback when creating a project fails@@shell.createProjectFailed:Could not create the project.`,
         );
       },
     });
@@ -723,7 +820,11 @@ export class ShellComponent implements OnInit {
       },
       error: () => {
         this.deleting.set(false);
-        this.deleteError.set(`Could not delete the ${target.kind}.`);
+        this.deleteError.set(
+          target.kind === "project"
+            ? $localize`:Fallback when deleting a project fails@@shell.deleteProjectFailed:Could not delete the project.`
+            : $localize`:Fallback when deleting a document fails@@shell.deleteDocumentFailed:Could not delete the document.`,
+        );
       },
     });
   }

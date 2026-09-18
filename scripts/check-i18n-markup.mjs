@@ -39,8 +39,6 @@ const ROOTS = ['src/app', 'src/viewer-core'];
  * below will tell you if you forget.
  */
 const NOT_YET_TRANSLATED = new Set([
-  'src/app/features/compare/compare.component.ts',
-  'src/app/features/projects/shell.component.ts',
 ]);
 
 /** Every non-spec TypeScript file under a directory, recursively. */
