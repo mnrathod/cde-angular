@@ -1,10 +1,7 @@
 import { Component, inject, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { ViewerStateService, SidebarTab, SearchResult } from '../../../../viewer-core/viewer-state.service';
-import { DrawingMatch } from '../../../../viewer-core/drawing-search.service';
+import { ViewerStateService, SidebarTab } from '../../../../viewer-core/viewer-state.service';
 import { IconComponent, IconName } from '../../../../viewer-core/icon.component';
-import { AnnotationService } from '../../../core/services/viewer/annotation.service';
 import { AnnotationThreadComponent } from '../markup/annotation-thread.component';
 import { DocumentSignatureComponent } from '../markup/document-signature.component';
 import { PdfFormComponent } from '../markup/pdf-form.component';
@@ -12,17 +9,20 @@ import { VersionHistoryComponent } from '../markup/version-history.component';
 import { PageOrganiserComponent } from '../markup/page-organiser.component';
 import { RedactionPanelComponent } from '../markup/redaction-panel.component';
 import { OutlinePanelComponent } from '../../../../viewer-core/outline-panel.component';
+import { AnnotationsPanelComponent } from './annotations-panel.component';
+import { DocumentSearchPanelComponent } from './document-search-panel.component';
+import { MeasurementsPanelComponent } from './measurements-panel.component';
 import { Annotation } from '../../../core/models';
-import { abbreviatedPageLabel } from '../../../../viewer-core/page-labels';
 
 @Component({
   selector: 'app-viewer-sidebar',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, AnnotationThreadComponent,
+    CommonModule, AnnotationThreadComponent,
     DocumentSignatureComponent, PdfFormComponent, VersionHistoryComponent,
     PageOrganiserComponent, RedactionPanelComponent, OutlinePanelComponent,
-    IconComponent
+    IconComponent, AnnotationsPanelComponent, DocumentSearchPanelComponent,
+    MeasurementsPanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -52,78 +52,8 @@ import { abbreviatedPageLabel } from '../../../../viewer-core/page-labels';
         }
       </div>
 
-      <!-- Annotations tab -->
       @if (state.sidebarTab() === 'annotations') {
-        <div class="flex-1 overflow-y-auto">
-          @if (state.annotations().length === 0 && state.shapes().length === 0) {
-            <div i18n="Empty state for the markup panel. The line break separates the statement from the next action.@@sidebar.noAnnotations"
-                 class="text-center text-gray-400 text-xs py-10 px-3">
-              No annotations yet.<br>Use the toolbar to add markup.
-            </div>
-          }
-
-          <!-- Unsaved shapes -->
-          @if (state.dirty() && state.shapes().length > 0) {
-            <div class="px-3 pt-2">
-              <div class="text-xs font-semibold text-amber-600 mb-1.5 flex items-center gap-1">
-                <span class="w-2 h-2 rounded-full bg-amber-400 inline-block" aria-hidden="true"></span>
-                <ng-container i18n="Heading over markup drawn but not yet saved, with how many@@sidebar.unsavedCount"
-                  >Unsaved ({{ state.shapes().length }})</ng-container
-                >
-              </div>
-              @for (s of state.shapes(); track s.id) {
-                <div class="flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 group mb-1">
-                  <div class="w-3 h-3 rounded-sm flex-shrink-0" [style.background]="s.color"></div>
-                  <span class="text-xs text-gray-600 flex-1 capitalize">{{ s.tool }}{{ s.text ? ': ' + s.text : '' }}</span>
-                  <span class="text-xs text-gray-400">{{ pageShort(s.pageNumber) }}</span>
-                  <button (click)="state.removeShape(s.id)"
-                    i18n-aria-label="@@sidebar.removeShape"
-                    aria-label="Remove this markup"
-                    class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs ms-1">✕</button>
-                </div>
-              }
-            </div>
-          }
-
-          <!-- Saved annotations -->
-          @if (state.annotations().length > 0) {
-            <div class="px-3 pt-2">
-              <div i18n="Heading over markup already saved to the server, with how many@@sidebar.savedCount"
-                   class="text-xs font-semibold text-gray-500 mb-1.5">
-                Saved ({{ state.annotations().length }})
-              </div>
-              @for (ann of state.annotations(); track ann.id) {
-                <div class="p-2 rounded border-s-2 mb-1.5 text-xs hover:bg-gray-50 cursor-pointer"
-                     [style.border-inline-start-color]="getAnnotationColor(ann)"
-                     (click)="goToPage(ann.pageNumber)">
-                  <div class="flex items-center justify-between gap-1">
-                    <span class="font-medium text-gray-700">{{ ann.authorName }}</span>
-                    <span class="text-gray-400">{{ pageShort(ann.pageNumber) }}</span>
-                  </div>
-                  @if (ann.comment) {
-                    <div class="text-gray-500 mt-0.5 truncate">{{ ann.comment }}</div>
-                  }
-                  <div class="flex items-center justify-between mt-1">
-                    <span class="px-1.5 py-0.5 rounded text-xs font-semibold"
-                      [class]="ann.status === 'OPEN' ? 'bg-amber-100 text-amber-700'
-                               : ann.status === 'RESOLVED' ? 'bg-green-100 text-green-700'
-                               : 'bg-gray-100 text-gray-500'">
-                      {{ ann.status }}
-                    </span>
-                    @if (ann.status === 'OPEN') {
-                      <button (click)="resolve(ann); $event.stopPropagation()"
-                        class="text-xs text-green-600 hover:text-green-700"
-                        ><span aria-hidden="true">✓</span>
-                        <ng-container i18n="Closes an annotation as dealt with@@sidebar.resolve"
-                          >Resolve</ng-container
-                        ></button>
-                    }
-                  </div>
-                </div>
-              }
-            </div>
-          }
-        </div>
+        <app-annotations-panel (pageRequested)="goToPage($event)" />
       }
 
       <!-- Threads tab -->
@@ -150,60 +80,8 @@ import { abbreviatedPageLabel } from '../../../../viewer-core/page-labels';
         </div>
       }
 
-      <!-- Measurements tab -->
       @if (state.sidebarTab() === 'measure') {
-        <div class="flex-1 overflow-y-auto p-3">
-          <div class="flex items-center justify-between mb-1">
-            <span i18n="@@sidebar.measurementsHeading" class="text-sm font-semibold text-gray-800">Measurements</span>
-            @if (state.measurements().length > 0) {
-              <button (click)="state.clearMeasurements()"
-                i18n="Discards every measurement in the list@@sidebar.clearMeasurements"
-                class="text-xs text-red-500 hover:text-red-700">Clear</button>
-            }
-          </div>
-
-          <div class="flex items-center justify-between text-xs mb-3 p-2 rounded border"
-               [class]="state.isCalibrated()
-                 ? 'bg-green-50 border-green-200 text-green-800'
-                 : 'bg-amber-50 border-amber-200 text-amber-800'">
-            <span i18n="How many real-world units one screen pixel represents@@sidebar.scaleLabel">Scale</span>
-            <span class="font-mono">
-              {{ state.isCalibrated() ? calibratedScale() : uncalibratedLabel }}
-            </span>
-          </div>
-
-          @if (!state.isCalibrated()) {
-            <p i18n="Explains why measurements are in pixels. The emphasised word must match the toolbar's Calibrate label.@@sidebar.calibrateHint"
-               class="text-xs text-gray-500 mb-3">
-              Results are in pixels. Use <span class="font-medium">Calibrate</span> in the
-              toolbar and draw a line over a known distance to read real units.
-            </p>
-          }
-
-          @if (state.measurements().length === 0) {
-            <div i18n="Empty state for the measurements panel. The three names must match the toolbar's tool labels.@@sidebar.noMeasurements"
-                 class="text-center text-gray-400 text-xs py-6">
-              No measurements yet. Use Measure, Area or Radius.
-            </div>
-          } @else {
-            @for (m of state.measurements(); track m.id) {
-              <div class="p-2 rounded border border-gray-100 mb-1.5 group hover:bg-gray-50">
-                <div class="flex items-start gap-2">
-                  <div class="flex-1 min-w-0">
-                    <div class="text-sm font-mono font-semibold text-gray-800">{{ m.value }}</div>
-                    <div class="text-xs text-gray-500">
-                      {{ m.kind }} · {{ m.detail }} · {{ pageShort(m.page) }}
-                    </div>
-                  </div>
-                  <button (click)="state.removeMeasurement(m.id)"
-                    class="opacity-0 group-hover:opacity-100 text-xs text-gray-400 hover:text-red-600"
-                    i18n-title="@@sidebar.removeMeasurement"
-                    title="Remove from list">✕</button>
-                </div>
-              </div>
-            }
-          }
-        </div>
+        <app-measurements-panel />
       }
 
       <!-- Form fields tab -->
@@ -234,69 +112,16 @@ import { abbreviatedPageLabel } from '../../../../viewer-core/page-labels';
       }
 
       @if (state.sidebarTab() === 'search') {
-        <div class="flex flex-col h-full">
-          <div class="p-3 border-b border-gray-200">
-            <div class="flex gap-1">
-              <input
-                [ngModel]="state.searchQuery()"
-                (ngModelChange)="state.searchQuery.set($event)"
-                (keydown.enter)="doSearch()"
-                i18n-placeholder="@@sidebar.searchPlaceholder"
-                placeholder="Search document..."
-                class="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-accent" />
-              <button (click)="doSearch()"
-                i18n="Runs the document search. Very short — it sits beside the search box.@@sidebar.searchGo"
-                class="px-2 py-1.5 text-xs bg-accent text-white rounded hover:bg-blue-700">Go</button>
-            </div>
-            @if (state.searchResults().length > 0) {
-              <div i18n="How many search hits were found@@sidebar.searchMatchCount"
-                   class="text-xs text-gray-500 mt-1">
-                {state.searchResults().length, plural, =1 {1 match} other {{{ state.searchResults().length }} matches}}
-              </div>
-            }
-          </div>
-          <div class="flex-1 overflow-y-auto">
-            @for (result of state.searchResults(); track $index) {
-              <!-- A search hit navigates the document, so it is a button.
-                   Keyboard users search more than most, and a result list that
-                   cannot be reached by Tab makes search itself unusable. -->
-              <button type="button" (click)="goToSearchResult(result)"
-                class="w-full text-start px-3 py-2 text-xs border-b border-gray-100 cursor-pointer hover:bg-blue-50">
-                @if (state.totalPages() > 1) {
-                  <div i18n="Which page a search hit is on@@sidebar.searchResultPage"
-                       class="font-medium text-gray-600 mb-0.5">Page {{ result.pageIndex }}</div>
-                }
-                <div class="text-gray-500">{{ snippetOf(result) }}</div>
-              </button>
-            }
-            <!--
-              "No matches found" is only true when there was something to look
-              through. A drawing whose text has not been indexed, or an image,
-              has nothing to search, and saying so is the difference between a
-              document that holds no match and a viewer that cannot look.
-            -->
-            @if (state.searchQuery() && state.searchResults().length === 0) {
-              @if (state.searchable()) {
-                <div i18n="Search found nothing, in a document that does have searchable text@@sidebar.noMatches"
-                     class="text-center text-gray-400 text-xs py-8">No matches found</div>
-              } @else {
-                <div i18n="Search is impossible — a scan or a drawing with no text layer@@sidebar.notSearchable"
-                     class="text-center text-gray-400 text-xs py-8 px-4">
-                  This document has no text to search.
-                </div>
-              }
-            }
-          </div>
-        </div>
+        <app-document-search-panel
+          (searchRequested)="doSearch()"
+          (pageRequested)="goToPage($event)"
+        />
       }
     </div>
   `
 })
 export class ViewerSidebarComponent {
-  pageShort = abbreviatedPageLabel;
-
   state      = inject(ViewerStateService);
-  annService = inject(AnnotationService);
 
   @Output() pageSelected = new EventEmitter<number>();
 
@@ -322,52 +147,9 @@ export class ViewerSidebarComponent {
     { id: 'versions',    icon: 'history',    label: $localize`:Sidebar tab — version history. Very short; truncates past about seven characters.@@sidebarTab.versions:History` },
   ];
 
-  /**
-   * The measurement scale, as shown beside the "Scale" label.
-   *
-   * <p>In a method rather than in the template because it is an expression,
-   * which `i18n` cannot mark. The number is formatted before it reaches the
-   * message so a translator never has to reason about decimal places.
-   */
-  calibratedScale(): string {
-    const scale = this.state.measurementScale();
-    const ratio = scale.unitsPerPixel.toFixed(5);
-    const unit = scale.unit;
-    return $localize`:How much one screen pixel is worth, e.g. "1px = 0.00423 m"@@sidebar.scaleValue:1px = ${ratio}:ratio: ${unit}:unit:`;
-  }
-
-  /** Shown in place of a scale until someone calibrates against a known distance. */
-  readonly uncalibratedLabel = $localize`:Shown where the measurement scale would be, before calibration@@sidebar.uncalibrated:uncalibrated`;
-
   goToPage(page: number) {
     this.state.navigateTo(page);
     this.pageSelected.emit(page);
-  }
-
-  /**
-   * How a result reads in the list.
-   *
-   * A PDF match is a window cut out of the page's text, so it usually begins
-   * and ends mid-sentence and is bracketed to say so. A drawing match is a
-   * whole label, and bracketing it would suggest text that is not there.
-   */
-  snippetOf(result: SearchResult): string {
-    return (result as DrawingMatch).item ? result.text : `…${result.text}…`;
-  }
-
-  /**
-   * Show the match. A PDF scrolls to the page; a drawing has one sheet, so it
-   * marks the hit where it sits and brings that into view instead.
-   */
-  goToSearchResult(result: SearchResult) {
-    this.state.searchIndex.set(result.matchIndex);
-
-    const hit = (result as DrawingMatch).item;
-    if (hit) {
-      this.state.searchFocus.set(hit);
-      return;
-    }
-    this.goToPage(result.pageIndex);
   }
 
   doSearch() {
@@ -375,18 +157,4 @@ export class ViewerSidebarComponent {
     this.pageSelected.emit(-1);  // signal "run search"
   }
 
-  resolve(ann: Annotation) {
-    this.annService.resolveAnnotation(ann.id).subscribe(updated => {
-      this.state.annotations.update(anns =>
-        anns.map(a => a.id === updated.id ? updated : a)
-      );
-    });
-  }
-
-  getAnnotationColor(ann: Annotation): string {
-    try {
-      const data = JSON.parse(ann.shapeData);
-      return data.color || '#1e5fbe';
-    } catch { return '#1e5fbe'; }
-  }
 }
