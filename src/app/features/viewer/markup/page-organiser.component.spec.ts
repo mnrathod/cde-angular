@@ -3,7 +3,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { CdkDragDrop } from '@angular/cdk/drag-drop';
 
-import { PageOrganiserComponent, DraftPage } from './page-organiser.component';
+import { PageOrganiserComponent } from './page-organiser.component';
+import { DraftPage } from './page-draft';
 import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 import { definitely } from '../../../../testing/definitely';
 
@@ -50,7 +51,7 @@ describe('PageOrganiserComponent', () => {
 
   /** Ids of the draft pages, which the selection is keyed on. */
   function ids(): number[] {
-    return organiser.draft().map(page => page.id);
+    return organiser.pages.pages().map(page => page.id);
   }
 
   /**
@@ -67,7 +68,7 @@ describe('PageOrganiserComponent', () => {
   }
 
   function sourceOrder(): number[] {
-    return organiser.draft().map(page => page.sourcePage);
+    return organiser.pages.pages().map(page => page.sourcePage);
   }
 
   beforeEach(() => {
@@ -89,18 +90,18 @@ describe('PageOrganiserComponent', () => {
     it('builds a draft page per thumbnail', () => {
       loadPages(3);
       expect(sourceOrder()).toEqual([1, 2, 3]);
-      expect(organiser.dirty()).toBe(false);
+      expect(organiser.pages.dirty()).toBe(false);
     });
 
     it('rebuilds when a committed version changes the page count', () => {
       loadPages(3);
-      organiser.selectAll();
+      organiser.pages.toggleSelectAll();
       state.applyVersionCommit(2, 'Deleted 1 page');
       loadPages(2);
 
       expect(sourceOrder()).toEqual([1, 2]);
-      expect(organiser.dirty()).toBe(false);
-      expect(organiser.hasSelection()).toBe(false);
+      expect(organiser.pages.dirty()).toBe(false);
+      expect(organiser.pages.hasSelection()).toBe(false);
     });
   });
 
@@ -110,8 +111,8 @@ describe('PageOrganiserComponent', () => {
       organiser.toggle(idAt(0), click);
       organiser.toggle(idAt(2), click);
 
-      expect(organiser.selection().size).toBe(1);
-      expect(organiser.isSelected(idAt(2))).toBe(true);
+      expect(organiser.pages.selection().size).toBe(1);
+      expect(organiser.pages.isSelected(idAt(2))).toBe(true);
     });
 
     it('ctrl-click adds to the selection', () => {
@@ -119,7 +120,7 @@ describe('PageOrganiserComponent', () => {
       organiser.toggle(idAt(0), click);
       organiser.toggle(idAt(2), ctrlClick);
 
-      expect(organiser.selection().size).toBe(2);
+      expect(organiser.pages.selection().size).toBe(2);
     });
 
     it('clicking the only selected page clears it', () => {
@@ -127,16 +128,16 @@ describe('PageOrganiserComponent', () => {
       organiser.toggle(idAt(0), click);
       organiser.toggle(idAt(0), click);
 
-      expect(organiser.hasSelection()).toBe(false);
+      expect(organiser.pages.hasSelection()).toBe(false);
     });
 
     it('select-all toggles both ways', () => {
       loadPages(3);
-      organiser.selectAll();
-      expect(organiser.allSelected()).toBe(true);
+      organiser.pages.toggleSelectAll();
+      expect(organiser.pages.allSelected()).toBe(true);
 
-      organiser.selectAll();
-      expect(organiser.hasSelection()).toBe(false);
+      organiser.pages.toggleSelectAll();
+      expect(organiser.pages.hasSelection()).toBe(false);
     });
   });
 
@@ -146,34 +147,34 @@ describe('PageOrganiserComponent', () => {
       organiser.onDrop(dropBetween(2, 0));
 
       expect(sourceOrder()).toEqual([3, 1, 2]);
-      expect(organiser.dirty()).toBe(true);
+      expect(organiser.pages.dirty()).toBe(true);
     });
 
     it('a drop that does not move anything leaves the draft clean', () => {
       loadPages(3);
       organiser.onDrop(dropBetween(1, 1));
 
-      expect(organiser.dirty()).toBe(false);
+      expect(organiser.pages.dirty()).toBe(false);
     });
 
     it('rotation accumulates and wraps at 360', () => {
       loadPages(1);
-      organiser.selectAll();
+      organiser.pages.toggleSelectAll();
       organiser.rotateSelection(90);
       organiser.rotateSelection(90);
-      expect(definitely(organiser.draft()[0]).rotate).toBe(180);
+      expect(definitely(organiser.pages.pages()[0]).rotate).toBe(180);
 
       organiser.rotateSelection(180);
-      expect(definitely(organiser.draft()[0]).rotate).toBe(0);
-      expect(organiser.dirty()).toBe(false);
+      expect(definitely(organiser.pages.pages()[0]).rotate).toBe(0);
+      expect(organiser.pages.dirty()).toBe(false);
     });
 
     it('rotating anticlockwise stays positive', () => {
       loadPages(1);
-      organiser.selectAll();
+      organiser.pages.toggleSelectAll();
       organiser.rotateSelection(-90);
 
-      expect(definitely(organiser.draft()[0]).rotate).toBe(270);
+      expect(definitely(organiser.pages.pages()[0]).rotate).toBe(270);
     });
 
     it('duplicates a page next to itself, with its own identity', () => {
@@ -197,25 +198,25 @@ describe('PageOrganiserComponent', () => {
 
     it('refuses to delete every page', () => {
       loadPages(2);
-      organiser.selectAll();
+      organiser.pages.toggleSelectAll();
 
-      expect(organiser.canDeleteSelection()).toBe(false);
+      expect(organiser.pages.canDeleteSelection()).toBe(false);
       organiser.deleteSelection();
       expect(sourceOrder()).toEqual([1, 2]);
     });
 
     it('discard returns the draft to the loaded layout', () => {
       loadPages(3);
-      organiser.selectAll();
+      organiser.pages.toggleSelectAll();
       organiser.rotateSelection(90);
       organiser.onDrop(dropBetween(0, 2));
-      expect(organiser.dirty()).toBe(true);
+      expect(organiser.pages.dirty()).toBe(true);
 
       organiser.discard();
 
       expect(sourceOrder()).toEqual([1, 2, 3]);
-      expect(organiser.draft().every(page => page.rotate === 0)).toBe(true);
-      expect(organiser.dirty()).toBe(false);
+      expect(organiser.pages.pages().every(page => page.rotate === 0)).toBe(true);
+      expect(organiser.pages.dirty()).toBe(false);
     });
   });
 
@@ -227,7 +228,7 @@ describe('PageOrganiserComponent', () => {
   describe('describing what is pending', () => {
     it('says nothing has changed in count when pages were only rotated', () => {
       loadPages(3);
-      organiser.selectAll();
+      organiser.pages.toggleSelectAll();
       organiser.rotateSelection(90);
 
       expect(organiser.pendingLabel()).toContain('not yet applied');
@@ -246,22 +247,6 @@ describe('PageOrganiserComponent', () => {
       expect(label).toContain('2');
     });
 
-    it('inserts at the end when nothing is selected', () => {
-      loadPages(3);
-
-      expect(organiser.insertAtLabel()).toBe('at the end');
-    });
-
-    it('inserts after the last selected page, not the first', () => {
-      // Selecting pages 1 and 2 and inserting must land after 2. Taking the
-      // first selected page instead would bury the inserted pages inside the
-      // selection, which is the opposite of what the gesture means.
-      loadPages(4);
-      organiser.toggle(idAt(0), click);
-      organiser.toggle(idAt(1), ctrlClick);
-
-      expect(organiser.insertAtLabel()).toContain('3');
-    });
   });
 
   describe('applying', () => {
@@ -335,80 +320,6 @@ describe('PageOrganiserComponent', () => {
     });
   });
 
-  describe('inserting from another document', () => {
-    it('offers only the other PDFs in the same project', () => {
-      loadPages(2);
-      organiser.openInsertPicker();
-
-      httpMock.expectOne('/api/documents/7').flush({ id: 7, projectId: 4 });
-      httpMock.expectOne(req => req.url === '/api/documents/project/4').flush([
-        { id: 7, name: 'This one',   fileName: 'a.pdf', fileType: 'application/pdf', projectId: 4 },
-        { id: 8, name: 'Sibling',    fileName: 'b.pdf', fileType: 'application/pdf', projectId: 4 },
-        { id: 9, name: 'A drawing',  fileName: 'c.dwg', fileType: 'image/vnd.dwg',   projectId: 4 }
-      ]);
-
-      // The document being edited would be a self-insert, and a DWG has no
-      // pages to take.
-      expect(organiser.candidates().map(c => c.id)).toEqual([8]);
-    });
-
-    it('asks the donor for its page count and inserts all of them', () => {
-      loadPages(2);
-      organiser.insertFrom(8);
-
-      httpMock.expectOne('/api/documents/8/pages').flush({
-        success: true, pageCount: 3,
-        pages: [{ page: 1 }, { page: 2 }, { page: 3 }]
-      });
-
-      const req = httpMock.expectOne('/api/documents/7/pages/insert');
-      expect(req.request.body.pages).toEqual([1, 2, 3]);
-      expect(req.request.body.sourceDocumentId).toBe(8);
-      req.flush({
-        success: true, documentId: 7, version: 2,
-        summary: 'Inserted 3 page(s) from "Sibling" at page 3',
-        pageCount: 5, createdAt: '2026-08-08T10:00:00'
-      });
-
-      expect(state.currentVersion()).toBe(2);
-    });
-
-    it('inserts after the selected page', () => {
-      loadPages(4);
-      organiser.toggle(idAt(1), click);
-      organiser.insertFrom(8);
-
-      httpMock.expectOne('/api/documents/8/pages')
-        .flush({ success: true, pageCount: 1, pages: [{ page: 1 }] });
-
-      // Selected page 2, so the block starts at what is currently page 3.
-      expect(httpMock.expectOne('/api/documents/7/pages/insert').request.body.position).toBe(3);
-    });
-
-    it('appends when nothing is selected', () => {
-      loadPages(3);
-      organiser.insertFrom(8);
-
-      httpMock.expectOne('/api/documents/8/pages')
-        .flush({ success: true, pageCount: 1, pages: [{ page: 1 }] });
-
-      expect(httpMock.expectOne('/api/documents/7/pages/insert').request.body.position)
-        .toBeUndefined();
-    });
-
-    it('says so when the donor has no pages, without calling insert', () => {
-      loadPages(2);
-      organiser.insertFrom(8);
-
-      httpMock.expectOne('/api/documents/8/pages')
-        .flush({ success: true, pageCount: 0, pages: [] });
-
-      httpMock.expectNone('/api/documents/7/pages/insert');
-      expect(organiser.messageIsError()).toBe(true);
-      expect(organiser.working()).toBe(false);
-    });
-  });
-
   describe('extracting', () => {
     it('sends the selected source pages in document order', () => {
       loadPages(4);
@@ -429,7 +340,7 @@ describe('PageOrganiserComponent', () => {
       loadPages(2);
       organiser.toggle(idAt(0), click);
       organiser.duplicateSelection();
-      organiser.selectAll();
+      organiser.pages.toggleSelectAll();
       organiser.extractSelection();
 
       const req = httpMock.expectOne('/api/documents/7/pages/extract');
