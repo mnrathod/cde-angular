@@ -157,6 +157,42 @@ describe('PageOrganiserComponent', () => {
       expect(organiser.pages.dirty()).toBe(false);
     });
 
+    it('moves a page one place earlier from the keyboard', () => {
+      // The single-pointer alternative to the drag (SC 2.5.7). The card's
+      // buttons call this; what they are wired to has to actually move it.
+      loadPages(3);
+      organiser.moveTo(2, 1);
+
+      expect(sourceOrder()).toEqual([1, 3, 2]);
+    });
+
+    it('moves a page one place later from the keyboard', () => {
+      loadPages(3);
+      organiser.moveTo(0, 1);
+
+      expect(sourceOrder()).toEqual([2, 1, 3]);
+    });
+
+    it('refuses a move off the front of the document', () => {
+      // The card disables the button, but a guard here is what makes the
+      // draft safe from a caller that does not. Array.splice(-1, 0, page)
+      // silently inserts before the *last* page, which is a reordering
+      // nobody asked for rather than a failure anyone would notice.
+      loadPages(3);
+      organiser.moveTo(0, -1);
+
+      expect(sourceOrder()).toEqual([1, 2, 3]);
+      expect(organiser.pages.dirty()).toBe(false);
+    });
+
+    it('refuses a move off the end of the document', () => {
+      loadPages(3);
+      organiser.moveTo(2, 3);
+
+      expect(sourceOrder()).toEqual([1, 2, 3]);
+      expect(organiser.pages.dirty()).toBe(false);
+    });
+
     it('rotation accumulates and wraps at 360', () => {
       loadPages(1);
       organiser.pages.toggleSelectAll();
@@ -295,16 +331,16 @@ describe('PageOrganiserComponent', () => {
                  traceId: '4f8a1c2e9b7d6a5f3e2d1c0b9a8f7e6d' },
                { status: 422, statusText: 'Unprocessable Entity' });
 
-      expect(organiser.messageIsError()).toBe(true);
+      expect(organiser.operations.messageIsError()).toBe(true);
       // The reference is appended now: §1.4 requires a correlation identifier
       // the user can quote to support, and this is the only place they see
       // one. The server's sentence still leads — it is what tells them what to
       // do, and the identifier is only useful once they have given up doing it
       // themselves.
-      expect(organiser.message()).toBe(
+      expect(organiser.operations.message()).toBe(
         'A document must keep at least one page. Reference 4f8a1c2e9b7d6a5f3e2d1c0b9a8f7e6d.');
       expect(sourceOrder()).toEqual([2, 3]);
-      expect(organiser.working()).toBe(false);
+      expect(organiser.operations.working()).toBe(false);
     });
 
     it('names the converter when it is the thing that is down', () => {
@@ -316,7 +352,7 @@ describe('PageOrganiserComponent', () => {
       httpMock.expectOne('/api/documents/7/pages/arrange')
         .flush({}, { status: 503, statusText: 'Service Unavailable' });
 
-      expect(organiser.message()).toContain('conversion service');
+      expect(organiser.operations.message()).toContain('conversion service');
     });
   });
 
@@ -332,8 +368,8 @@ describe('PageOrganiserComponent', () => {
       req.flush({ success: true, documentId: 12, name: 'Plan (pages 1, 3)',
                   pageCount: 2, fileSize: 2048 });
 
-      expect(organiser.messageIsError()).toBe(false);
-      expect(organiser.message()).toContain('Plan (pages 1, 3)');
+      expect(organiser.operations.messageIsError()).toBe(false);
+      expect(organiser.operations.message()).toContain('Plan (pages 1, 3)');
     });
 
     it('sends a duplicated page once', () => {
