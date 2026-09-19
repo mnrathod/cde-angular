@@ -7,6 +7,10 @@
  */
 import {
   PdfRect,
+  formFieldDraftFrom,
+  onScreenBoxes,
+  redactionFrom,
+  rotatedFootprint,
   toPdfRect,
   toScreenRect,
 } from "./pdf-page-geometry";
@@ -130,6 +134,96 @@ describe("pdf page geometry", () => {
       expect(Number.isFinite(toScreenRect(stored, 0, A4_HEIGHT).screenY)).toBe(
         true,
       );
+    });
+  });
+
+  describe("turning a drawn box into something the server stores", () => {
+    const onPageThree = { page: 3, zoom: 1, renderedHeightPx: A4_HEIGHT };
+    const drawn = { x: 20, y: 100, width: 200, height: 50 };
+
+    it("tags a redaction with the page it was drawn on", () => {
+      const region = redactionFrom("r1", drawn, onPageThree);
+
+      expect(region.id).toBe("r1");
+      expect(region.page).toBe(3);
+      expect(region.y).toBe(692);
+    });
+
+    it("converts a field draft with the same arithmetic as a redaction", () => {
+      // The two differ in what they carry, never in where they sit. A box
+      // drawn once must not land in two places depending on the tool.
+      const region = redactionFrom("r1", drawn, onPageThree);
+      const draft = formFieldDraftFrom("f1", drawn, onPageThree);
+
+      expect({ x: draft.x, y: draft.y, width: draft.width, height: draft.height })
+        .toEqual({ x: region.x, y: region.y, width: region.width, height: region.height });
+    });
+
+    it("leaves a field draft unnamed for the Form panel to name", () => {
+      const draft = formFieldDraftFrom("f1", drawn, onPageThree);
+
+      expect(draft.name).toBe("");
+      expect(draft.required).toBe(false);
+    });
+  });
+
+  describe("picking the boxes that belong on a page", () => {
+    const stored = [
+      { id: "a", page: 1, x: 10, y: 700, width: 30, height: 40 },
+      { id: "b", page: 2, x: 10, y: 700, width: 30, height: 40 },
+      { id: "c", page: 1, x: 50, y: 600, width: 30, height: 40 },
+    ];
+
+    it("leaves out the boxes drawn on another page", () => {
+      const onPageOne = onScreenBoxes(stored, {
+        page: 1,
+        zoom: 1,
+        renderedHeightPx: A4_HEIGHT,
+      });
+
+      expect(onPageOne.map((box) => box.id)).toEqual(["a", "c"]);
+    });
+
+    it("gives each box its position in the pixels on screen now", () => {
+      const [first] = onScreenBoxes(stored, {
+        page: 1,
+        zoom: 2,
+        renderedHeightPx: A4_HEIGHT * 2,
+      });
+
+      expect(first?.screenY).toBe((A4_HEIGHT - 700 - 40) * 2);
+      expect(first?.screenWidth).toBe(60);
+    });
+
+    it("keeps whatever else a box was carrying", () => {
+      // A field draft's name is drawn beside it, so dropping the rest of the
+      // record while converting would label every field with nothing.
+      const drafts = [{ id: "f1", page: 1, name: "Signature", x: 0, y: 0, width: 1, height: 1 }];
+
+      const [converted] = onScreenBoxes(drafts, {
+        page: 1,
+        zoom: 1,
+        renderedHeightPx: A4_HEIGHT,
+      });
+
+      expect(converted?.name).toBe("Signature");
+    });
+  });
+
+  describe("the space a rotated page needs", () => {
+    it("swaps width and height on a quarter turn", () => {
+      // Without the swap the pages either side of a landscape one overlap it.
+      expect(rotatedFootprint(true, 595, A4_HEIGHT)).toEqual({
+        width: A4_HEIGHT,
+        height: 595,
+      });
+    });
+
+    it("leaves an upright page alone", () => {
+      expect(rotatedFootprint(false, 595, A4_HEIGHT)).toEqual({
+        width: 595,
+        height: A4_HEIGHT,
+      });
     });
   });
 });

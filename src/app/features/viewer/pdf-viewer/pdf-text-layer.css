@@ -1,0 +1,64 @@
+/*
+ * Styling for the text layer pdf.js builds over a rendered page.
+ *
+ * Derived from pdfjs-dist/web/pdf_viewer.css (Apache-2.0), reduced to the
+ * rules TextLayer output actually needs. Kept in its own file so that
+ * provenance is visible rather than buried in a component's styles array.
+ *
+ * ::ng-deep is required throughout: pdf.js builds the spans itself via the
+ * DOM API, so they never receive Angular's _ngcontent attribute and ordinary
+ * emulated-encapsulation rules cannot match them. That was the bug — the
+ * spans rendered as visible, statically positioned black text on top of the
+ * page.
+ */
+
+:host ::ng-deep .textLayer {
+  position: absolute;
+  inset: 0;
+  text-align: initial;
+  overflow: clip;
+  line-height: 1;
+  transform-origin: 0 0;
+  forced-color-adjust: none;
+  /* Must sit below the markup overlay (z-index 2) so drawing still receives
+     pointer events once a text layer exists. */
+  z-index: 1;
+  /* The page wrapper sets Tailwind's select-none to stop drag-select while
+     drawing; re-enable it here or the text layer is unselectable. */
+  -webkit-user-select: text;
+  user-select: text;
+  --total-scale-factor: 1;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+:host ::ng-deep .textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+:host ::ng-deep .textLayer > :not(.markedContent),
+:host ::ng-deep .textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x))
+    scale(var(--min-font-size-inv));
+}
+
+:host ::ng-deep .textLayer .markedContent {
+  display: contents;
+}
+
+:host ::ng-deep .textLayer .cde-search-match {
+  background: rgba(255, 214, 0, 0.45);
+  border-radius: 2px;
+}

@@ -1,27 +1,26 @@
 import {
-  Component, Input, signal, computed, inject,
+  Component, Input, computed, inject,
   AfterViewInit, OnDestroy, OnChanges, SimpleChanges,
-  ElementRef, ViewChild, ChangeDetectionStrategy, HostListener
+  ElementRef, ViewChild, ChangeDetectionStrategy
 } from '@angular/core';
 import { PdfEngineService } from '../../../../viewer-core/pdf-engine.service';
-import { MarkupEngineService } from '../../../../viewer-core/markup-engine.service';
-import { ViewerStateService, ShapeData } from '../../../../viewer-core/viewer-state.service';
+import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 import { CollaborationService } from '../../../core/services/collaboration.service';
 import { RemoteCursorsComponent } from '../markup/remote-cursors.component';
 import { PageLinksComponent } from '../../../../viewer-core/page-links.component';
-import { MarkupShapesComponent } from '../../../../viewer-core/markup-shapes.component';
-import { MarkupDrawingSession, MarkupSurface } from '../../../../viewer-core/markup-drawing-session';
-import {
-  formFieldDraftFrom, redactionFrom, toScreenRect,
-} from './pdf-page-geometry';
+import { PdfMarkupLayerComponent } from './pdf-markup-layer.component';
+import { PageRequest, PdfPagePainting } from './pdf-page-painting';
+import { rotatedFootprint } from './pdf-page-geometry';
 import { pageLabel } from '../../../../viewer-core/page-labels';
 
 @Component({
   selector: 'app-pdf-page',
   standalone: true,
-  imports: [RemoteCursorsComponent, PageLinksComponent, MarkupShapesComponent],
+  imports: [RemoteCursorsComponent, PageLinksComponent, PdfMarkupLayerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [MarkupDrawingSession],
+  // The stylesheet is a derived subset of pdfjs-dist/web/pdf_viewer.css and
+  // is kept in its own file so its provenance stays visible (§17.2).
+  styleUrls: ['./pdf-text-layer.css'],
   template: `
     <!-- Outer box takes the rotated footprint so the scroll container
          reserves the right space; the inner box is what actually turns. -->
@@ -30,13 +29,13 @@ import { pageLabel } from '../../../../viewer-core/page-labels';
          [style.height.px]="outerHeight()">
     <div class="relative select-none pdf-page-wrap"
          (mousemove)="reportCursor($event)"
-         [style.width.px]="pageWidth()"
-         [style.height.px]="pageHeight()"
+         [style.width.px]="painting.width()"
+         [style.height.px]="painting.height()"
          [style.transform]="rotationTransform()"
          style="transform-origin: center center">
 
       <!-- Placeholder shown while this page is outside the render window -->
-      @if (!rendered()) {
+      @if (!painting.painted()) {
         <div class="absolute inset-0 bg-white shadow-lg flex items-center justify-center">
           <span class="text-xs text-gray-400 select-none">{{ pageLabel(pageNumber) }}</span>
         </div>
@@ -45,8 +44,8 @@ import { pageLabel } from '../../../../viewer-core/page-labels';
       <!-- PDF canvas -->
       <canvas #pageCanvas
         class="block shadow-lg"
-        [style.width.px]="pageWidth()"
-        [style.height.px]="pageHeight()">
+        [style.width.px]="painting.width()"
+        [style.height.px]="painting.height()">
       </canvas>
 
       <!-- Text layer (for text selection + search highlight).
@@ -54,63 +53,20 @@ import { pageLabel } from '../../../../viewer-core/page-labels';
       <div #textLayer
         class="textLayer"
         [style.--total-scale-factor]="zoom"
-        [style.width.px]="pageWidth()"
-        [style.height.px]="pageHeight()">
+        [style.width.px]="painting.width()"
+        [style.height.px]="painting.height()">
       </div>
 
-      <!-- Annotation SVG overlay — BOUND to this page's coordinate system -->
-      <svg #markupSvg
-        class="absolute top-0 left-0"
-        style="z-index:2"
-        [attr.width]="pageWidth()"
-        [attr.height]="pageHeight()"
-        [attr.viewBox]="'0 0 ' + pageWidth() + ' ' + pageHeight()"
-        [style.cursor]="cursorStyle()"
-        [style.pointer-events]="drawingEnabled() ? 'auto' : 'none'"
-        (mousedown)="session.pointerDown($event)"
-        (mousemove)="session.pointerMove($event)"
-        (mouseup)="session.pointerUp()"
-        (dblclick)="session.doubleClick($event)"
-        (touchstart)="session.pointerDown($event); $event.preventDefault()"
-        (touchmove)="session.pointerMove($event); $event.preventDefault()"
-        (touchend)="session.pointerUp()">
-
-        <!-- Saved / persisted shapes -->
-        <g markupShapes [shapes]="shapesOnPage()"></g>
-
-        <!-- Committed redaction regions (stored in PDF-point space, converted
-             back to this page's current screen pixels — stays correctly
-             positioned across zoom changes, unlike ShapeData) -->
-        @for (region of redactionRegionsOnPage(); track region.id) {
-          <rect [attr.x]="region.screenX" [attr.y]="region.screenY"
-                [attr.width]="region.screenWidth" [attr.height]="region.screenHeight"
-                fill="#000000" stroke="#000000"/>
-        }
-
-        <!-- Placed but not yet added form fields, converted from PDF points
-             so they stay put across zoom changes -->
-        @for (draft of formFieldDraftsOnPage(); track draft.id) {
-          <g>
-            <rect [attr.x]="draft.screenX" [attr.y]="draft.screenY"
-                  [attr.width]="draft.screenWidth" [attr.height]="draft.screenHeight"
-                  fill="#3b82f622" stroke="#3b82f6" stroke-width="1.5"
-                  stroke-dasharray="4 3" rx="2"/>
-            <text [attr.x]="draft.screenX + 3" [attr.y]="draft.screenY - 3"
-                  font-size="10" fill="#2563eb">{{ draft.name || 'unnamed' }}</text>
-          </g>
-        }
-
-        <!-- In-progress shape being drawn (polygon/polyline rubber-band
-             to the cursor between clicks via the session) -->
-        @if (session.activeShape()) {
-          <g markupShapes [shapes]="[session.previewShape()]"></g>
-        }
-      </svg>
+      <!-- What people draw on top, bound to this page's coordinate system -->
+      <app-pdf-markup-layer
+        [pageNumber]="pageNumber" [zoom]="zoom"
+        [pageWidth]="painting.width()" [pageHeight]="painting.height()">
+      </app-pdf-markup-layer>
 
       <!-- Link annotations, below the cursors so a remote pointer is never
            swallowed by a link's hit area -->
       <app-page-links [pageNumber]="pageNumber" [zoom]="zoom"
-                      [pageHeight]="pageHeight() / zoom"></app-page-links>
+                      [pageHeight]="painting.height() / zoom"></app-page-links>
 
       <!-- Other people's pointers -->
       <app-remote-cursors [pageNumber]="pageNumber" [zoom]="zoom"></app-remote-cursors>
@@ -121,60 +77,9 @@ import { pageLabel } from '../../../../viewer-core/page-labels';
       </div>
     </div>
     </div>
-  `,
-  // ::ng-deep is required throughout: pdf.js builds the text-layer spans
-  // itself via the DOM API, so they never receive Angular's _ngcontent
-  // attribute and ordinary emulated-encapsulation rules cannot match them.
-  // (That was the bug — the spans rendered as visible, statically
-  // positioned black text on top of the page.) Rules below are the minimum
-  // subset of pdfjs-dist/web/pdf_viewer.css that TextLayer output needs.
-  styles: [`
-    :host ::ng-deep .textLayer {
-      position: absolute; inset: 0;
-      text-align: initial;
-      overflow: clip;
-      line-height: 1;
-      transform-origin: 0 0;
-      forced-color-adjust: none;
-      /* Must sit below the markup overlay (z-index 2) so drawing still
-         receives pointer events once a text layer exists. */
-      z-index: 1;
-      /* The page wrapper sets Tailwind's select-none to stop drag-select
-         while drawing; re-enable it here or the text layer is unselectable. */
-      -webkit-user-select: text;
-      user-select: text;
-      --total-scale-factor: 1;
-      --min-font-size: 1;
-      --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
-      --min-font-size-inv: calc(1 / var(--min-font-size));
-    }
-    :host ::ng-deep .textLayer :is(span, br) {
-      color: transparent;
-      position: absolute;
-      white-space: pre;
-      cursor: text;
-      transform-origin: 0% 0%;
-      -webkit-user-select: text;
-      user-select: text;
-    }
-    :host ::ng-deep .textLayer > :not(.markedContent),
-    :host ::ng-deep .textLayer .markedContent span:not(.markedContent) {
-      z-index: 1;
-      --font-height: 0;
-      font-size: calc(var(--text-scale-factor) * var(--font-height));
-      --scale-x: 1;
-      --rotate: 0deg;
-      transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
-    }
-    :host ::ng-deep .textLayer .markedContent { display: contents; }
-    :host ::ng-deep .textLayer .cde-search-match {
-      background: rgba(255, 214, 0, 0.45);
-      border-radius: 2px;
-    }
-  `]
+  `
 })
-export class PdfPageComponent
-  implements AfterViewInit, OnChanges, OnDestroy, MarkupSurface {
+export class PdfPageComponent implements AfterViewInit, OnChanges, OnDestroy {
   pageLabel = pageLabel;
 
   @Input({ required: true }) pdfDoc!:    any;
@@ -184,110 +89,54 @@ export class PdfPageComponent
   /**
    * Whether this page is close enough to the viewport to be worth painting.
    * When false the page keeps its correct size (so scroll height and page
-   * anchors stay right) but releases its canvas backing store — at ~1.9 MB
-   * per page a long document otherwise pins hundreds of MB of GPU memory.
+   * anchors stay right) but releases its canvas backing store.
    */
   @Input()                   active      = true;
 
   @ViewChild('pageCanvas')  canvas!:    ElementRef<HTMLCanvasElement>;
-  @ViewChild('markupSvg')   svg!:       ElementRef<SVGSVGElement>;
   @ViewChild('textLayer')   textLayer!: ElementRef<HTMLDivElement>;
 
-  state   = inject(ViewerStateService);
-  engine  = inject(PdfEngineService);
-  markup  = inject(MarkupEngineService);
-  session = inject(MarkupDrawingSession);
+  state = inject(ViewerStateService);
   private collaboration = inject(CollaborationService);
 
-  pageWidth  = signal(0);
-  pageHeight = signal(0);
-  rendered   = signal(false);
-  private viewport: any = null;
-
-  /**
-   * With the pan tool the markup overlay stops capturing pointer events, so
-   * they reach the text layer underneath and the user can select text —
-   * mirrors CadViewerComponent's existing drawingEnabled() behaviour.
-   */
-  drawingEnabled = computed(() => this.state.activeTool() !== 'pan');
-
-  cursorStyle = () => {
-    switch (this.state.activeTool()) {
-      case 'pan':    return 'grab';
-      case 'select': return 'default';
-      case 'text':   return 'text';
-      default:       return 'crosshair';
-    }
-  };
+  readonly painting = new PdfPagePainting(inject(PdfEngineService), () => ({
+    canvas: this.canvas?.nativeElement,
+    textLayer: this.textLayer?.nativeElement,
+  }));
 
   // @ViewChild('pageCanvas') isn't populated until after the view is
-  // initialized, so the *first* render has to happen here rather than in an
-  // ngOnInit — calling render() before this silently no-ops on its
-  // `!this.canvas` guard, which is why pages never painted.
-  ngAfterViewInit() {
-    // After the view exists, because the session measures against the markup
-    // overlay and reads it through the getter above.
-    this.session.attachTo(this);
-    this.render();
-  }
+  // initialized, so the *first* paint has to happen here rather than in an
+  // ngOnInit — asking earlier silently no-ops on the missing canvas, which
+  // is why pages never painted.
+  ngAfterViewInit() { this.painting.repaint(this.request); }
 
   ngOnChanges(changes: SimpleChanges) {
     // Skip the very first call — the view (and @ViewChild canvas) isn't
-    // ready yet; ngAfterViewInit handles the initial render instead.
+    // ready yet; ngAfterViewInit handles the initial paint instead.
     const isFirstChange = Object.values(changes).some(c => c.isFirstChange());
     if (isFirstChange) return;
 
     if (changes['zoom'] || changes['pdfDoc'] || changes['pageNumber'] || changes['active']) {
-      this.render();
-      return;   // render() re-applies the search highlight itself
+      this.painting.repaint(this.request);
+      return;   // repaint() re-applies the search highlight itself
     }
     if (changes['searchQuery']) {
-      this.highlightSearch();
+      this.painting.markSearchMatches(this.request);
     }
   }
 
-  ngOnDestroy() { this.releaseCanvas(); }
+  ngOnDestroy() { this.painting.release(); }
 
-  async render() {
-    if (!this.pdfDoc || !this.canvas) return;
-
-    // Size the page even when it isn't being painted, so its placeholder
-    // occupies the right scroll height and annotation geometry stays valid.
-    const size = await this.engine.getPageSize(this.pdfDoc, this.pageNumber, this.zoom);
-    this.pageWidth.set(size.width);
-    this.pageHeight.set(size.height);
-    this.viewport = size.viewport;
-
-    if (!this.active) { this.releaseCanvas(); return; }
-
-    await this.engine.renderPage(
-      this.pdfDoc, this.pageNumber, this.canvas.nativeElement, this.zoom
-    );
-    this.rendered.set(true);
-    await this.highlightSearch();
+  /** What this page is currently being asked to show. */
+  private get request(): PageRequest {
+    return {
+      pdfDoc: this.pdfDoc,
+      pageNumber: this.pageNumber,
+      zoom: this.zoom,
+      searchQuery: this.searchQuery,
+      active: this.active,
+    };
   }
-
-  /**
-   * Drop the canvas backing store for an off-screen page. Setting the
-   * dimensions to zero is what actually frees the memory — merely clearing
-   * the 2D context keeps the full buffer allocated.
-   */
-  private releaseCanvas() {
-    const el = this.canvas?.nativeElement;
-    if (el) { el.width = 0; el.height = 0; }
-    this.textLayer?.nativeElement.replaceChildren();
-    this.rendered.set(false);
-  }
-
-  /**
-   * The shapes belonging to this page.
-   *
-   * Filtered in a computed rather than with an `@if` inside the loop: the
-   * drawing component takes a list, and a per-shape guard in the template
-   * would put an empty group on the page for every shape on every other page.
-   */
-  readonly shapesOnPage = computed(() =>
-    this.state.shapes().filter((shape) => shape.pageNumber === this.pageNumber));
 
   // ── View rotation ────────────────────────────────────────────
   rotationTransform = computed(() => {
@@ -295,51 +144,12 @@ export class PdfPageComponent
     return degrees ? `rotate(${degrees}deg)` : '';
   });
 
-  /**
-   * A quarter turn swaps the page's footprint. The rotation itself is a
-   * transform, which does not affect layout, so the outer box has to carry
-   * the swapped size or neighbouring pages overlap.
-   */
-  outerWidth  = computed(() => this.state.isQuarterTurned() ? this.pageHeight() : this.pageWidth());
-  outerHeight = computed(() => this.state.isQuarterTurned() ? this.pageWidth()  : this.pageHeight());
+  /** The space this page needs once the view rotation is applied. */
+  private footprint = computed(() => rotatedFootprint(
+    this.state.isQuarterTurned(), this.painting.width(), this.painting.height()));
 
-  redactionRegionsOnPage = computed(() =>
-    this.state.redactionRegions()
-      .filter(region => region.page === this.pageNumber)
-      .map(region => ({
-        id: region.id,
-        ...toScreenRect(region, this.zoom, this.pageHeight()),
-      })));
-
-  /**
-   * The gesture that draws a shape lives in the session, shared with the CAD
-   * drawing so the two cannot disagree about which gestures finish a shape.
-   * What stays here is what is genuinely this page's: its number, its zoom,
-   * and the fact that a redaction or a form field goes somewhere other than
-   * the shape list.
-   */
-  get overlay(): SVGSVGElement {
-    return this.svg.nativeElement;
-  }
-  get acceptsDrawing(): boolean {
-    const tool = this.state.activeTool();
-    return tool !== 'pan' && tool !== 'select';
-  }
-  commit(shape: ShapeData): void {
-    if (shape.tool === 'redact') {
-      this.commitRedactionRegion(shape);
-    } else if (shape.tool === 'formfield') {
-      this.commitFormFieldDraft(shape);
-    } else {
-      this.state.addShape(shape);
-    }
-  }
-
-  @HostListener('document:keydown.enter')
-  finishFromKeyboard() { this.session.finishFromKeyboard(); }
-
-  @HostListener('document:keydown.escape')
-  cancelPolyInProgress() { this.session.cancel(); }
+  outerWidth  = computed(() => this.footprint().width);
+  outerHeight = computed(() => this.footprint().height);
 
   /**
    * Tells other viewers where this pointer is.
@@ -359,42 +169,5 @@ export class PdfPageComponent
       x: (e.clientX - box.left) / scale,
       y: (e.clientY - box.top) / scale
     });
-  }
-
-  private commitRedactionRegion(shape: ShapeData) {
-    this.state.addRedactionRegion(
-      redactionFrom(this.markup.newId(), this.pageNumber, shape, this.zoom,
-                    this.pageHeight()));
-  }
-
-  private commitFormFieldDraft(shape: ShapeData) {
-    this.state.addFormFieldDraft(
-      formFieldDraftFrom(this.markup.newId(), this.pageNumber, shape, this.zoom,
-                         this.pageHeight()));
-  }
-
-  /** Field drafts on this page, in current screen pixels. */
-  formFieldDraftsOnPage = computed(() =>
-    this.state.formFieldDrafts()
-      .filter(draft => draft.page === this.pageNumber)
-      .map(draft => ({
-        ...draft,
-        ...toScreenRect(draft, this.zoom, this.pageHeight()),
-      })));
-
-  // ── Build the text layer and mark search matches ─────────────
-  private async highlightSearch() {
-    if (!this.textLayer || !this.pdfDoc || !this.viewport || !this.active) return;
-
-    const elements = await this.engine.renderTextLayer(
-      this.pdfDoc, this.pageNumber, this.textLayer.nativeElement, this.viewport
-    );
-    this.engine.markMatches(elements, this.searchQuery);
-  }
-
-  // ── Export this page's markup as SVG string (for print) ─────
-  getSvgForPrint(): string {
-    const shapes = this.state.shapes().filter(s => s.pageNumber === this.pageNumber);
-    return this.markup.shapesToSvgContent(shapes, this.pageWidth(), this.pageHeight());
   }
 }

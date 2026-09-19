@@ -89,16 +89,32 @@ export function toScreenRect(
   };
 }
 
-/** A redaction region as the server stores it. */
-export interface RedactionRegion extends PdfRect {
-  id: string;
+/**
+ * Which page is being drawn on and how it is currently displayed.
+ *
+ * <p>The three travel together everywhere: no conversion here means anything
+ * without all of them. Passing them as one also keeps the conversions inside
+ * §3.3's four-parameter limit, which taking them separately did not.
+ */
+export interface PageGeometry {
+  page: number;
+  zoom: number;
+  renderedHeightPx: number;
+}
+
+/** A box the server stores, tagged with the page it is on. */
+interface PageBox extends PdfRect {
   page: number;
 }
 
-/** An unnamed form field, as drawn and before the Form panel names it. */
-export interface FormFieldDraft extends PdfRect {
+/** A redaction region as the server stores it. */
+export interface RedactionRegion extends PageBox {
   id: string;
-  page: number;
+}
+
+/** An unnamed form field, as drawn and before the Form panel names it. */
+export interface FormFieldDraft extends PageBox {
+  id: string;
   name: string;
   kind: "TEXT";
   required: boolean;
@@ -108,12 +124,14 @@ export interface FormFieldDraft extends PdfRect {
 /** A drawn box turned into a redaction the server can act on. */
 export function redactionFrom(
   id: string,
-  page: number,
   drawn: DrawnBox,
-  zoom: number,
-  renderedHeightPx: number,
+  geometry: PageGeometry,
 ): RedactionRegion {
-  return { id, page, ...toPdfRect(drawn, zoom, renderedHeightPx) };
+  return {
+    id,
+    page: geometry.page,
+    ...toPdfRect(drawn, geometry.zoom, geometry.renderedHeightPx),
+  };
 }
 
 /**
@@ -124,18 +142,53 @@ export function redactionFrom(
  */
 export function formFieldDraftFrom(
   id: string,
-  page: number,
   drawn: DrawnBox,
-  zoom: number,
-  renderedHeightPx: number,
+  geometry: PageGeometry,
 ): FormFieldDraft {
   return {
     id,
-    page,
-    ...toPdfRect(drawn, zoom, renderedHeightPx),
+    page: geometry.page,
+    ...toPdfRect(drawn, geometry.zoom, geometry.renderedHeightPx),
     name: "",
     kind: "TEXT",
     required: false,
     options: "",
   };
+}
+
+/**
+ * The stored boxes that belong on this page, in the pixels it occupies now.
+ *
+ * <p>Here rather than in the overlay component because it is arithmetic, and
+ * because the overlay draws two lists that differ in nothing but what they
+ * are drawn as — a redaction is filled black, a field draft is outlined and
+ * labelled, and neither difference is in the conversion.
+ */
+export function onScreenBoxes<BoxOnPage extends PageBox>(
+  boxes: readonly BoxOnPage[],
+  geometry: PageGeometry,
+): (BoxOnPage & ScreenRect)[] {
+  return boxes
+    .filter((box) => box.page === geometry.page)
+    .map((box) => ({
+      ...box,
+      ...toScreenRect(box, geometry.zoom, geometry.renderedHeightPx),
+    }));
+}
+
+/**
+ * The space a page needs once the view rotation is applied.
+ *
+ * <p>A quarter turn swaps a page's footprint, and the rotation itself is a
+ * CSS transform, which does not affect layout. Something has to carry the
+ * swapped size or neighbouring pages overlap.
+ */
+export function rotatedFootprint(
+  quarterTurned: boolean,
+  width: number,
+  height: number,
+): { width: number; height: number } {
+  return quarterTurned
+    ? { width: height, height: width }
+    : { width, height };
 }
