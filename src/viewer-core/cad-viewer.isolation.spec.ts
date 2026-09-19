@@ -62,6 +62,23 @@ function viewerShowing(svg: string) {
   return fixture;
 }
 
+/**
+ * Clears the layer panel's checkbox for one layer.
+ *
+ * <p>Through the control a reader would use, rather than by reaching into
+ * the component: the panel's checkbox is the thing that has to work, and a
+ * test that sets a signal instead would still pass with the checkbox wired
+ * to nothing (§14).
+ */
+function hideLayerNamed(element: HTMLElement, name: string): void {
+  const row = Array.from(element.querySelectorAll('label')).find((label) =>
+    label.textContent?.includes(name));
+  expect(row, `no layer row named ${name} in the panel`).toBeDefined();
+  const toggle = row!.querySelector<HTMLInputElement>('input[type=checkbox]');
+  expect(toggle, `layer ${name} has no checkbox to clear`).not.toBeNull();
+  toggle!.click();
+}
+
 /** The <img> exists and points at an object URL. */
 function drawingImage(element: HTMLElement): HTMLImageElement {
   const image = element.querySelector('img');
@@ -101,8 +118,7 @@ describe('the CAD drawing is isolated from this document', () => {
     const captured = captureDrawings();
     const fixture = viewerShowing(DRAWING);
 
-    fixture.componentInstance.layers.update((layers) =>
-      layers.map((layer) => layer.name === 'NOTES' ? { ...layer, visible: false } : layer));
+    hideLayerNamed(fixture.nativeElement, 'NOTES');
     fixture.detectChanges();
 
     const svg = await captured.latest();
