@@ -131,12 +131,7 @@
               "text-summary",
               "lcov"
             ],
-            "coverageThresholds": {
-              "statements": 45,
-              "branches": 43,
-              "functions": 38,
-              "lines": 44
-            }
+            "coverageThresholds": { "statements": 61, "branches": 58, "functions": 50, "lines": 62 }
           }
         },
         "extract-i18n": {
