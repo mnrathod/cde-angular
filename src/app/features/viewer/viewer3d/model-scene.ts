@@ -16,6 +16,9 @@ import {
   ModelGeometryGroup,
 } from "../../../../viewer-core/model-geometry";
 
+/** The six faces a model can be looked at square-on from. */
+export type ModelDirection = "top" | "front" | "side";
+
 /** Everything the component needs to keep hold of after the scene is built. */
 export interface ModelViewport {
   renderer: { dispose(): void; render(scene: unknown, camera: unknown): void };
@@ -26,6 +29,10 @@ export interface ModelViewport {
   wireframe: boolean;
   /** The size the canvas should be, recomputed on a resize. */
   resize(width: number, height: number): void;
+  /** Puts the camera back where it started, framing the whole model. */
+  resetView(): void;
+  /** Looks at the model square-on from one direction. */
+  lookFrom(direction: ModelDirection): void;
   /** Stops the animation loop and releases the GPU resources. */
   dispose(): void;
 }
@@ -80,7 +87,7 @@ export function buildModelScene(
   );
   scene.add(mesh);
 
-  frameModel(three, { camera, controls, grid, mesh });
+  const bounds = frameModel(three, { camera, controls, grid, mesh });
 
   let frame: number | null = null;
   const draw = () => {
@@ -101,6 +108,12 @@ export function buildModelScene(
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height);
+    },
+    resetView() {
+      placeCamera(camera, controls, bounds, RESET_OFFSET);
+    },
+    lookFrom(direction: ModelDirection) {
+      placeCamera(camera, controls, bounds, SQUARE_ON_OFFSET[direction]);
     },
     dispose() {
       if (frame !== null) cancelAnimationFrame(frame);
@@ -156,23 +169,65 @@ function materialsFor(three: any, groups: readonly ModelGeometryGroup[]) {
   );
 }
 
+/** What a model occupies, kept so the camera can be sent back to it. */
+interface ModelBounds {
+  centre: { x: number; y: number; z: number };
+  /** The model's longest side, which every camera distance is a multiple of. */
+  largest: number;
+}
+
+/**
+ * Where the camera sits for each named view, as multiples of the model's
+ * longest side.
+ *
+ * <p>Multiples rather than distances, because a door handle and a terminal
+ * building are both models and a fixed distance frames neither.
+ */
+const RESET_OFFSET = { x: 1.2, y: 0.8, z: 1.2 };
+const SQUARE_ON_OFFSET: Record<ModelDirection, { x: number; y: number; z: number }> = {
+  top: { x: 0, y: 2, z: 0.0001 },
+  front: { x: 0, y: 0, z: 2 },
+  side: { x: 2, y: 0, z: 0 },
+};
+
+/**
+ * Puts the camera at an offset from the model's centre and points it there.
+ *
+ * <p>The tiny z on the top view is deliberate: looking straight down puts
+ * the view direction along the camera's own up vector, and the resulting
+ * cross product is zero, so the orientation is undefined and three.js
+ * produces a blank frame. Nudging off the axis is the standard way round it
+ * and is far too small to see.
+ */
+function placeCamera(
+  camera: any,
+  controls: any,
+  bounds: ModelBounds,
+  offset: { x: number; y: number; z: number },
+): void {
+  const { centre, largest } = bounds;
+  camera.position.set(
+    centre.x + largest * offset.x,
+    centre.y + largest * offset.y,
+    centre.z + largest * offset.z,
+  );
+  controls.target.copy(centre);
+  controls.update?.();
+}
+
 /** Points the camera at the model and sizes the grid under it. */
 function frameModel(
   three: any,
   parts: { camera: any; controls: any; grid: any; mesh: any },
-): void {
+): ModelBounds {
   const { camera, controls, grid, mesh } = parts;
   const box = new three.Box3().expandByObject(mesh);
   const centre = box.getCenter(new three.Vector3());
   const extent = box.getSize(new three.Vector3());
   const largest = Math.max(extent.x, extent.y, extent.z);
+  const bounds: ModelBounds = { centre, largest };
 
-  camera.position.set(
-    centre.x + largest * 1.2,
-    centre.y + largest * 0.8,
-    centre.z + largest * 1.2,
-  );
-  controls.target.copy(centre);
+  placeCamera(camera, controls, bounds, RESET_OFFSET);
   // Near and far derived from the model's own size: a fixed pair either
   // clips a building in half or z-fights on a door handle.
   camera.near = largest * 0.001;
@@ -181,4 +236,5 @@ function frameModel(
 
   grid.scale.setScalar(largest / 10);
   grid.position.y = box.min.y;
+  return bounds;
 }
