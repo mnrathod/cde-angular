@@ -1,31 +1,21 @@
 import {
-  Component, inject, OnInit, OnDestroy, signal, effect,
-  ViewChildren, QueryList, ChangeDetectionStrategy
+  Component, inject, OnInit, OnDestroy, effect, ChangeDetectionStrategy
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
 
 import { ViewerStateService } from '../../../viewer-core/viewer-state.service';
 import { DocumentOperationsService } from './toolbar/document-operations.service';
 import { PdfEngineService } from '../../../viewer-core/pdf-engine.service';
-import { AnnotationService } from '../../core/services/viewer/annotation.service';
-import { ViewerService } from '../../core/services/viewer.service';
-import { DocumentService } from '../../core/services/document.service';
-import { AuthService } from '../../core/services/auth.service';
+import { DrawingSearchService } from '../../../viewer-core/drawing-search.service';
+import { CollaborationService } from '../../core/services/collaboration.service';
+import { RemoteDocumentChanges } from './remote-document-changes';
+import { ViewerDocumentLoader } from './viewer-document-loader';
 
 import { MarkupToolbarComponent } from './toolbar/markup-toolbar.component';
 import { ToolRailComponent } from '../../../viewer-core/tool-rail.component';
-import { IconComponent } from '../../../viewer-core/icon.component';
 import { ViewerSidebarComponent } from './sidebar/viewer-sidebar.component';
-import { PdfViewerComponent } from './pdf-viewer/pdf-viewer.component';
-import { CadViewerComponent } from '../../../viewer-core/cad-viewer.component';
-import { PdfPageComponent } from './pdf-viewer/pdf-page.component';
-import { ViewerData } from '../../core/models';
-import { CollaborationService, CollaborationEvent } from '../../core/services/collaboration.service';
+import { ViewerCanvasComponent } from './viewer-canvas.component';
 import { ViewerTopBarComponent } from './viewer-top-bar.component';
-import { DrawingSearchService } from '../../../viewer-core/drawing-search.service';
 
 @Component({
   selector: 'app-viewer-shell',
@@ -34,16 +24,19 @@ import { DrawingSearchService } from '../../../viewer-core/drawing-search.servic
   // the socket down, not leave it announcing a presence that has gone.
   // Alongside the viewer state, because the in-flight flags on the
   // operations belong to one open document.
-  providers: [ViewerStateService, CollaborationService, DocumentOperationsService],
+  providers: [
+    ViewerStateService,
+    CollaborationService,
+    DocumentOperationsService,
+    ViewerDocumentLoader,
+    RemoteDocumentChanges,
+  ],
   imports: [
-    CommonModule,
     ViewerTopBarComponent,
     MarkupToolbarComponent,
     ToolRailComponent,
     ViewerSidebarComponent,
-    PdfViewerComponent,
-    CadViewerComponent,
-    IconComponent,
+    ViewerCanvasComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -51,30 +44,11 @@ import { DrawingSearchService } from '../../../viewer-core/drawing-search.servic
 
       <app-viewer-top-bar (backRequested)="goBack()" />
 
-      <!-- ── Loading / Error ─────────────────────────────────────── -->
-      @if (state.loading()) {
-        <div class="flex-1 flex flex-col items-center justify-center bg-gray-800 text-white/60">
-          <div class="w-8 h-8 border-2 border-white/20 border-t-white/70 rounded-full animate-spin mb-3"></div>
-          <div class="text-sm">{{ state.loadingMsg() }}</div>
-        </div>
-      }
-
-      @if (!state.loading() && state.errorMsg()) {
-        <div class="flex-1 flex items-center justify-center" style="background:#0a0c14">
-          <div class="max-w-md p-6 bg-red-900/30 rounded-lg border border-red-500/30
-                      text-red-300 text-sm flex items-start gap-2.5">
-            <app-icon name="warning" [size]="18" class="mt-px flex-shrink-0" />
-            <span>{{ state.errorMsg() }}</span>
-          </div>
-        </div>
-      }
-
-      <!-- ── Main viewer area ───────────────────────────────────── -->
-      @if (!state.loading() && !state.errorMsg()) {
-
-        <!-- Markup toolbar -->
+      @if (state.loading() || state.errorMsg()) {
+        <app-viewer-canvas />
+      } @else {
         <app-markup-toolbar
-          (saveRequested)="saveMarkup()"
+          (saveRequested)="loader.saveShapes()"
           (printRequested)="printDocument()">
         </app-markup-toolbar>
 
@@ -87,52 +61,10 @@ import { DrawingSearchService } from '../../../viewer-core/drawing-search.servic
           -->
           <app-tool-rail></app-tool-rail>
 
-          <!-- Content area -->
-          <div class="flex-1 overflow-hidden flex flex-col min-w-0">
+          <app-viewer-canvas />
 
-            <!-- PDF viewer -->
-            @if (isPdf()) {
-              <app-pdf-viewer class="flex-1 overflow-hidden flex flex-col"></app-pdf-viewer>
-            }
-
-            <!-- CAD viewer (DXF/DWG) with layer toggle -->
-            @if (isSvg()) {
-              <app-cad-viewer
-                class="flex-1 flex overflow-hidden min-h-0"
-                [svgContent]="state.viewerData()?.content || ''"
-                [dxfVersion]="state.viewerData()?.dwgVersion || ''"
-                [entityCount]="entityCount">
-              </app-cad-viewer>
-            }
-
-            <!-- Image viewer -->
-            @if (isImage()) {
-              <div class="flex-1 overflow-auto flex items-center justify-center p-4" style="background:#0a0c14">
-                <!-- The document's own name, because that is what this image
-                     is. An empty alt would be right for decoration; this is
-                     the content of the page. -->
-                <img [src]="imageUrl" class="max-w-full max-h-full shadow-lg"
-                     [alt]="state.viewerData()?.name || untitledDocumentLabel" />
-              </div>
-            }
-
-            <!-- Unsupported file type -->
-            @if (isUnsupported()) {
-              <div class="flex-1 flex items-center justify-center text-gray-400">
-                <div class="text-center">
-                  <div class="text-5xl mb-3" aria-hidden="true">📄</div>
-                  <div i18n="Shown for a file the viewer cannot render@@viewerShell.noPreview">Preview not available for this file type</div>
-                  <div class="text-sm mt-1 text-gray-500">{{ state.viewerData()?.fileName }}</div>
-                </div>
-              </div>
-            }
-          </div>
-
-          <!-- Sidebar -->
           @if (state.sidebarOpen()) {
-            <app-viewer-sidebar
-              (pageSelected)="onPageSelected($event)">
-            </app-viewer-sidebar>
+            <app-viewer-sidebar (pageSelected)="onPageSelected($event)" />
           }
         </div>
       }
@@ -140,25 +72,14 @@ import { DrawingSearchService } from '../../../viewer-core/drawing-search.servic
   `
 })
 export class ViewerShellComponent implements OnInit, OnDestroy {
-  state      = inject(ViewerStateService);
-  pdfEngine  = inject(PdfEngineService);
-  annService = inject(AnnotationService);
-  viewerSvc  = inject(ViewerService);
-  docService = inject(DocumentService);
-  http       = inject(HttpClient);
-  private route  = inject(ActivatedRoute);
-  private router = inject(Router);
-  private auth   = inject(AuthService);
+  state = inject(ViewerStateService);
+  loader = inject(ViewerDocumentLoader);
 
-  collaboration = inject(CollaborationService);
+  private pdfEngine = inject(PdfEngineService);
   private drawingSearch = inject(DrawingSearchService);
-
-  imageUrl = '';
-  entityCount = 0;
-
-  /** Stops the cursor-expiry timer and the event subscription on teardown. */
-  private cursorTimer?: ReturnType<typeof setInterval>;
-  private unsubscribeCollaboration?: () => void;
+  private remoteChanges = inject(RemoteDocumentChanges);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
   constructor() {
     // Redact/OCR/flatten/form-fill rewrite the document server-side and
@@ -167,7 +88,7 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
     effect(() => {
       const token = this.state.reloadToken();
       if (token === 0) return;   // no commit yet — ngOnInit does the first load
-      this.loadDocument(this.state.documentId());
+      this.loader.load(this.state.documentId());
     });
   }
 
@@ -175,158 +96,19 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
     const id = Number(this.route.snapshot.paramMap.get('id'));
     if (!id) { this.router.navigate(['/']); return; }
     this.state.documentId.set(id);
-    this.loadDocument(id);
-    this.loadAnnotations(id);
-    this.startCollaboration(id);
+    this.loader.load(id);
+    this.loader.loadAnnotations(id);
+    this.remoteChanges.watch(id);
   }
 
-  ngOnDestroy() {
-    this.unsubscribeCollaboration?.();
-    if (this.cursorTimer) clearInterval(this.cursorTimer);
-    this.collaboration.disconnect();
-  }
-
-  // ── Collaboration ────────────────────────────────────────────
-
-  private startCollaboration(documentId: number) {
-    this.collaboration.connect(documentId);
-    this.unsubscribeCollaboration = this.collaboration.onEvent(
-      event => this.applyRemoteChange(event));
-    // Cursors expire rather than being cleared: someone who stops moving has
-    // not left, but a pointer frozen where they last were is misleading.
-    this.cursorTimer = setInterval(() => this.collaboration.pruneStaleCursors(), 2000);
-  }
-
-  /**
-   * Applies a change someone else made.
-   *
-   * <p>Annotation events reload the document's annotations rather than
-   * patching the local list from the payload: the list is small, and
-   * re-reading it cannot drift out of step with the server the way a
-   * sequence of incremental patches can.
-   */
-  private applyRemoteChange(event: CollaborationEvent) {
-    if (event.actor && event.actor === this.auth.username()) return;
-
-    switch (event.type) {
-      case 'ANNOTATION_CREATED':
-      case 'ANNOTATION_UPDATED':
-      case 'ANNOTATION_DELETED':
-      case 'ANNOTATION_RESOLVED':
-      case 'REPLY_ADDED':
-        this.loadAnnotations(this.state.documentId());
-        break;
-
-      case 'VERSION_COMMITTED':
-        // The bytes this viewer is showing have been replaced. Reload, and
-        // say who did it — the page changing underneath you with no
-        // explanation is alarming.
-        this.state.processingMessage.set(this.versionNotice(event));
-        this.state.applyVersionCommit(event.version ?? this.state.currentVersion());
-        break;
-    }
-  }
-
-  /**
-   * Says who replaced the document under you, and what they did.
-   *
-   * <p>One message with placeholders. It was three fragments joined with a
-   * dash — hardcoded English in a .ts file, which the template sweep cannot
-   * see — and the word order does not survive translation.
-   */
-  private versionNotice(event: CollaborationEvent): string {
-    const version = event.version ?? this.state.currentVersion();
-    const actor = event.actor ?? '';
-    const summary =
-      event.summary ??
-      $localize`:Stands in for a change summary the server did not send@@viewerShell.documentUpdated:document updated`;
-    return $localize`:Says who committed a new version of the document while it was open, and what changed@@viewerShell.versionCommitted:v${version}:version: by ${actor}:actor: — ${summary}:summary:`;
-  }
-
-  /**
-   * Labels that live in expressions, so `i18n` cannot mark them — see the
-   * note in login.component.ts.
-   */
-  readonly untitledDocumentLabel = $localize`:Alternative text for an image whose document has no name@@viewerShell.untitledDocument:Document`;
-
-
-  private async loadDocument(id: number) {
-    this.state.loading.set(true);
-    this.state.loadingMsg.set(
-      $localize`:Progress message while the document is being fetched@@viewerShell.loadingDocument:Loading document...`,
-    );
-
-    this.http.get<any>(`/api/viewer/${id}`).subscribe({
-      next: async (data: any) => {
-        if (data.type === 'svg') {
-          this.state.viewerData.set(data);
-        } else if (data.type === 'pdf' || data.pdfUrl) {
-          this.state.loadingMsg.set(
-            $localize`:Progress message while the PDF is being drawn@@viewerShell.renderingPdf:Rendering PDF...`,
-          );
-          const url = data.pdfUrl || `/api/viewer/${id}/pdf`;
-          // Fetch via HttpClient (authInterceptor attaches the JWT) rather than
-          // handing pdf.js a URL to fetch itself — pdf.js's internal fetch is a
-          // plain browser fetch() that bypasses Angular's interceptors entirely,
-          // which the backend correctly rejects as unauthenticated (403).
-          const bytes  = await firstValueFrom(this.http.get(url, { responseType: 'arraybuffer' }));
-          const pdfDoc = await this.pdfEngine.openDocument(bytes);
-          // Release the previous document before swapping it out — reloading
-          // after a version commit would otherwise leak a pdf.js worker and
-          // its page buffers on every operation.
-          this.state.pdfDoc()?.destroy?.();
-          this.state.pdfDoc.set(pdfDoc);
-          this.state.totalPages.set(pdfDoc.numPages);
-          this.state.currentVersion.set(data.version ?? 1);
-          this.state.viewerData.set({ ...data, type: 'pdf' });
-        } else {
-          this.state.viewerData.set(data);
-        }
-        this.state.loading.set(false);
-      },
-      error: err => {
-        this.state.errorMsg.set('Failed to load document: ' + err.message);
-        this.state.loading.set(false);
-      }
-    });
-  }
-
-  private loadAnnotations(docId: number) {
-    this.annService.loadAnnotations(docId).subscribe(anns => {
-      this.state.setAnnotationsSaved(anns);
-      // Restore shapes from saved annotations
-      const shapes = this.annService.annotationsToShapes(anns);
-      if (shapes.length > 0) {
-        this.state.shapes.set(shapes);
-        this.state.dirty.set(false);  // already saved
-      }
-    });
-  }
-
-  saveMarkup() {
-    const shapes = this.state.shapes();
-    const docId  = this.state.documentId();
-    if (!shapes.length) return;
-
-    this.annService.saveShapes(docId, shapes).subscribe(saved => {
-      // Update shapes with saved IDs
-      saved.forEach(ann => {
-        try {
-          const data = JSON.parse(ann.shapeData);
-          if (data.id) {
-            this.state.updateShape(data.id, { savedId: ann.id });
-          }
-        } catch { /* ignore */ }
-      });
-      this.state.setAnnotationsSaved(saved);
-    });
-  }
+  ngOnDestroy() { this.remoteChanges.stop(); }
 
   async printDocument() {
     const pdfDoc = this.state.pdfDoc();
     if (!pdfDoc) { window.print(); return; }
 
-    // Import markup engine dynamically to avoid circular dep
+    // Imported here rather than at the top to keep the markup engine out of
+    // the shell's own chunk; printing is rare and the engine is not small.
     const { MarkupEngineService } = await import('../../../viewer-core/markup-engine.service');
     const markupEngine = new MarkupEngineService();
 
@@ -340,12 +122,7 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
   }
 
   onPageSelected(page: number) {
-    if (page === -1) {
-      // Search requested
-      this.runSearch();
-      return;
-    }
-    // Scroll to page
+    if (page === SEARCH_REQUESTED) { this.runSearch(); return; }
     document.getElementById('pdf-page-' + page)
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -353,7 +130,7 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
   /**
    * Search whichever kind of document is open.
    *
-   * This used to read the PDF document and return the moment there wasn't
+   * <p>This used to read the PDF document and return the moment there wasn't
    * one, so a converted CAD drawing — which has plenty of text, in its title
    * block alone — answered every query with "No matches found" whether the
    * words were on the drawing or not.
@@ -380,16 +157,11 @@ export class ViewerShellComponent implements OnInit, OnDestroy {
     this.state.searchFocus.set(matches[0]?.item ?? null);
   }
 
-
-
-  // ── View type helpers ────────────────────────────────────────
-  isPdf()         { return this.state.pdfDoc() !== null; }
-  isSvg()         { return this.state.viewerData()?.type === 'svg'; }
-  isImage()       { return this.state.viewerData()?.type === 'image'; }
-  isUnsupported() {
-    const t = this.state.viewerData()?.type;
-    return t && !['pdf','svg','image'].includes(t);
-  }
-
   goBack() { this.router.navigate(['/']); }
 }
+
+/**
+ * What the sidebar sends instead of a page number when the reader pressed
+ * Search. It was a bare -1 with a comment beside every use.
+ */
+const SEARCH_REQUESTED = -1;
