@@ -2,11 +2,28 @@ import { Injectable, ErrorHandler, inject, signal } from '@angular/core';
 import { RemoteLoggingService } from '../services/remote-logging.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { problemDetail } from './problem-detail';
+import {
+  messageForStatus,
+  staleApplicationDetail,
+  staleApplicationMessage,
+  unexpectedFaultMessage,
+} from './error-wording';
 
 export interface AppError {
   id:        string;
+  /** What the reader is shown. Translated, and never an exception's text. */
   message:   string;
   detail?:   string;
+  /**
+   * The exception's own message, for the remote log only.
+   *
+   * <p>Never rendered. It is written for whoever will fix the fault, in
+   * English, and often names an internal shape — showing it to a reader
+   * explains nothing and leaks the application's insides (§1.4). Dropping it
+   * entirely would have cost the one field that makes a report diagnosable,
+   * so it travels here instead of in `message`.
+   */
+  technical?: string;
   stack?:    string;
   timestamp: Date;
   type:      'http' | 'runtime' | 'chunk' | 'unknown';
@@ -58,35 +75,33 @@ export class GlobalErrorHandler implements ErrorHandler {
       // Lazy-chunk loading failure (route-level code splitting)
       if (err.message?.includes('Loading chunk') || err.message?.includes('Failed to fetch')) {
         return { id, timestamp, type: 'chunk', dismissed: false,
-                 message: 'A page failed to load. Please refresh.',
-                 detail: 'This usually happens after a deployment. Refreshing fixes it.' };
+                 message: staleApplicationMessage(),
+                 detail: staleApplicationDetail(),
+                 technical: err.message };
       }
       return { id, timestamp, type: 'runtime', dismissed: false,
-               message: err.message || 'An unexpected error occurred',
-               stack: err.stack, detail: err.name };
+               message: unexpectedFaultMessage(),
+               technical: err.message, stack: err.stack, detail: err.name };
     }
 
     return { id, timestamp, type: 'unknown', dismissed: false,
-             message: 'An unexpected error occurred',
-             detail: String(err) };
+             message: unexpectedFaultMessage(),
+             technical: String(err) };
   }
 
+  /**
+   * What to show for a failed request.
+   *
+   * <p>The server's own sentence wherever it sent one — only it knows
+   * whether a 409 was a stale edit or a duplicate name — and the shared
+   * wording otherwise. The statuses that carry no useful body of their own
+   * go straight to the shared mapping.
+   */
   private httpMessage(err: HttpErrorResponse): string {
-    switch (err.status) {
-      case 0:   return 'Cannot connect to server. Check your network connection.';
-      case 400: return problemDetail(err, 'Invalid request.');
-      case 401: return 'Your session has expired. Please sign in again.';
-      case 403: return 'You do not have permission to perform this action.';
-      case 404: return 'The requested resource was not found.';
-      case 409: return problemDetail(err, 'A conflict occurred. Please try again.');
-      case 413: return 'File is too large to upload.';
-      case 422: return problemDetail(err, 'Validation failed.');
-      case 429: return 'Too many requests. Please slow down.';
-      case 500: return 'Server error. Our team has been notified.';
-      case 502:
-      case 503: return 'Service temporarily unavailable. Please try again shortly.';
-      default:  return `Request failed (${err.status}).`;
-    }
+    const explained = [400, 409, 422].includes(err.status);
+    return explained
+      ? problemDetail(err, messageForStatus(err.status))
+      : messageForStatus(err.status);
   }
 
   private log(appError: AppError, original: unknown): void {
@@ -94,7 +109,7 @@ export class GlobalErrorHandler implements ErrorHandler {
     if (appError.type === 'http' && appError.status && appError.status < 500) {
       console.warn(label, appError.message, appError.detail);
     } else {
-      console.error(label, appError.message, original);
+      console.error(label, appError.technical ?? appError.message, original);
     }
 
     // Send to remote logging (Sentry-compatible via RemoteLoggingService)
@@ -102,7 +117,7 @@ export class GlobalErrorHandler implements ErrorHandler {
       level:   appError.type === 'http' && appError.status && appError.status < 500
                  ? 'warning' : 'error',
       type:    appError.type,
-      message: appError.message,
+      message: appError.technical ?? appError.message,
       detail:  appError.detail,
       stack:   appError.stack,
       tags:    appError.status ? { http_status: String(appError.status) } : undefined

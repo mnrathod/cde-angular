@@ -1,4 +1,12 @@
 import { problemDetail, problemTraceId, problemMessage } from './problem-detail';
+// Asserted against the wording functions rather than their prose: these
+// tests are about which message is chosen, and rewording one should not
+// fail a test that was never about the words.
+import {
+  forbiddenMessage,
+  offlineMessage,
+  sessionExpiredMessage,
+} from './error-wording';
 
 /**
  * The API returns RFC 9457 problem documents, where the readable text is
@@ -95,17 +103,17 @@ describe('problemMessage', () => {
     // "OCR failed." here sends the reader to look at OCR, which was never asked
     // to do anything.
     expect(problemMessage({ status: 0, error: null }, 'OCR failed.'))
-      .toBe('Cannot connect to server. Check your network connection.');
+      .toBe(offlineMessage());
   });
 
   it('says the session expired rather than blaming the feature', () => {
     expect(problemMessage({ status: 401, error: null }, 'Could not load version history.'))
-      .toBe('Your session has expired. Please sign in again.');
+      .toBe(sessionExpiredMessage());
   });
 
   it('says the permission is missing rather than blaming the feature', () => {
     expect(problemMessage({ status: 403, error: null }, 'OCR failed.'))
-      .toBe('You do not have permission to perform this action.');
+      .toBe(forbiddenMessage());
   });
 
   it('prefers what the server said about a refusal over the generic sentence', () => {

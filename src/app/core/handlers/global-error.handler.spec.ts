@@ -2,6 +2,11 @@ import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { GlobalErrorHandler } from './global-error.handler';
 import { definitely } from '../../../testing/definitely';
+import {
+  notFoundMessage,
+  staleApplicationMessage,
+  unexpectedFaultMessage,
+} from './error-wording';
 
 describe('GlobalErrorHandler', () => {
   let handler: GlobalErrorHandler;
@@ -24,8 +29,25 @@ describe('GlobalErrorHandler', () => {
     const errors = handler.errors();
     expect(errors.length).toBe(1);
     expect(definitely(errors[0]).type).toBe('runtime');
-    expect(definitely(errors[0]).message).toBe('Something broke');
     expect(definitely(errors[0]).dismissed).toBe(false);
+  });
+
+  it('tells a reader what to do, not what the exception said', () => {
+    // This used to put err.message on screen. An exception message is
+    // written for whoever will fix the fault: it is in English whatever the
+    // reader's language, and it names internal shapes. The toast renders
+    // this field, so it has to be a sentence a reader can act on (§1.4).
+    handler.handleError(new TypeError("Cannot read properties of undefined (reading 'pageNumber')"));
+
+    expect(definitely(handler.errors()[0]).message).toBe(unexpectedFaultMessage());
+  });
+
+  it('keeps the exception text for the remote log', () => {
+    // Not rendered, but dropping it would cost the one field that makes a
+    // report diagnosable.
+    handler.handleError(new Error('Something broke'));
+
+    expect(definitely(handler.errors()[0]).technical).toBe('Something broke');
   });
 
   it('should classify 401 HttpErrorResponse', () => {
@@ -38,13 +60,13 @@ describe('GlobalErrorHandler', () => {
 
   it('should classify 404 HttpErrorResponse', () => {
     handler.handleError(new HttpErrorResponse({ status: 404, statusText: 'Not Found' }));
-    expect(definitely(handler.errors()[0]).message).toContain('not found');
+    expect(definitely(handler.errors()[0]).message).toBe(notFoundMessage());
   });
 
   it('should classify chunk load error', () => {
     handler.handleError(new Error('Loading chunk 5 failed'));
     expect(definitely(handler.errors()[0]).type).toBe('chunk');
-    expect(definitely(handler.errors()[0]).message).toContain('refresh');
+    expect(definitely(handler.errors()[0]).message).toBe(staleApplicationMessage());
   });
 
   it('should classify unknown error', () => {

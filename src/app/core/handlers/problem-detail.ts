@@ -1,3 +1,9 @@
+import {
+  messageForStatus,
+  offlineMessage,
+  referenceSuffix,
+} from './error-wording';
+
 /**
  * The human-readable text from an RFC 9457 problem document.
  *
@@ -57,7 +63,7 @@ export function problemMessage(err: unknown, fallback: string): string {
   const status = (err as { status?: number } | null)?.status;
 
   // Status 0 is the one case that cannot carry a body: no response arrived.
-  if (status === 0) return 'Cannot connect to server. Check your network connection.';
+  if (status === 0) return offlineMessage();
 
   // The server's own sentence always wins. A 403 can mean "registration is by
   // invitation only" as easily as "you lack the permission", and only the
@@ -66,14 +72,13 @@ export function problemMessage(err: unknown, fallback: string): string {
   const detail = problemDetail(err, '');
   if (detail) {
     const traceId = problemTraceId(err);
-    return traceId ? `${detail} Reference ${traceId}.` : detail;
+    return traceId ? `${detail} ${referenceSuffix(traceId)}` : detail;
   }
 
   // Nothing to read. Only now is a status-derived sentence better than the
-  // caller's fallback, because the fallback names the feature.
-  switch (status) {
-    case 401: return 'Your session has expired. Please sign in again.';
-    case 403: return 'You do not have permission to perform this action.';
-    default:  return fallback;
-  }
+  // caller's fallback, because the fallback names the feature — and only for
+  // the statuses that say something about the caller rather than the
+  // feature. Anything else keeps the fallback.
+  if (status === 401 || status === 403) return messageForStatus(status);
+  return fallback;
 }
