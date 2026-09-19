@@ -1,6 +1,6 @@
 import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 
-import { IfcNode } from './ifc-tree.component';
+import { IfcNode } from './ifc-node';
 import { iconForType } from './ifc-icons';
 
 /**

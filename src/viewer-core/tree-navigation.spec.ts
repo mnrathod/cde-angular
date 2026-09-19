@@ -12,7 +12,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { IfcNode } from './ifc-tree.component';
+import { IfcNode } from './ifc-node';
 import { commandForKey, matchingNodes, parentRow, visibleRows } from './tree-navigation';
 
 function node(id: string, children: IfcNode[] = [], expanded = false): IfcNode {

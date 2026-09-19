@@ -1,5 +1,6 @@
 import { SimpleChange, SimpleChanges } from '@angular/core';
-import { IfcTreeComponent, IfcNode } from './ifc-tree.component';
+import { IfcTreeComponent } from './ifc-tree.component';
+import { IfcNode } from './ifc-node';
 
 /**
  * What the tree does with what it is given.

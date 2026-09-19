@@ -11,7 +11,7 @@
  * failing — and testing it inside the component would need a WebGL context,
  * which is exactly the kind of thing that ends up untested.
  */
-import { IfcNode } from './ifc-tree.component';
+import { IfcNode } from './ifc-node';
 import { ModelGeometryGroup } from './model-geometry';
 
 /**

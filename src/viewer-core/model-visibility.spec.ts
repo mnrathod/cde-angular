@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { IfcNode } from './ifc-tree.component';
+import { IfcNode } from './ifc-node';
 import { ModelGeometryGroup } from './model-geometry';
 import {
   elementTypesIn,

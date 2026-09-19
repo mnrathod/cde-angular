@@ -17,7 +17,8 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, expect, it } from 'vitest';
 
-import { IfcNode, IfcTreeComponent } from './ifc-tree.component';
+import { IfcTreeComponent } from './ifc-tree.component';
+import { IfcNode } from './ifc-node';
 
 function storey(): IfcNode {
   return {

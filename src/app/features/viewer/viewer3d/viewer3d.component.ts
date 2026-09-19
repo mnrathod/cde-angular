@@ -11,7 +11,8 @@ import {
 import { ActivatedRoute, Router } from "@angular/router";
 import { CommonModule } from "@angular/common";
 import { ViewerService } from "../../../core/services/viewer.service";
-import { IfcTreeComponent, IfcNode } from "../../../../viewer-core/ifc-tree.component";
+import { IfcTreeComponent } from "../../../../viewer-core/ifc-tree.component";
+import { IfcNode } from "../../../../viewer-core/ifc-node";
 import {
   ModelGeometry,
   ModelGeometryGroup,

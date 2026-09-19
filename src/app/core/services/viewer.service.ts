@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ViewerData } from '../models';
-import { IfcNode } from '../../../viewer-core/ifc-tree.component';
+import { IfcNode } from '../../../viewer-core/ifc-node';
 
 @Injectable({ providedIn: 'root' })
 export class ViewerService {

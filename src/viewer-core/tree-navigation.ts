@@ -15,7 +15,7 @@
  * edges worth testing — the last visible row, a collapsed branch, a leaf at
  * depth three — and none of them need a DOM to state.
  */
-import { IfcNode } from './ifc-tree.component';
+import { IfcNode } from './ifc-node';
 
 /**
  * One rendered row, with what the ARIA attributes need.
