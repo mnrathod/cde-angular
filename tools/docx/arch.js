@@ -9,14 +9,21 @@ const children = [
   ...titleBlock(
     'Technical Architecture',
     'The document viewer as a product a third-party common data environment embeds.',
-    ['**Status.** The rendering core is built and boundary-enforced, and so — since this document '
-   + 'was last issued — is the integration surface: the `cde.viewer.v1` embed protocol is '
-   + 'implemented on both sides and tested against an independent host, the backend carries the '
-   + '`frame-ancestors` allow-list that used to refuse every frame, and **the image now serves '
-   + 'the embed document itself**, which is what closed the gap this document reported last '
-   + 'time. The demo host now drives the whole protocol against it end to end. What has '
-   + 'not happened is a real CDE integrating it. Section 13 states exactly what is left — read it before quoting '
-   + 'anything here to a customer.']),
+    ['**Status.** The rendering core is built and boundary-enforced, and so is the integration '
+   + 'surface: the `cde.viewer.v1` embed protocol is implemented on both sides and tested '
+   + 'against an independent host, the backend carries the `frame-ancestors` allow-list that '
+   + 'used to refuse every frame, and the image serves the embed document itself. The demo host '
+   + 'drives the whole protocol against it end to end. What has not happened is a real CDE '
+   + 'integrating it.',
+     '**Since the last issue**, the work has been conformance and structure rather than '
+   + 'features: every hardcoded user-facing string is now a translatable message behind two CI '
+   + 'gates (section 9.4); two drag-only interactions have a keyboard route, and a set of '
+   + 'controls that announced themselves as glyphs now have names (sections 9.2 and 9.3); and '
+   + '`viewer-core` is inside the section 3.3 size limits throughout (section 3.2). **One claim '
+   + 'in the last issue was wrong** and is corrected in section 12 — the environment note that '
+   + 'qualified every statement about test results.',
+     'Section 13 states exactly what is left — read it before quoting anything here to a '
+   + 'customer.']),
 
   p('**Scope.** The viewer as described by ADR 12 (`cde-platform`, '
   + '`docs/adr/0012-viewer-as-a-standalone-product.md`).'),
@@ -86,9 +93,9 @@ const children = [
     { header: true, cells: [{ t: 'Service' }, { t: 'Lines' }, { t: 'Responsibility' }] },
     { cells: [{ t: 'viewer-state.service' }, { t: '375', align: AlignmentType.CENTER },
       { t: 'The single source of truth. Signals for document, page, zoom, rotation, active tool, selection, sidebar tab, and the version-commit token that makes panels reload after a server-side operation' }] },
-    { cells: [{ t: 'markup-engine.service' }, { t: '565', align: AlignmentType.CENTER },
-      { t: 'All drawing: pointer events (mouse and touch), shape creation, SVG rendering, hit testing' }] },
-    { cells: [{ t: 'pdf-engine.service' }, { t: '201', align: AlignmentType.CENTER },
+    { cells: [{ t: 'markup-engine.service' }, { t: '372', align: AlignmentType.CENTER },
+      { t: 'Shape creation, geometry updates and hit testing. Pointer handling and the in-progress shape moved out to markup-drawing-session when the second surface needed them' }] },
+    { cells: [{ t: 'pdf-engine.service' }, { t: '238', align: AlignmentType.CENTER },
       { t: 'pdfjs-dist wrapper — document loading, page rendering to canvas, text-layer extraction' }] },
     { cells: [{ t: 'measurement.service' }, { t: '165', align: AlignmentType.CENTER },
       { t: 'Scale calibration and the geometry behind length, area and radius. unitsPerPixel === 1 with unit px means uncalibrated' }] },
@@ -104,18 +111,30 @@ const children = [
   + '`page-links`, `tool-rail`, and `icon` — the last being the product’s whole icon set as '
   + 'stroke-only 24×24 path data, so one definition sits on a light rail, a dark header and an '
   + 'accent-filled button without variants.'),
-  note('`cad-viewer.component.ts` is 678 lines, over the §3.3 limits of 400 per file and 200 per '
-     + 'component. Recorded rather than hidden: it is known debt, it predates the extraction, and '
-     + 'splitting a canvas component wants a test suite that can actually run first. It grew from '
-     + '629 when the §5.12 sanitiser bypasses came out of it — the converted drawing now reaches '
-     + 'the page through an `<img>` and a blob URL, which is more code here and no injected markup '
-     + 'anywhere. The markup drawing went the other way, out to `markup-shapes.component` (121 '
-     + 'lines) on its third caller, so `markup-engine.service` fell from 665 to 576.'),
+  p('**Every component in `viewer-core` is now inside the §3.3 limits.** The last issue recorded '
+  + '`cad-viewer.component.ts` at 678 lines and called splitting it debt that wanted a runnable '
+  + 'test suite first. The suite runs (§12), and the split happened: `cad-viewer` is 118 lines, '
+  + 'with the viewport transform, the image lifecycle, the layer panel and the markup overlay '
+  + 'each in their own file. `ifc-tree` went the same way, 398 to 190, with a row component and '
+  + 'a roving tab stop beside it.'),
+  p('The decomposition was not cosmetic. Splitting a file forces every seam through a test, and '
+  + 'four defects came out of these two alone: a drawing whose rotation shift had never been '
+  + 'asserted, a layer panel whose checkbox the spec bypassed by reaching into the component, an '
+  + 'image-viewer branch that could never have run, and model metadata computed, translated and '
+  + 'never rendered.'),
+  note('Two spec files remain over the 400-line file limit — `ifc-tree.visibility.spec.ts` (458) '
+     + 'and `markup-drawing-session.spec.ts` (408). Recorded rather than hidden; they are the '
+     + 'next thing to split.'),
 
   h2('3.3  What is deliberately not here'),
-  p('The 15 components still in the application are not there by accident. Thirteen import the '
-  + 'platform’s HTTP services; two (`viewer.component`, `viewer3d.component`) inject '
-  + '`ViewerService`, which calls `/api/viewer/{id}` and the annotation endpoints.'),
+  p('The 33 viewer components still in the application are not there by accident. Eighteen '
+  + 'import the platform’s HTTP services directly; the rest are presentational children produced '
+  + 'by the §3.3 decomposition, and those move as they are — a page card, a signature stamp, a '
+  + 'form-field row and a toolbar have no opinion about where their data came from.'),
+  p('That count rose while the coupling did not, which is the point: splitting an oversized '
+  + 'component multiplies files, and the question “what still has to move” is answered by the '
+  + 'eighteen, not the thirty-three. `viewer.component` is no longer among them — it was dead '
+  + 'and has been deleted.'),
   p('**ADR 12’s open step 4 is now closed.** ADR 14 decided the rule: reads and computations are '
   + 'viewer-side, and anything that changes the document is a callback into the host. That covers '
   + 'seventeen operations, and three of them — `document.sign`, `version.create`, '
@@ -308,15 +327,63 @@ const children = [
   + 'than each other, which is what lets those operations compose: each starts from the previous '
   + 'one’s output rather than from the untouched original.'),
 
-  h1('9.  Accessibility architecture'),
-  p('Not a layer applied afterwards. Three decisions are structural.'),
-  bullet('**The IFC tree is the primary data interface.** A canvas alone cannot conform.'),
-  bullet('**Every drag interaction needs a single-pointer alternative** (SC 2.5.7) — which for a '
-       + 'markup tool means every shape must be creatable and movable without a drag. This is a '
-       + 'known gap: the callout box cannot currently be dragged at all, because `updateShape` has '
-       + 'no `callout` case.'),
+  h1('9.  Accessibility and localisation architecture'),
+  lead('Both are procurement gates rather than preferences, and both are structural here for the '
+     + 'same reason: a host CDE embedding this viewer inherits our conformance and our '
+     + 'untranslated strings, and can fix neither from the outside.'),
+
+  h2('9.1  The three structural decisions'),
+  bullet('**The IFC tree is the primary data interface.** A canvas alone cannot conform. It now '
+       + 'implements the full tree pattern — a roving tab stop, arrow navigation, `aria-level` '
+       + 'and `aria-expanded` on each row — rather than a list of divs that looked like a tree.'),
+  bullet('**Every drag interaction needs a single-pointer alternative** (SC 2.5.7).'),
   bullet('**Exports must be tagged and PDF/UA-conformant.** An inaccessible export is a product '
        + 'accessibility failure, and it is the most common gap found in government audits.'),
+
+  h2('9.2  What the second of those cost'),
+  p('SC 2.5.7 was stated in the last issue of this document and not implemented. Two drag-only '
+  + 'interactions have since been given a keyboard route.'),
+  bullet('**Page reordering** was a CDK drag handle and nothing else. Angular’s CDK drag-drop has '
+       + 'no keyboard mode and a `<span cdkDragHandle>` cannot take focus, so a reader without a '
+       + 'pointer could select, rotate, duplicate and delete pages but never move one — while the '
+       + 'grip’s own translator note claimed reordering worked from the keyboard. Each page now '
+       + 'carries a pair of move buttons that name the page they move.'),
+  bullet('**The comparison wipe** was a drag-only divider. It is a range input with the visual '
+       + 'handle drawn over it, so it answers arrow keys, Home and End.'),
+  note('**The remaining gap is the markup layer**, and it is the same one as last time: '
+     + '`updateShape` still has no `callout` case, so a callout box cannot be dragged at all, and '
+     + 'no shape can yet be created or moved without a pointer. This is the largest accessibility '
+     + 'item outstanding and it is not a small one.'),
+
+  h2('9.3  Defects that were not on anyone’s list'),
+  p('A pass over the panels found a class of failure worth naming, because it is invisible to an '
+  + 'automated checker and to a sighted developer alike: **accessible-name computation takes '
+  + 'element content over `title`.** A `<button>` whose whole content is “↺” is announced as that '
+  + 'glyph; its tooltip is never read. Six controls announced themselves as a symbol. The fix is '
+  + 'an `aria-label` on the button and `aria-hidden` on the glyph.'),
+  p('The same pass found a label pointing at a DOM id that did not exist, because the id was a '
+  + 'PDF AcroForm field name and “Given name” has a space in it; four buttons bound to empty '
+  + 'method bodies; required form fields marked only by an `aria-hidden` asterisk; validation '
+  + 'messages not tied to the control they were about; and status icons announced as “white heavy '
+  + 'check mark” beside a badge that already said the status.'),
+  note('None of these would have been caught by axe. **This is the argument for §1A.5’s position '
+     + 'that automated checks are a floor, not conformance** — and it is worth quoting to a buyer '
+     + 'who asks what our VPAT rests on.'),
+
+  h2('9.4  Localisation'),
+  p('There are no hardcoded user-facing strings left in the application. Every sentence a reader '
+  + 'sees is an `i18n` attribute or a `$localize` call carrying a stable message id and a '
+  + 'translator note, extracted to a committed catalogue at `src/locale/messages.json` — **552 '
+  + 'messages at this issue.**'),
+  p('Two gates hold it, and both run in CI. `check:i18n` regenerates the catalogue and fails on '
+  + 'any difference, the same contract §3.5 imposes on the OpenAPI spec and for the same reason: '
+  + 'a generated file nothing compares to its source rots, and a stale catalogue ships an '
+  + 'untranslated string to every language at once. `check:i18n-markup` sweeps component '
+  + 'templates for text a translator will never see.'),
+  p('Two things a host should know. Server-produced English still reaches the screen in a few '
+  + 'places where only the server knows what happened — it has been removed wherever the server '
+  + 'also sends a status code we can word ourselves, which is most of them. And the viewer ships '
+  + 'the source catalogue, not translations: a host wanting French supplies French.'),
 
   h1('10.  Security posture'),
   p('Most of §5 is inherited from the platform and documented there — RLS tenant isolation, the '
@@ -413,13 +480,24 @@ const children = [
   p('Angular 22 with TypeScript strict **and** `noUncheckedIndexedAccess`. Third-party JavaScript '
   + 'is bundled, never loaded from a CDN — §5.12 A08, and it is also what makes air-gapped '
   + 'deployment possible.'),
-  note('A note on the current environment, because it affects what any statement about test '
-     + 'results is worth: `ng test` and `ng build` require Node ≥ 22.22.3, and the development '
-     + 'container runs 22.22.2. Specs that need Angular TestBed cannot run there at all, and '
-     + 'neither can `ng build viewer-core`; `tsc --noEmit`, bare Vitest and Playwright can. **The '
-     + '`/embed` route has therefore been typechecked and unit-tested but never rendered by '
-     + 'Angular in a browser** — the demo’s end-to-end tests run against a stub viewer, not the '
-     + 'real one. Any claim of “tests pass” in this repository should say which of those it means.'),
+  note('**The environment note in the last issue of this document was wrong, and the correction '
+     + 'matters because that note qualified every test claim in it.** It said `ng test` and '
+     + '`ng build` require Node ≥ 22.22.3, that the development container runs 22.22.2, and that '
+     + 'specs needing Angular TestBed therefore could not run at all. The version facts are right '
+     + '— `@angular/build` does declare `^22.22.3` and the container is on 22.22.2 — but the '
+     + 'conclusion is not. npm’s engine range is advisory unless `engine-strict` is set, and it is '
+     + 'not set here. `ng test` and `ng build --configuration production` both run, and have been '
+     + 'running throughout the work described in this issue: **909 specs pass, and the production '
+     + 'build is clean.** TestBed specs are the majority of them.'),
+  p('That correction is load-bearing in an unwelcome direction. Several components had never been '
+  + 'type-checked against their own templates, because `ng test` does not type-check a component '
+  + 'no spec imports and `tsc --noEmit` does not check Angular templates at all. Only '
+  + '`ng build --configuration production` catches both, and running it surfaced real defects — a '
+  + 'template referencing a signal that did not exist, another calling `new` where the Angular '
+  + 'parser has no `new`. Both checks stay in the loop.'),
+  p('What remains true: the demo’s end-to-end tests drive a stub viewer rather than the real one, '
+  + 'so **the `/embed` route still has not been rendered by Angular inside a host frame on an '
+  + 'installed deployment** (§13).'),
 
   h2('12.1  Gates'),
   p('Each of these fails loudly rather than warning, and each exists because the thing it checks '
@@ -435,14 +513,38 @@ const children = [
     { cells: [{ t: 'check:samples' },
       { t: 'The demo’s three sample documents match their generator byte for byte' }] },
     { cells: [{ t: 'test:demo' },
-      { t: 'Eight Playwright tests drive the demo host in a real browser' }] }
+      { t: 'Eight Playwright tests drive the demo host in a real browser' }] },
+    { cells: [{ t: 'check:i18n' },
+      { t: 'The committed message catalogue regenerates to exactly what is in the tree. It captures the extractor\u2019s stderr rather than inheriting it, because duplicate message ids are reported there and it exits 0 regardless \u2014 two source strings sharing an id means one of them ships the wrong words in every translated language' }] },
+    { cells: [{ t: 'check:i18n-markup' },
+      { t: 'No component template carries user-facing text a translator will never see' }] },
+    { cells: [{ t: 'check:served-assets' },
+      { t: 'Nothing in the built bundle is unreachable code' }] },
+    { cells: [{ t: 'test:scripts' },
+      { t: 'The gate scripts themselves have tests, so a gate cannot pass by being broken' }] }
   ]),
   caption('Table 6 — The repository’s own gates.'),
-  note('**Four of these five are not run by CI.** The platform’s `Jenkinsfile` runs `npm ci`, '
-     + '`tsc --noEmit`, `check:no-remote-code`, `ng build` and `ng test` against this repository, '
-     + 'and nothing else. `check:attribution`, `check:icons`, `check:samples` and `test:demo` '
-     + 'exist, pass, and guard nothing until a pipeline stage calls them. A gate nothing runs is '
-     + 'documentation.'),
+  p('**Five of these nine now run in CI**, against four last time. The platform’s `Jenkinsfile` '
+  + 'runs `npm ci`, `tsc --build --force --noEmit`, `check:no-remote-code`, `check:i18n`, '
+  + '`check:i18n-markup`, `test:scripts`, `ng build` and `ng test` against this repository. '
+  + '`check:attribution`, `check:icons`, `check:samples`, `check:served-assets` and `test:demo` '
+  + 'exist, pass locally, and guard nothing until a pipeline stage calls them. A gate nothing '
+  + 'runs is documentation.'),
+  note('One correction to the `tsc` line in the last issue: the pipeline passes `--build --force`, '
+     + 'not a bare `--noEmit`. `tsconfig.json` carries `"files": []` and project references, so '
+     + '`tsc --noEmit` type-checks nothing at all and exits 0 — proven by putting a type error in '
+     + 'a production file and watching it pass. **A gate that cannot fail is worse than no gate, '
+     + 'because it is quoted.**'),
+  note('**`check:attribution` is currently failing, and it is not this issue’s doing.** Two '
+     + 'transitive packages carry licences on neither §2.1’s allowed nor its forbidden list: '
+     + '`caniuse-lite` (CC-BY-4.0, a browser-support dataset) and `lru-cache` (BlueOak-1.0.0, an '
+     + 'OSI-approved permissive licence). Both arrive only through `@angular/build` and '
+     + '`@angular/cli`, which are devDependencies, but the lockfile marks them '
+     + 'production-reachable so the generator counts them. Neither is forbidden and both look '
+     + 'shippable; adding a licence to the allow-list is a policy decision rather than an '
+     + 'engineering one, so the generator refuses to write `THIRD-PARTY-NOTICES.txt` over an '
+     + 'unresolved violation rather than assert a position nobody took. **This blocks §17.6’s '
+     + 'release checklist until someone rules on it.**'),
 
   h1('13.  What this architecture does not yet have'),
   lead('Stated plainly, and shorter than it was. The gap between “the viewer works” and “a CDE can '
@@ -487,17 +589,24 @@ const children = [
      + 'unambiguously and that a design decision actually turns on; **the partition needs '
      + 're-deriving before it goes in front of a customer**, and no number here should be quoted '
      + 'as a complete breakdown until it does.'),
-  p('**A library in shape, never built here.** `viewer-core` has its manifest, its ng-packagr '
-  + 'configuration and its own `angular.json` project, so `ng build viewer-core` is a real target '
-  + '— it has simply never run in this container, for the Node reason in section 12. The '
+  p('**A library in shape, never built as one.** `viewer-core` has its manifest, its ng-packagr '
+  + 'configuration and its own `angular.json` project, so `ng build viewer-core` is a real '
+  + 'target. The last issue said it could not run here for the Node reason in section 12; that '
+  + 'reason was wrong, so the honest statement is now simply that nobody has run it. The '
   + '`UNLICENSED` marker is still deliberate and still means no publish decision has been taken.'),
   p('**Accessibility evidence.** The artefacts exist in `cde-platform/docs/accessibility/` — an '
   + 'accessibility statement, a VPAT 2.5 INT conformance report, and a screen-reader matrix — and '
   + 'all three say the same thing about themselves: the statement is a draft not fit to publish, '
   + 'every criterion in the ACR reads Not Evaluated or Does Not Support, and no screen-reader pass '
   + 'has been run. **What is missing is not the document; it is the evidence the document is '
-  + 'supposed to cite.** No axe, no Lighthouse budget, no manual keyboard pass, and no gate in the '
-  + 'pipeline to produce any of it.'),
+  + 'supposed to cite.** There is still no axe run, no Lighthouse budget, and no gate in the '
+  + 'pipeline to produce either.'),
+  p('What has changed is the ground underneath them. The defects in sections 9.2 and 9.3 were '
+  + 'real conformance failures and they are fixed, with a keyboard-operable test pinning each '
+  + 'one — so an ACR filled in today would read differently from one filled in at the last issue. '
+  + 'It would still read mostly Not Evaluated, because a test asserting an `aria-label` exists is '
+  + 'not a screen-reader pass and must never be reported as one (§1A.5). **The ACR has not been '
+  + 'updated, and should not be until someone runs the matrix.**'),
   p('The embed makes this worse rather than inheriting it. Focus crossing a frame boundary, '
   + 'printing from inside a frame, and 200% zoom in a host-sized frame are all new surfaces that '
   + 'need testing afresh, and some of them will be worse than the standalone viewer. §1A is '

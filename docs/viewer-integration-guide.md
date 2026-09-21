@@ -4,12 +4,18 @@ For an engineer at a common data environment — Asite, Procore, Dalux, or your
 own — who has to make this viewer open your customers' documents.
 
 **Read section 1 before planning anything.** All four exchanges an integration
-needs are now built, you can run a working host application from this repository
-today, and the viewer deployment now has a `frame-ancestors` allow-list to put
-your origins on. **What is still missing is a tier that serves the embed
-document at all**, so the embed does not yet work against a stock install. This
-guide says which parts you can build on now and which you cannot, rather than
-describing an interface you would then fail to find.
+needs are built, you can run a working host application from this repository
+today, the image serves the embed document itself, and the deployment carries a
+`frame-ancestors` allow-list to put your origins on. What has not happened is a
+real CDE integrating it. This guide says which parts you can build on now and
+which you cannot, rather than describing an interface you would then fail to
+find.
+
+> **Since the last issue**, nothing in the protocol has changed — section 5 is
+> the same contract. What changed is what you inherit when you embed it:
+> section 7 now tells you what our accessibility and localisation position
+> actually is, in enough detail to answer a procurement questionnaire without
+> overstating it.
 
 Companion: `viewer-architecture.md` for how the thing works internally.
 
@@ -23,7 +29,7 @@ Companion: `viewer-architecture.md` for how the thing works internally.
 | 2 | Tell the viewer who is looking | you → viewer | **Built** — `host.init.identity`, three untrusted fields. §5.5 |
 | 3 | Hand over a document | you → viewer | **Built** — `host.init.document`, or the conversion API. §3 |
 | 4 | Get back what was drawn | viewer → you | **Built** — markup events, lifecycle events and one operation pair. §5.3, §5.4 |
-| — | A tier that serves the embed document | — | **Missing** — the allow-list exists; nothing answers `/embed`. §5.2 |
+| — | A tier that serves the embed document | — | **Built** — the image answers `/embed` when `cde.web.app.path` points at a staged build. §5.2 |
 
 Two things are true at once, and conflating them will cost you a sprint.
 
@@ -280,7 +286,7 @@ engineering cannot take alone.
 
 ---
 
-## 5. Embedding — built, and what your deployment still needs
+## 5. Embedding — built, and what your deployment must configure
 
 **An iframe and a versioned `postMessage` protocol.** The viewer authenticates
 nobody and authorises nothing: you mint a short-lived URL for the document, tell
@@ -517,12 +523,49 @@ Exports must be tagged and PDF/UA-conformant.
 > **Do not inherit a conformance claim from us, because we are not making one
 > yet.** An accessibility statement, a VPAT 2.5 INT conformance report and a
 > screen-reader matrix all exist in our repository, and all three record the
-> same thing: no criterion has been evaluated by test. Real work has been
-> done — keyboard-reachable controls, a visible focus indicator throughout,
-> `prefers-reduced-motion` honoured, an authentication flow that meets SC 3.3.8
-> by construction — but none of it has been through an audit, and an untested
-> claim is worth nothing in a procurement. If your bid depends on ours, ask for
-> the current state in writing rather than citing this guide.
+> same thing: no criterion has been evaluated by an audit. If your bid depends
+> on ours, ask for the current state in writing rather than citing this guide.
+
+What we can tell you honestly, because each item has a test that fails when it
+regresses:
+
+- The model hierarchy tree implements the full tree pattern — roving tab stop,
+  arrow navigation, `aria-level` and `aria-expanded` per row.
+- Page reordering and the comparison wipe, both previously drag-only, have
+  keyboard routes (SC 2.5.7).
+- Icon-only controls carry accessible names rather than announcing their glyph.
+- Form controls are programmatically associated with their labels, their
+  validation messages and their hints; required fields say so to assistive
+  technology rather than only showing an asterisk.
+- Long operations and their results are announced through live regions.
+
+**And what we cannot.** No axe run, no Lighthouse budget, no screen-reader pass
+against the supported matrix, and no CI gate producing any of them. One known
+functional gap: **markup shapes cannot yet be created or moved without a
+pointer**, which is an SC 2.5.7 failure in the annotation layer specifically.
+If your customers annotate drawings and your bid claims AA, raise this with us
+before you sign.
+
+**Localisation.** The viewer has no hardcoded user-facing strings. Everything a
+reader sees carries a stable message id and a translator note, extracted to a
+committed catalogue — 552 messages — with two CI gates keeping it honest: one
+fails if the catalogue drifts from source, the other if a template grows text a
+translator will never see.
+
+> **We ship the source catalogue, not translations.** The messages are English
+> and there are no other locales in the repository. If you sell into a market
+> that needs French or Arabic, you supply the translated catalogue; the
+> mechanism to consume it is Angular's standard `$localize` pipeline and costs
+> you a build per locale, not a fork. RTL layout has been kept in mind
+> throughout — logical properties rather than `left`/`right` — but has not been
+> verified against a real RTL locale, because there is not one to verify
+> against.
+
+A few sentences still reach the screen in English from the server, in the
+places where only the server knows what happened. We have replaced them
+wherever the response also carries a status code the client can word itself,
+which is most of them, but a host serving a non-English market should expect a
+small residue and ask us to name it for the paths they care about.
 
 **Trademarks.** "Works with Microsoft SharePoint" is nominative fair use.
 "Microsoft-approved", their logo, or any implication of partnership is not. The

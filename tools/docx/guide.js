@@ -16,7 +16,12 @@ const children = [
    + 'your origins on. **What has not been exercised end to end is a real document opening '
    + 'inside a real host frame**, so treat section 4 as the contract and your first integration '
    + 'as the thing that proves it. This guide says which parts you can build on now and which '
-   + 'are newer than anyone’s production traffic.']),
+   + 'are newer than anyone’s production traffic.',
+     '**Since the last issue**, nothing in the protocol has changed — section 5 is the same '
+   + 'contract. What changed is what you inherit when you embed it: section 7 now states our '
+   + 'accessibility and localisation position in enough detail to answer a procurement '
+   + 'questionnaire without overstating it, including the one functional accessibility gap that '
+   + 'is still open.']),
 
   p('Companion document: **Technical Architecture**, for how the thing works internally.'),
 
@@ -425,11 +430,40 @@ const children = [
   note('**Do not inherit a conformance claim from us, because we are not making one yet.** An '
      + 'accessibility statement, a VPAT 2.5 INT conformance report and a screen-reader matrix all '
      + 'exist in our repository, and all three record the same thing: no criterion has been '
-     + 'evaluated by test. Real work has been done — keyboard-reachable controls, a visible focus '
-     + 'indicator throughout, `prefers-reduced-motion` honoured, an authentication flow that meets '
-     + 'SC 3.3.8 by construction — but none of it has been through an audit, and an untested claim '
-     + 'is worth nothing in a procurement. If your bid depends on ours, ask for the current state '
-     + 'in writing rather than citing this guide.'),
+     + 'evaluated by an audit. If your bid depends on ours, ask for the current state in writing '
+     + 'rather than citing this guide.'),
+  p('What we can tell you honestly, because each item has a test that fails when it regresses:'),
+  bullet('The model hierarchy tree implements the full tree pattern — roving tab stop, arrow '
+       + 'navigation, `aria-level` and `aria-expanded` per row.'),
+  bullet('Page reordering and the comparison wipe, both previously drag-only, have keyboard '
+       + 'routes (SC 2.5.7).'),
+  bullet('Icon-only controls carry accessible names rather than announcing their glyph.'),
+  bullet('Form controls are programmatically associated with their labels, their validation '
+       + 'messages and their hints; required fields say so to assistive technology rather than '
+       + 'only showing an asterisk.'),
+  bullet('Long operations and their results are announced through live regions.'),
+  note('**And what we cannot.** No axe run, no Lighthouse budget, no screen-reader pass against '
+     + 'the supported matrix, and no CI gate producing any of them. One known functional gap: '
+     + '**markup shapes cannot yet be created or moved without a pointer**, which is an SC 2.5.7 '
+     + 'failure in the annotation layer specifically. If your customers annotate drawings and '
+     + 'your bid claims AA, raise this with us before you sign.'),
+
+  p('**Localisation.** The viewer has no hardcoded user-facing strings. Everything a reader sees '
+  + 'carries a stable message id and a translator note, extracted to a committed catalogue — 552 '
+  + 'messages — with two CI gates keeping it honest: one fails if the catalogue drifts from '
+  + 'source, the other if a template grows text a translator will never see.'),
+  note('**We ship the source catalogue, not translations.** The messages are English and there '
+     + 'are no other locales in the repository. If you sell into a market that needs French or '
+     + 'Arabic, you supply the translated catalogue; the mechanism to consume it is Angular’s '
+     + 'standard `$localize` pipeline and costs you a build per locale, not a fork. RTL layout '
+     + 'has been kept in mind throughout — logical properties rather than `left`/`right` — but '
+     + 'has not been verified against a real RTL locale, because there is not one to verify '
+     + 'against.'),
+  p('A few sentences still reach the screen in English from the server, in the places where only '
+  + 'the server knows what happened. We have replaced them wherever the response also carries a '
+  + 'status code the client can word itself, which is most of them, but a host serving a '
+  + 'non-English market should expect a small residue and ask us to name it for the paths they '
+  + 'care about.'),
   p('**Trademarks.** “Works with Microsoft SharePoint” is nominative fair use. '
   + '“Microsoft-approved”, their logo, or any implication of partnership is not. The same applies '
   + 'to Amazon, Google and Autodesk. Integration documentation is where this goes wrong most '
