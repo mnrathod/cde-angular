@@ -169,6 +169,90 @@ describe('the stamp shown after signing', () => {
 });
 
 /**
+ * What the panel says when a request fails.
+ *
+ * <p>All three of these swallowed their error: listing set `loading` false
+ * and said nothing, so a document whose signatures could not be read looked
+ * exactly like one that had none; signing re-enabled its button and said
+ * nothing, which reads as "nothing happened" rather than "refused"; and the
+ * verify result appeared without being announced. §1.4 asks for what
+ * happened, why, and what to do next — none of which is silence.
+ */
+describe('a signing request that fails', () => {
+  let fixture: ComponentFixture<DocumentSignatureComponent>;
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [DocumentSignatureComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting(), ViewerStateService],
+    });
+    fixture = TestBed.createComponent(DocumentSignatureComponent);
+    fixture.componentRef.setInput('documentId', 42);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => httpMock.verify());
+
+  /** Whatever the panel is currently announcing, if anything. */
+  function announced(): string {
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+    return host.querySelector('[role="status"]')?.textContent?.trim() ?? '';
+  }
+
+  function listingFails() {
+    fixture.detectChanges();
+    httpMock.expectOne('/api/signatures/document/42')
+      .flush({ detail: 'Storage unavailable' }, { status: 503, statusText: 'Unavailable' });
+  }
+
+  it('says so when the signatures cannot be listed', () => {
+    listingFails();
+
+    expect(announced()).not.toBe('');
+  });
+
+  it('does not claim the document has no signatures when it could not look', () => {
+    listingFails();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.textContent).not.toContain('No signatures on this document yet');
+  });
+
+  it('says so when signing is refused', () => {
+    fixture.detectChanges();
+    httpMock.expectOne('/api/signatures/document/42').flush([]);
+
+    fixture.componentInstance.signReq = { role: 'Approver', reason: 'Approved' };
+    fixture.componentInstance.signDocument();
+    httpMock.expectOne('/api/signatures/document/42/sign')
+      .flush({ detail: 'Not permitted' }, { status: 403, statusText: 'Forbidden' });
+
+    expect(announced()).not.toBe('');
+  });
+
+  it('announces what re-checking a signature found, rather than only showing it', () => {
+    fixture.detectChanges();
+    httpMock.expectOne('/api/signatures/document/42').flush([SIGNATURE]);
+    fixture.detectChanges();
+
+    fixture.componentInstance.verifySignature(SIGNATURE);
+    httpMock.expectOne(`/api/signatures/${SIGNATURE.signatureId}/verify`)
+      .flush({ valid: true, status: 'VALID', message: 'Signature is valid', embedded: true });
+    httpMock.expectOne('/api/signatures/document/42').flush([SIGNATURE]);
+
+    const host = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+    const region = host.querySelector('[role="status"]');
+    expect(region?.getAttribute('aria-live')).toBe('polite');
+    // The server's own English sentence is not what reaches the screen.
+    expect(region?.textContent).not.toContain('Signature is valid');
+    expect(region?.textContent).toContain('has not changed');
+  });
+});
+
+/**
  * What Angular's sanitiser actually does to an SVG string.
  *
  * <p>Asserted rather than assumed, because the redesign above rests on it and

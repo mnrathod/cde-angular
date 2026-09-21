@@ -48,7 +48,8 @@ export interface SignResult {
 
 export interface VerifyResult {
   valid:    boolean;
-  status:   string;
+  /** Same enum the record carries, so the outcome can be worded client-side. */
+  status:   SignatureRecord['status'];
   message:  string;
   /** Whether the check read the document itself or only our record of it. */
   embedded: boolean;
