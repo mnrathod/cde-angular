@@ -108,6 +108,41 @@ describe("CompareComponent", () => {
       expect(compare.comparing()).toBe(false);
     });
 
+    it("says why, when the comparison fails", () => {
+      // It only cleared the busy flag, so a refused comparison looked
+      // exactly like one that found no differences. `problemMessage` was
+      // imported here and never called, which is what gave it away.
+      vi.spyOn(service, "compare").mockReturnValue(throwError(() => ({})));
+      compare.doc1.set(document(1, "Rev A"));
+      compare.doc2.set(document(2, "Rev B"));
+
+      compare.runCompare();
+      fixture.detectChanges();
+
+      // `querySelector(...)?.textContent` is undefined when the element is
+      // absent, and `expect(undefined).not.toBe("")` passes — so the first
+      // draft of this test survived deleting the very line it guards. The
+      // element has to be asserted present before its text is read.
+      const host = fixture.nativeElement as HTMLElement;
+      const alert = host.querySelector('[role="alert"]');
+      expect(alert).not.toBeNull();
+      expect(alert!.textContent!.trim().length).toBeGreaterThan(0);
+    });
+
+    it("clears the previous failure when a new comparison starts", () => {
+      vi.spyOn(service, "compare").mockReturnValue(throwError(() => ({})));
+      compare.doc1.set(document(1, "Rev A"));
+      compare.doc2.set(document(2, "Rev B"));
+      compare.runCompare();
+
+      vi.spyOn(service, "compare").mockReturnValue(of(comparison()));
+      compare.runCompare();
+      fixture.detectChanges();
+
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('[role="alert"]')).toBeNull();
+    });
+
     it("swaps which file is which", () => {
       compare.doc1.set(document(1, "Rev A"));
       compare.doc2.set(document(2, "Rev B"));
@@ -206,6 +241,15 @@ describe("CompareComponent", () => {
       compare.pickFile(1);
 
       expect(render()).toContain("Rev A");
+    });
+
+    it("teaches in the picker when the project holds nothing to compare", () => {
+      // It opened a dialog containing a heading and blank space, which says
+      // neither what it is for nor what to do about it (§1.1).
+      TestBed.inject(DocumentService).documents.set([]);
+      compare.pickFile(1);
+
+      expect(render()).toContain("no documents yet");
     });
   });
 
