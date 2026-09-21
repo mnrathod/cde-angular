@@ -1,7 +1,7 @@
 import {
   Component, inject, effect, signal, ChangeDetectionStrategy
 } from '@angular/core';
-import { CdkDropList, CdkDragDrop } from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDropList, CdkDragDrop } from '@angular/cdk/drag-drop';
 
 import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
 import { InsertPagesPanelComponent } from './insert-pages-panel.component';
@@ -22,7 +22,7 @@ import { PageDraft, DraftPage } from './page-draft';
   selector: 'app-page-organiser',
   standalone: true,
   imports: [
-    CdkDropList, InsertPagesPanelComponent, PageCardComponent,
+    CdkDrag, CdkDropList, InsertPagesPanelComponent, PageCardComponent,
     PageOrganiserActionsComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -43,7 +43,8 @@ import { PageDraft, DraftPage } from './page-draft';
         [canDelete]="pages.canDeleteSelection()"
         [dirty]="pages.dirty()"
         [working]="operations.working()"
-        [pendingLabel]="pendingLabel()"
+        [pageCount]="pages.pages().length"
+        [originalPageCount]="pages.originalPageCount()"
         [message]="operations.message()"
         [messageIsError]="operations.messageIsError()"
         (selectAllToggled)="pages.toggleSelectAll()"
@@ -75,6 +76,7 @@ import { PageDraft, DraftPage } from './page-draft';
         }
         @for (page of pages.pages(); track page.id; let index = $index) {
           <app-page-card
+            cdkDrag
             [page]="page"
             [position]="index + 1"
             [total]="pages.pages().length"
@@ -188,14 +190,5 @@ export class PageOrganiserComponent {
   /** True when this source page appears more than once in the draft. */
   duplicated(sourcePage: number): boolean {
     return this.pages.pages().filter(page => page.sourcePage === sourcePage).length > 1;
-  }
-
-  pendingLabel(): string {
-    const before = this.pages.originalPageCount();
-    const after  = this.pages.pages().length;
-    if (after === before) {
-      return $localize`:Shown when pages were rotated or reordered but the count is unchanged@@pageOrganiser.pendingSameCount:Page changes not yet applied`;
-    }
-    return $localize`:Shown when the page count has changed and nothing is saved yet@@pageOrganiser.pendingCountChanged:${after}:after: pages, was ${before}:before: — not yet applied`;
   }
 }

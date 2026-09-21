@@ -11,20 +11,24 @@
  *
  * <p>Two buttons, then. They are the boring answer, they work everywhere,
  * and they announce which page they move and where it goes.
+ *
+ * <p>`cdkDrag` sits on this component in the organiser's template, not in a
+ * `host` block here. A directive does not match the host element of its own
+ * component — written here it would only have added an attribute, leaving
+ * the grip inert and the pointer with no way to reorder either.
  */
 import {
   ChangeDetectionStrategy, Component, EventEmitter, Input, Output,
 } from "@angular/core";
-import { CdkDrag, CdkDragHandle } from "@angular/cdk/drag-drop";
+import { CdkDragHandle } from "@angular/cdk/drag-drop";
 
 import { DraftPage } from "./page-draft";
 
 @Component({
   selector: "app-page-card",
   standalone: true,
-  imports: [CdkDrag, CdkDragHandle],
+  imports: [CdkDragHandle],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { cdkDrag: "" },
   template: `
     <div class="page-card rounded border-2 transition-colors overflow-hidden"
       [class]="selected

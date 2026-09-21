@@ -87,10 +87,7 @@ import { Annotation } from '../../../core/models';
       <!-- Form fields tab -->
       @if (state.sidebarTab() === 'form') {
         <div class="flex-1 overflow-y-auto">
-          <app-pdf-form
-            [documentId]="state.documentId()"
-            [documentName]="state.viewerData()?.name || 'document'">
-          </app-pdf-form>
+          <app-pdf-form [documentId]="state.documentId()"></app-pdf-form>
         </div>
       }
 

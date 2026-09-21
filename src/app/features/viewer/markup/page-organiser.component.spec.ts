@@ -103,6 +103,19 @@ describe('PageOrganiserComponent', () => {
       expect(organiser.pages.dirty()).toBe(false);
       expect(organiser.pages.hasSelection()).toBe(false);
     });
+
+    it('makes every page card draggable', () => {
+      // `cdkDrag` briefly sat in the card's own `host` block, where it only
+      // added an attribute: a directive never matches the host element of
+      // its own component, so nothing instantiated and the grip was inert.
+      // The class is what CdkDrag itself puts on the element it runs on.
+      loadPages(2);
+      const host = fixture.nativeElement as HTMLElement;
+
+      const cards = Array.from(host.querySelectorAll('app-page-card'));
+      expect(cards).toHaveLength(2);
+      expect(cards.every(card => card.classList.contains('cdk-drag'))).toBe(true);
+    });
   });
 
   describe('selection', () => {
@@ -262,13 +275,27 @@ describe('PageOrganiserComponent', () => {
    * the moment when being wrong is expensive.
    */
   describe('describing what is pending', () => {
+    /**
+     * The banner as it reaches the screen.
+     *
+     * <p>Read from the rendered output rather than from a method on the
+     * component: the sentence moved to the component that draws the banner,
+     * and a test that called the old method would have kept passing while
+     * nothing reached the page (§14 — never by implementation detail).
+     */
+    function pendingBanner(): string {
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      return host.querySelector('.bg-amber-50')?.textContent ?? '';
+    }
+
     it('says nothing has changed in count when pages were only rotated', () => {
       loadPages(3);
       organiser.pages.toggleSelectAll();
       organiser.rotateSelection(90);
 
-      expect(organiser.pendingLabel()).toContain('not yet applied');
-      expect(organiser.pendingLabel()).not.toContain('was 3');
+      expect(pendingBanner()).toContain('not yet applied');
+      expect(pendingBanner()).not.toContain('was 3');
     });
 
     it('names both counts when pages were added or removed', () => {
@@ -278,11 +305,10 @@ describe('PageOrganiserComponent', () => {
       organiser.toggle(idAt(0), click);
       organiser.duplicateSelection();
 
-      const label = organiser.pendingLabel();
-      expect(label).toContain('3');
-      expect(label).toContain('2');
+      const banner = pendingBanner();
+      expect(banner).toContain('3');
+      expect(banner).toContain('2');
     });
-
   });
 
   describe('applying', () => {

@@ -53,7 +53,7 @@ import {
 
     @if (dirty) {
       <div class="flex items-center gap-2 px-2 py-1.5 bg-amber-50 border-b border-amber-200 flex-shrink-0">
-        <span class="text-xs text-amber-800 flex-1">{{ pendingLabel }}</span>
+        <span class="text-xs text-amber-800 flex-1">{{ pendingLabel() }}</span>
         <button (click)="discarded.emit()" [disabled]="working"
           i18n="Throws away unapplied page changes@@pageOrganiser.discard"
           class="text-xs px-2 py-0.5 rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-40">
@@ -96,7 +96,9 @@ export class PageOrganiserActionsComponent {
   @Input() canDelete = false;
   @Input() dirty = false;
   @Input() working = false;
-  @Input() pendingLabel = "";
+  /** How many pages the document has now, and how many it had before. */
+  @Input() pageCount = 0;
+  @Input() originalPageCount = 0;
   @Input() message = "";
   @Input() messageIsError = false;
 
@@ -108,6 +110,22 @@ export class PageOrganiserActionsComponent {
   @Output() insertRequested = new EventEmitter<void>();
   @Output() discarded = new EventEmitter<void>();
   @Output() applied = new EventEmitter<void>();
+
+  /**
+   * What is waiting to be applied.
+   *
+   * <p>Written here rather than passed in as text: this is the component
+   * that shows the banner, and a sentence about the banner's contents has no
+   * business being assembled somewhere that cannot see it.
+   */
+  pendingLabel(): string {
+    const after = this.pageCount;
+    const before = this.originalPageCount;
+    if (after === before) {
+      return $localize`:Shown when pages were rotated or reordered but the count is unchanged@@pageOrganiser.pendingSameCount:Page changes not yet applied`;
+    }
+    return $localize`:Shown when the page count has changed and nothing is saved yet@@pageOrganiser.pendingCountChanged:${after}:after: pages, was ${before}:before: — not yet applied`;
+  }
 
   /**
    * Labels and tooltips that live in expressions, so `i18n` cannot mark them
