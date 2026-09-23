@@ -1,13 +1,13 @@
-import { Component, inject, signal, computed, ChangeDetectionStrategy } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import {
-  RedactionService, RedactionPreset, REDACTION_PRESETS, TextSearch, TextMatch
+  RedactionPreset, REDACTION_PRESETS, TextSearch,
 } from '../../../core/services/redaction.service';
 import { ViewerStateService } from '../../../../viewer-core/viewer-state.service';
-import { problemMessage } from '../../../core/handlers/problem-detail';
-import { abbreviatedPageLabel } from '../../../../viewer-core/page-labels';
+import { RedactionMatchesComponent } from './redaction-matches.component';
+import { RedactionRegionsComponent } from './redaction-regions.component';
+import { RedactionSearchService } from './redaction-search.service';
 
 /**
  * Redaction: by hand, and by rule.
@@ -21,8 +21,9 @@ import { abbreviatedPageLabel } from '../../../../viewer-core/page-labels';
 @Component({
   selector: 'app-redaction-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule, RedactionMatchesComponent, RedactionRegionsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [RedactionSearchService],
   template: `
     <div class="flex-1 overflow-y-auto p-3">
       <div i18n="@@redaction.heading" class="text-sm font-semibold text-gray-800 mb-1">Redaction</div>
@@ -32,13 +33,20 @@ import { abbreviatedPageLabel } from '../../../../viewer-core/page-labels';
         The previous version stays in the history. PDF documents only.
       </p>
 
-      <!-- ── Find and redact ──────────────────────────────────── -->
       <div i18n="@@redaction.findHeading" class="text-xs font-semibold text-gray-500 mb-1.5">Find and redact</div>
 
-      <div class="flex flex-wrap gap-1 mb-2">
+      <div class="flex flex-wrap gap-1 mb-2" role="group"
+           i18n-aria-label="Names the row of buttons that switch on a kind of content to look for@@redaction.presetsGroup"
+           aria-label="Kinds of content to find">
         @for (preset of presets; track preset.id) {
-          <button (click)="togglePreset(preset.id)"
-            class="text-xs px-1.5 py-0.5 rounded border transition-colors"
+          <!--
+            aria-pressed, because these are toggles. Whether one was on
+            showed only as a darker background — colour as the sole carrier
+            of meaning, and nothing at all to a screen reader (§1A.2).
+          -->
+          <button type="button" (click)="togglePreset(preset.id)"
+            [attr.aria-pressed]="isPresetOn(preset.id)"
+            class="text-xs px-1.5 py-1 rounded border transition-colors min-h-6"
             [class]="isPresetOn(preset.id)
               ? 'bg-gray-800 border-gray-800 text-white'
               : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'">
@@ -47,118 +55,83 @@ import { abbreviatedPageLabel } from '../../../../viewer-core/page-labels';
         }
       </div>
 
-      <input type="text" [(ngModel)]="term" (ngModelChange)="onSearchChanged()"
+      <label class="sr-only" for="redaction-term">{{ termLabel }}</label>
+      <input id="redaction-term" type="text" [(ngModel)]="term" (ngModelChange)="search.forget()"
+        [ngModelOptions]="{ standalone: true }"
         i18n-placeholder="Follows the preset buttons, so it reads as an alternative to them@@redaction.termPlaceholder"
         placeholder="or type a word or phrase"
         class="w-full text-xs border border-gray-300 rounded px-2 py-1 mb-1.5" />
 
       <label class="flex items-center gap-1 text-xs text-gray-600 mb-0.5">
-        <input type="checkbox" [(ngModel)]="matchCase" (ngModelChange)="onSearchChanged()" />
+        <input type="checkbox" [(ngModel)]="matchCase" (ngModelChange)="search.forget()"
+               [ngModelOptions]="{ standalone: true }" />
         <ng-container i18n="@@redaction.matchCase">Match case</ng-container>
       </label>
       <label class="flex items-center gap-1 text-xs text-gray-600 mb-2">
-        <input type="checkbox" [(ngModel)]="wholeWord" (ngModelChange)="onSearchChanged()" />
+        <input type="checkbox" [(ngModel)]="wholeWord" (ngModelChange)="search.forget()"
+               [ngModelOptions]="{ standalone: true }" />
         <ng-container i18n="@@redaction.wholeWord">Whole word only</ng-container>
       </label>
 
       <div class="flex gap-1.5 mb-2">
-        <button (click)="preview()" [disabled]="!hasSearch() || busy()"
+        <button type="button" (click)="preview()" [disabled]="!hasSearch() || search.busy()"
+          [attr.aria-busy]="search.searching() ? 'true' : null"
           class="flex-1 text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-30">
-          {{ searching() ? searchingLabel : previewLabel }}
+          {{ search.searching() ? searchingLabel : previewLabel }}
         </button>
-        <button (click)="redactMatches()" [disabled]="!canRedactMatches() || busy()"
-          i18n-title="@@redaction.redactAllHint"
-          title="Permanently destroy every match"
+        <button type="button" (click)="redactMatches()"
+          [disabled]="!search.canRedactMatches() || search.busy()"
+          [attr.aria-busy]="search.redacting() ? 'true' : null"
+          i18n-title="@@redaction.redactAllHint" title="Permanently destroy every match"
           class="flex-1 text-xs px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-30">
-          {{ redacting() ? redactingLabel : redactAllLabel }}
+          {{ search.redacting() ? redactingLabel : redactAllLabel }}
         </button>
       </div>
 
-      @if (message()) {
-        <p class="text-xs mb-2" [class]="messageIsError() ? 'text-red-600' : 'text-gray-600'">
-          {{ message() }}
-        </p>
-      }
-
-      @if (matches().length) {
-        <div i18n="How many occurrences the search found, above the list of them@@redaction.matchCount"
-             class="text-xs font-semibold text-gray-500 mb-1">
-          {matches().length, plural, =1 {1 match — this will be destroyed} other {{{ matches().length }} matches — these will be destroyed}}
-        </div>
-        <ul class="mb-3 max-h-40 overflow-y-auto border border-gray-100 rounded">
-          @for (match of matches(); track $index) {
-            <li (click)="state.navigateTo(match.page)"
-                class="flex items-center gap-2 px-1.5 py-1 text-xs hover:bg-gray-50 cursor-pointer">
-              <span class="text-gray-400 w-8 flex-shrink-0">{{ pageShort(match.page) }}</span>
-              <span class="font-mono truncate flex-1 text-gray-700">{{ match.text }}</span>
-            </li>
-          }
-        </ul>
-      }
-
-      <!-- ── Drawn regions ────────────────────────────────────── -->
-      <div i18n="Heading for redaction areas drawn by hand, as opposed to found by search@@redaction.drawnHeading"
-           class="text-xs font-semibold text-gray-500 mb-1.5 pt-2 border-t border-gray-100">
-        Drawn regions
-      </div>
-      <p i18n="How to draw a redaction area. The two emphasised names must match the toolbar labels.@@redaction.drawnInstructions"
-         class="text-xs text-gray-500 mb-2">
-        Pick the <span class="font-medium">Redact</span> tool and draw over content, then
-        <span class="font-medium">Apply Redaction</span> in the toolbar.
-      </p>
-
-      @if (state.redactionRegions().length === 0) {
-        <div i18n="@@redaction.noRegions" class="text-center text-gray-400 text-xs py-4">No regions drawn yet.</div>
-      } @else {
-        @for (region of state.redactionRegions(); track region.id) {
-          <div class="flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 group mb-1 border border-gray-100">
-            <div class="w-3 h-3 rounded-sm bg-black flex-shrink-0"></div>
-            <span i18n="One drawn redaction area — which page it is on and how big it is in points@@redaction.regionSummary"
-                  class="text-xs text-gray-600 flex-1">
-              Page {{ region.page }} · {{ region.width.toFixed(0) }}×{{ region.height.toFixed(0) }}pt
-            </span>
-            <button (click)="state.removeRedactionRegion(region.id)"
-              class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs ms-1"
-              i18n-title="@@redaction.removeRegion"
-              title="Remove this region">✕</button>
-          </div>
+      <!-- A live region: how many matches a preview found, and what a
+           redaction destroyed, both appeared silently before. -->
+      <div role="status" aria-live="polite">
+        @if (search.message()) {
+          <p class="text-xs mb-2"
+             [class]="search.messageIsError() ? 'text-red-600' : 'text-gray-600'">
+            {{ search.message() }}
+          </p>
         }
-      }
+      </div>
+
+      <app-redaction-matches
+        [matches]="search.matches()"
+        (chosen)="state.navigateTo($event)"
+      />
+
+      <app-redaction-regions
+        [regions]="state.redactionRegions()"
+        (removed)="state.removeRedactionRegion($event)"
+      />
     </div>
   `
 })
 export class RedactionPanelComponent {
-  pageShort = abbreviatedPageLabel;
-
-  private redaction = inject(RedactionService);
-  readonly state    = inject(ViewerStateService);
+  readonly search = inject(RedactionSearchService);
+  readonly state = inject(ViewerStateService);
 
   readonly presets = REDACTION_PRESETS;
 
-  term      = '';
+  term = '';
   matchCase = false;
   wholeWord = false;
 
   readonly selectedPresets = signal<Set<RedactionPreset>>(new Set());
-  readonly matches   = signal<TextMatch[]>([]);
-  readonly searching = signal(false);
-  readonly redacting = signal(false);
-  readonly message   = signal('');
 
   /**
-   * Button labels, which sit in expressions and so cannot be marked with
-   * `i18n` — see the note in login.component.ts.
+   * Labels that sit in expressions and so cannot be marked with `i18n` —
+   * see the note in login.component.ts.
    */
   readonly previewLabel = $localize`:Finds matches without changing anything@@redaction.previewAction:Preview matches`;
   readonly searchingLabel = $localize`:Preview button while the search is running@@redaction.searchingAction:Searching...`;
   readonly redactAllLabel = $localize`:Destroys every match found@@redaction.redactAllAction:Redact all`;
   readonly redactingLabel = $localize`:Redact-all button while the request is in flight@@redaction.redactingAction:Redacting...`;
-  readonly messageIsError = signal(false);
-
-  readonly busy = computed(() => this.searching() || this.redacting());
-
-  /** Redacting all requires a previewed, non-empty result. */
-  readonly canRedactMatches = computed(() => this.matches().length > 0);
+  readonly termLabel = $localize`:Accessible name of the box for typing a word to redact@@redaction.termLabel:Word or phrase to redact`;
 
   hasSearch(): boolean {
     return this.term.trim().length > 0 || this.selectedPresets().size > 0;
@@ -171,51 +144,21 @@ export class RedactionPanelComponent {
   togglePreset(preset: RedactionPreset) {
     this.selectedPresets.update(current => {
       const next = new Set(current);
-      next.has(preset) ? next.delete(preset) : next.add(preset);
+      if (next.has(preset)) next.delete(preset);
+      else next.add(preset);
       return next;
     });
-    this.onSearchChanged();
+    this.search.forget();
   }
 
-  /** Any change invalidates the preview, so it cannot be applied stale. */
-  onSearchChanged() {
-    this.matches.set([]);
-    this.message.set('');
-  }
 
   preview() {
     if (!this.hasSearch()) return;
-    this.searching.set(true);
-    this.message.set('');
-
-    this.redaction.findText(this.state.documentId(), this.search()).subscribe({
-      next: result => {
-        this.searching.set(false);
-        if (!result.success) {
-          this.report(result.error ?? this.searchFailedText(), true);
-          return;
-        }
-        this.matches.set(result.matches ?? []);
-        if (!result.matchCount) {
-          this.report(result.pagesWithoutText
-            ? $localize`:Shown when a search finds nothing and the document has unsearchable scanned pages@@redaction.noMatchesNeedsOcr:No matches. Some pages have no text layer — run OCR to make them searchable.`
-            : $localize`:Shown when a search finds nothing@@redaction.noMatches:No matches found.`, false);
-        }
-      },
-      error: err => {
-        this.searching.set(false);
-        this.report(this.errorText(err, this.searchFailedText()), true);
-      }
-    });
-  }
-
-  /** Used from two call sites, which is why it is a method rather than a field. */
-  private searchFailedText(): string {
-    return $localize`:Shown when the document cannot be searched at all@@redaction.searchFailed:The document could not be searched.`;
+    this.search.preview(this.terms());
   }
 
   redactMatches() {
-    const count = this.matches().length;
+    const count = this.search.matches().length;
     if (!count) return;
     // Typed confirmation is §1.3's rule for destructive tenant-level
     // operations; this is destructive but scoped to one document, so a
@@ -224,45 +167,15 @@ export class RedactionPanelComponent {
     const consequence = $localize`:Second paragraph of the redaction confirmation@@redaction.confirmConsequence:The content cannot be recovered from the resulting file. The current version stays in the history.`;
     if (!confirm(`${question}\n\n${consequence}`)) return;
 
-    this.redacting.set(true);
-    this.redaction.redactMatching(this.state.documentId(), this.search()).subscribe({
-      next: result => {
-        this.redacting.set(false);
-        this.matches.set([]);
-        this.state.applyVersionCommit(result.version, result.summary);
-        this.report(result.summary, false);
-      },
-      error: err => {
-        this.redacting.set(false);
-        this.report(
-          this.errorText(
-            err,
-            $localize`:Fallback when redaction fails without a reason@@redaction.failed:Redaction failed.`,
-          ),
-          true,
-        );
-      }
-    });
+    this.search.redactMatches(this.terms());
   }
 
-  private search(): TextSearch {
+  private terms(): TextSearch {
     return {
-      terms:     this.term.trim() ? [this.term.trim()] : [],
-      presets:   [...this.selectedPresets()],
+      terms: this.term.trim() ? [this.term.trim()] : [],
+      presets: [...this.selectedPresets()],
       matchCase: this.matchCase,
-      wholeWord: this.wholeWord
+      wholeWord: this.wholeWord,
     };
-  }
-
-  private report(text: string, isError: boolean) {
-    this.message.set(text);
-    this.messageIsError.set(isError);
-  }
-
-  private errorText(err: { status?: number; error?: { message?: string } }, fallback: string): string {
-    if (err.status === 503) {
-      return $localize`:Shown when the backend conversion service is unreachable@@redaction.converterDown:The document conversion service is not running.`;
-    }
-    return problemMessage(err, fallback);
   }
 }
