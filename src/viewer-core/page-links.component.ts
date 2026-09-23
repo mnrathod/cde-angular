@@ -26,7 +26,7 @@ import { ViewerStateService } from './viewer-state.service';
         <a [attr.href]="link.url ?? null"
            [attr.target]="link.url ? '_blank' : null"
            [attr.rel]="link.url ? 'noopener noreferrer' : null"
-           [title]="link.url ?? 'Go to page ' + link.page"
+           [title]="titleFor(link)"
            (click)="follow(link, $event)"
            class="absolute block rounded-sm cursor-pointer
                   hover:bg-blue-400/20 hover:outline hover:outline-1 hover:outline-blue-500/60"
@@ -59,6 +59,20 @@ export class PageLinksComponent {
       const page   = this.pageNumber();
       if (pdfDoc) this.load(pdfDoc, page);
     });
+  }
+
+  /**
+   * What the link says it goes to.
+   *
+   * <p>An external link shows its own URL; an internal one names the page.
+   * That name was `'Go to page ' + link.page` in the template — English
+   * inside a bound expression, which no translator receives and which the
+   * markup sweep could not see until it was taught to read bindings too.
+   */
+  titleFor(link: PageLink): string {
+    if (link.url) return link.url;
+    const page = link.page;
+    return $localize`:Tooltip on a link that jumps to another page of the same document@@pageLinks.goToPage:Go to page ${page}:page:`;
   }
 
   /** PDF coordinates start at the bottom; CSS starts at the top. */

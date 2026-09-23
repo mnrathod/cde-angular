@@ -54,7 +54,7 @@ describe("InsertPagesPanelComponent", () => {
     // pages to take.
     offerSiblings();
 
-    expect(panel.candidates().map((candidate) => candidate.id)).toEqual([8]);
+    expect(panel.insertion.candidates().map((candidate) => candidate.id)).toEqual([8]);
   });
 
   it("asks the donor for its page count and inserts all of them", () => {
@@ -124,7 +124,7 @@ describe("InsertPagesPanelComponent", () => {
 
     http.expectNone("/api/documents/7/pages/insert");
     expect(failures[0]).toContain("no pages to insert");
-    expect(panel.busy()).toBe(false);
+    expect(panel.insertion.busy()).toBe(false);
   });
 
   it("names the converter when the converter is what is down", () => {
@@ -141,7 +141,7 @@ describe("InsertPagesPanelComponent", () => {
       .flush("", { status: 503, statusText: "Service Unavailable" });
 
     expect(failures[0]).toContain("conversion service");
-    expect(panel.busy()).toBe(false);
+    expect(panel.insertion.busy()).toBe(false);
   });
 
   it("refuses a second insert while the first is in flight", () => {

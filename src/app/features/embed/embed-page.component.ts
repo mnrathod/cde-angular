@@ -19,23 +19,30 @@ import {
   AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, Input, OnChanges,
   SimpleChanges, ViewChild, effect, inject, output, signal,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { PdfEngineService } from '../../../viewer-core/pdf-engine.service';
-import { MarkupEngineService } from '../../../viewer-core/markup-engine.service';
 import { MarkupShapesComponent } from '../../../viewer-core/markup-shapes.component';
 import { ViewerStateService, ShapeData } from '../../../viewer-core/viewer-state.service';
+import { pageLabel } from '../../../viewer-core/page-labels';
+import { EmbedStrokeSession } from './embed-stroke-session';
 
 @Component({
   selector: 'app-embed-page',
   standalone: true,
-  imports: [CommonModule, MarkupShapesComponent],
+  imports: [MarkupShapesComponent],
+  providers: [EmbedStrokeSession],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="page" [style.width.px]="widthPx()" [style.height.px]="heightPx()">
-      <canvas #canvas [attr.aria-label]="'Page ' + pageNumber"></canvas>
+      <!--
+        The page image, named for what it is. The label was built by
+        concatenating "Page " onto a number in the template: English text
+        outside any message, which the markup sweep cannot see and a
+        translator never receives.
+      -->
+      <canvas #canvas role="img" [attr.aria-label]="pageName()"></canvas>
       <svg #overlay
            [attr.viewBox]="'0 0 ' + widthPx() + ' ' + heightPx()"
-           [class.drawing]="isDrawingTool()"
+           [class.drawing]="strokes.acceptsDrawing()"
            (pointerdown)="beginStroke($event)"
            (pointermove)="extendStroke($event)"
            (pointerup)="endStroke()"
@@ -79,15 +86,13 @@ export class EmbedPageComponent implements AfterViewInit, OnChanges {
   @ViewChild('overlay') private overlayRef?: ElementRef<SVGSVGElement>;
 
   private readonly pdfEngine = inject(PdfEngineService);
-  private readonly markupEngine = inject(MarkupEngineService);
   private readonly viewerState = inject(ViewerStateService);
+  readonly strokes = inject(EmbedStrokeSession);
 
   readonly widthPx = signal(0);
   readonly heightPx = signal(0);
   /** Everything to draw on this page, committed shapes plus the live stroke. */
   readonly drawn = signal<ShapeData[]>([]);
-
-  private inProgress: ShapeData | null = null;
 
   constructor() {
     /*
@@ -105,9 +110,9 @@ export class EmbedPageComponent implements AfterViewInit, OnChanges {
     });
   }
 
-  isDrawingTool(): boolean {
-    const tool = this.viewerState.activeTool();
-    return tool !== 'pan' && tool !== 'select';
+  /** "Page 3", in the reader's language. */
+  pageName(): string {
+    return pageLabel(this.pageNumber);
   }
 
   /**
@@ -152,51 +157,33 @@ export class EmbedPageComponent implements AfterViewInit, OnChanges {
   private redrawOverlay(): void {
     const shapes = this.viewerState.shapes()
       .filter((shape) => shape.pageNumber === this.pageNumber);
-    const all = this.inProgress ? [...shapes, this.inProgress] : shapes;
+    const drawing = this.strokes.inProgress();
+    const all = drawing ? [...shapes, drawing] : shapes;
     this.drawn.set(all);
   }
 
   beginStroke(event: PointerEvent): void {
-    if (!this.isDrawingTool()) return;
-    const overlay = this.overlayRef?.nativeElement;
-    if (!overlay) return;
-
-    overlay.setPointerCapture(event.pointerId);
-    const point = this.markupEngine.getSvgPoint(event as unknown as MouseEvent, overlay);
-    this.inProgress = this.markupEngine.startShape(
-      this.viewerState.activeTool(),
-      point,
-      this.pageNumber,
-      this.viewerState.strokeColor(),
-      this.viewerState.strokeWidth(),
-      this.viewerState.fillOpacity(),
-      // No author. §6.2: the host stamps that from its own session, and a name
-      // put here would be the browser's claim about its own user.
-    );
+    const surface = this.surface();
+    if (!surface) return;
+    this.strokes.begin(event, surface);
     this.redrawOverlay();
   }
 
   extendStroke(event: PointerEvent): void {
-    const overlay = this.overlayRef?.nativeElement;
-    if (!this.inProgress || !overlay) return;
-    const point = this.markupEngine.getSvgPoint(event as unknown as MouseEvent, overlay);
-    this.inProgress = this.markupEngine.updateShape(this.inProgress, point);
+    const surface = this.surface();
+    if (!surface) return;
+    this.strokes.extend(event, surface);
     this.redrawOverlay();
   }
 
   endStroke(): void {
-    const finished = this.inProgress;
-    this.inProgress = null;
-    if (!finished) return;
-
-    // A click that never moved is not a shape. Emitting it would put an
-    // invisible zero-size markup in the host's store for every stray tap.
-    if (!this.markupEngine.hasMinimumSize(finished)) {
-      this.redrawOverlay();
-      return;
-    }
-    this.viewerState.addShape(finished);
+    const finished = this.strokes.end();
     this.redrawOverlay();
-    this.shapeDrawn.emit(finished);
+    if (finished) this.shapeDrawn.emit(finished);
+  }
+
+  private surface() {
+    const overlay = this.overlayRef?.nativeElement;
+    return overlay ? { overlay, pageNumber: this.pageNumber } : null;
   }
 }

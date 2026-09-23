@@ -184,4 +184,54 @@ describe('findUnmarkedStrings', () => {
       findUnmarkedStrings('<span>{{ a() }} · {{ b() }}</span>', 'n.ts'),
     ).toEqual([]);
   });
+
+  describe('English hiding inside a bound expression', () => {
+    // Three of these shipped before the sweep looked for them: a page
+    // label built with `'Page ' + n`, a link tooltip built with
+    // `'Go to page ' + page`, and a zoom reading with a bare percent sign.
+    // A text node is not the only place a sentence hides.
+
+    it('flags a literal sentence in a bound title', () => {
+      const found = findUnmarkedStrings(
+        `<a [title]="link.url ?? 'Go to page ' + link.page"></a>`,
+        'links.ts',
+      );
+
+      expect(found).toHaveLength(1);
+      expect(found[0].attribute).toBe('title');
+    });
+
+    it('flags one in a bound attr.aria-label', () => {
+      const found = findUnmarkedStrings(
+        `<canvas [attr.aria-label]="'Page ' + pageNumber"></canvas>`,
+        'page.ts',
+      );
+
+      expect(found).toHaveLength(1);
+      expect(found[0].attribute).toBe('aria-label');
+    });
+
+    it('says nothing when the bound value is a translated field', () => {
+      expect(
+        findUnmarkedStrings('<button [title]="saveHint"></button>', 'bar.ts'),
+      ).toEqual([]);
+    });
+
+    it('says nothing about class names, which are full of letters', () => {
+      // The reason only perceived targets are scanned. Every conditional
+      // class binding in the application would otherwise be a finding.
+      expect(
+        findUnmarkedStrings(
+          `<div [class]="on ? 'bg-accent text-white' : 'bg-white'"></div>`,
+          'card.ts',
+        ),
+      ).toEqual([]);
+    });
+
+    it('says nothing about an empty string used as a missing tooltip', () => {
+      expect(
+        findUnmarkedStrings(`<button [title]="ready ? '' : hint"></button>`, 'b.ts'),
+      ).toEqual([]);
+    });
+  });
 });

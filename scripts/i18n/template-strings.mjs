@@ -77,6 +77,31 @@ function literalTextOf(value) {
   return isUserFacing(strings.join(' ')) ? (value.source ?? strings.join(' ')) : undefined;
 }
 
+/** A quoted string literal, either way round, with its contents captured. */
+const QUOTED = /'([^']*)'|"([^"]*)"/g;
+
+/**
+ * English sitting inside a bound expression.
+ *
+ * <p>A text node is not the only place a sentence hides. `[title]="'Go to
+ * page ' + page"` and `[attr.aria-label]="'Page ' + n"` are both read out to
+ * somebody and neither is text this could see, because the parser hands a
+ * binding an expression rather than a string. Three of those shipped before
+ * this looked for them.
+ *
+ * <p>Only bindings whose target is perceived are scanned, which is what
+ * keeps it quiet: `[class]="on ? 'bg-accent' : 'bg-white'"` is full of
+ * letters and none of them are words.
+ */
+function quotedWordsIn(expression) {
+  const words = [];
+  for (const match of expression.matchAll(QUOTED)) {
+    const literal = match[1] ?? match[2] ?? '';
+    if (isUserFacing(literal)) words.push(literal);
+  }
+  return words;
+}
+
 function isUserFacing(text) {
   const withoutInterpolations = text.replace(/\{\{[^}]*\}\}/g, '');
   return /\p{Letter}/u.test(withoutInterpolations);
@@ -134,6 +159,15 @@ function visit(nodes, translated, found) {
       if (!TRANSLATABLE_ATTRIBUTES.includes(attribute.name)) continue;
       if (!isUserFacing(attribute.value)) continue;
       record(attribute.value, attribute, found, attribute.name);
+    }
+
+    for (const binding of candidate.inputs ?? []) {
+      if (binding.i18n) continue;
+      const perceived = String(binding.name ?? '').replace(/^attr\./, '');
+      if (!TRANSLATABLE_ATTRIBUTES.includes(perceived)) continue;
+      for (const literal of quotedWordsIn(binding.value?.source ?? '')) {
+        record(literal, binding, found, perceived);
+      }
     }
 
     visit(childrenOf(candidate), translated || Boolean(candidate.i18n), found);
