@@ -48,3 +48,7 @@ Thumbs.db
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# The document generators write here; the reviewed copies are committed
+# under docs/. A stray root copy is build output, not a deliverable.
+/Viewer-Product-*.docx
