@@ -4,23 +4,23 @@ import {
   inject,
   ChangeDetectionStrategy,
 } from "@angular/core";
-import { FormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
-import { CommonModule } from "@angular/common";
+
 import { AuthService } from "../../core/services/auth.service";
+import { AuthTab, authPanelId, authTabId } from "./auth-tab-ids";
+import { AuthTabsComponent } from "./auth-tabs.component";
+import { AuthTextFieldComponent } from "./auth-text-field.component";
 import { RegisterFormComponent } from "./register-form.component";
 
 @Component({
   selector: "app-login",
   standalone: true,
-  imports: [FormsModule, CommonModule, RegisterFormComponent],
+  imports: [AuthTabsComponent, AuthTextFieldComponent, RegisterFormComponent],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
-    <div
-      class="min-h-screen bg-gradient-to-br from-nav to-accent flex items-center justify-center p-4"
-    >
+    <div class="min-h-screen bg-gradient-to-br from-nav to-accent flex items-center justify-center p-4">
       <div class="bg-white rounded-lg shadow-2xl p-8 w-full max-w-sm">
-        <!-- Logo -->
+
         <div class="flex items-center gap-3 mb-8">
           <div
             i18n="Product mark on the sign-in card. A brand name: leave it as-is in Latin-script languages, transliterate it where the script differs.@@login.brandMark"
@@ -28,142 +28,72 @@ import { RegisterFormComponent } from "./register-form.component";
           >
             CDE
           </div>
-          <span i18n="@@login.brandName" class="font-bold text-lg text-gray-800"
-            >Platform</span
-          >
+          <span i18n="@@login.brandName" class="font-bold text-lg text-gray-800">Platform</span>
         </div>
 
-        <!--
-          Tabs, announced as tabs. Without role="tab" the Sign In tab and the
-          Sign In submit button are two buttons with the same accessible name
-          and nothing to tell them apart — ambiguous to a screen reader, and
-          to anything else selecting by role and name.
+        <app-auth-tabs [selected]="tab()" (chosen)="showTab($event)" />
 
-          type="button" because a <button> defaults to type="submit". These
-          sit outside the form today so the default is harmless, but moving
-          them inside one would silently turn a tab switch into a submit.
-        -->
-        <div
-          role="tablist"
-          i18n-aria-label="@@login.tablistLabel"
-          aria-label="Sign in or register"
-          class="flex gap-1 mb-6 bg-gray-100 p-1 rounded"
-        >
-          <button
-            type="button"
-            role="tab"
-            i18n="Tab that shows the sign-in form@@login.signInTab"
-            (click)="showTab('login')"
-            [attr.aria-selected]="tab() === 'login'"
-            class="flex-1 py-1.5 text-sm rounded transition-all"
-            [class]="
-              tab() === 'login'
-                ? 'bg-white text-accent shadow-sm font-semibold'
-                : 'text-gray-500'
-            "
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            role="tab"
-            i18n="Tab that shows the registration form@@login.registerTab"
-            (click)="showTab('register')"
-            [attr.aria-selected]="tab() === 'register'"
-            class="flex-1 py-1.5 text-sm rounded transition-all"
-            [class]="
-              tab() === 'register'
-                ? 'bg-white text-accent shadow-sm font-semibold'
-                : 'text-gray-500'
-            "
-          >
-            Register
-          </button>
-        </div>
-
-        <!-- Error -->
         @if (error()) {
-          <div
-            class="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded"
-          >
+          <!--
+            A live region. This banner carries the only account of what went
+            wrong — a refused sign-in, a password below policy, a missing
+            invitation code — and it simply appeared, so a reader who could
+            not see it was told nothing at all (§1A.2).
+          -->
+          <div role="alert"
+               class="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded">
             {{ error() }}
           </div>
         }
 
-        <!-- Login Form -->
         @if (tab() === "login") {
-          <form (ngSubmit)="doLogin()" class="space-y-4">
-            <div>
-              <label
-                for="login-username"
-                i18n="@@login.usernameLabel"
-                class="block text-xs font-medium text-gray-600 mb-1"
-                >Username</label
+          <div role="tabpanel" [id]="panelId('login')" [attr.aria-labelledby]="tabId('login')">
+            <form (ngSubmit)="doLogin()" class="space-y-4">
+              <app-auth-text-field
+                fieldId="login-username" [label]="usernameLabel"
+                [(value)]="username" required autocomplete="username" />
+
+              <app-auth-text-field
+                fieldId="login-password" [label]="passwordLabel" type="password"
+                [(value)]="password" required autocomplete="current-password" />
+
+              <button
+                type="submit"
+                [disabled]="loading()"
+                [attr.aria-busy]="loading() ? 'true' : null"
+                class="w-full bg-accent hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded text-sm transition-colors mt-2"
               >
-              <input
-                id="login-username"
-                [(ngModel)]="username"
-                name="username"
-                type="text"
-                required
-                autocomplete="username"
-                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label
-                for="login-password"
-                i18n="@@login.passwordLabel"
-                class="block text-xs font-medium text-gray-600 mb-1"
-                >Password</label
-              >
-              <input
-                id="login-password"
-                [(ngModel)]="password"
-                name="password"
-                type="password"
-                required
-                autocomplete="current-password"
-                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                placeholder="••••••••"
-              />
-            </div>
-            <button
-              type="submit"
-              [disabled]="loading()"
-              class="w-full bg-accent hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded text-sm transition-colors mt-2"
+                {{ loading() ? signingInLabel : signInLabel }}
+              </button>
+            </form>
+
+            <!--
+              No demonstration credentials. This used to print "Demo: admin /
+              admin123" on the login page of every deployed environment; the
+              account it named no longer exists unless a deployment creates one
+              with its own password.
+            -->
+            <p
+              i18n="Invitation to register, shown under the sign-in form. The button in the middle is part of the sentence, so the whole paragraph is one message and a translator may move it.@@login.registerInvitation"
+              class="text-xs text-gray-500 text-center mt-4"
             >
-              {{ loading() ? signingInLabel : signInLabel }}
-            </button>
-          </form>
-          <!--
-            No demonstration credentials. This used to print "Demo: admin /
-            admin123" on the login page of every deployed environment; the
-            account it named no longer exists unless a deployment creates one
-            with its own password.
-          -->
-          <p
-            i18n="Invitation to register, shown under the sign-in form. The button in the middle is part of the sentence, so the whole paragraph is one message and a translator may move it.@@login.registerInvitation"
-            class="text-xs text-gray-500 text-center mt-4"
-          >
-            No account yet?
-            <button
-              type="button"
-              (click)="showTab('register')"
-              class="text-accent underline hover:no-underline"
-            >
-              Create one
-            </button>
-            — you'll get an organisation of your own.
-          </p>
+              No account yet?
+              <button type="button" (click)="showTab('register')"
+                      class="text-accent underline hover:no-underline">
+                Create one
+              </button>
+              — you'll get an organisation of your own.
+            </p>
+          </div>
         }
 
-        <!-- Register Form -->
         @if (tab() === "register") {
-          <app-register-form
-            (registered)="router.navigate(['/'])"
-            (failed)="error.set($event)"
-          />
+          <div role="tabpanel" [id]="panelId('register')" [attr.aria-labelledby]="tabId('register')">
+            <app-register-form
+              (registered)="goToApplication()"
+              (failed)="error.set($event)"
+            />
+          </div>
         }
       </div>
     </div>
@@ -173,7 +103,7 @@ export class LoginComponent {
   private auth = inject(AuthService);
   readonly router = inject(Router);
 
-  tab = signal<"login" | "register">("login");
+  tab = signal<AuthTab>("login");
   loading = signal(false);
   error = signal("");
 
@@ -190,6 +120,16 @@ export class LoginComponent {
    */
   readonly signInLabel = $localize`:Sign-in submit button@@login.signInAction:Sign In`;
   readonly signingInLabel = $localize`:Sign-in submit button, while the request is in flight@@login.signingInAction:Signing in...`;
+  readonly usernameLabel = $localize`:@@login.usernameLabel:Username`;
+  readonly passwordLabel = $localize`:@@login.passwordLabel:Password`;
+
+  tabId(tab: AuthTab): string {
+    return authTabId(tab);
+  }
+
+  panelId(tab: AuthTab): string {
+    return authPanelId(tab);
+  }
 
   /**
    * The two forms used to share username and password, so the development
@@ -199,7 +139,7 @@ export class LoginComponent {
    * its own fields, so there is nothing to clear; only the error belongs to
    * the page, and it is stale the moment the tab changes.
    */
-  showTab(tab: "login" | "register") {
+  showTab(tab: AuthTab) {
     if (tab === this.tab()) return;
     this.error.set("");
     this.tab.set(tab);
@@ -208,7 +148,7 @@ export class LoginComponent {
   doLogin() {
     if (!this.username || !this.password) {
       // Never fail silently — e.g. browser autofill can populate the visible
-      // inputs without ngModel picking up the change, leaving these blank.
+      // inputs without the model picking up the change, leaving these blank.
       this.error.set(
         $localize`:Shown when the sign-in form is submitted with an empty field@@login.missingCredentials:Please enter both username and password.`,
       );
@@ -219,7 +159,7 @@ export class LoginComponent {
     this.auth
       .login({ username: this.username, password: this.password })
       .subscribe({
-        next: () => this.router.navigate(["/"]),
+        next: () => this.goToApplication(),
         error: () => {
           // Deliberately does not say which was wrong: §4.2 forbids
           // revealing whether an account exists.
@@ -229,5 +169,23 @@ export class LoginComponent {
           this.loading.set(false);
         },
       });
+  }
+
+  /**
+   * Leaves for the application, and recovers if it cannot.
+   *
+   * <p>A navigation that a guard refuses resolves `false` rather than
+   * throwing, and nothing read that: the button stayed disabled on
+   * "Signing in..." for good, with the page giving no account of why and no
+   * way to try again.
+   */
+  goToApplication() {
+    this.router.navigate(["/"]).then((left) => {
+      if (left) return;
+      this.loading.set(false);
+      this.error.set(
+        $localize`:Shown when sign-in succeeded but the application would not open@@login.navigationRefused:You are signed in, but this page could not be opened. Reload and try again, or contact support if it keeps happening.`,
+      );
+    });
   }
 }
