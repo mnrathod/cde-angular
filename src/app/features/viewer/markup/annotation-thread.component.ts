@@ -2,111 +2,46 @@ import {
   Component, inject, signal, Input, OnInit, OnChanges,
   SimpleChanges, ChangeDetectionStrategy
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
-import { Annotation, AnnotationReply, AnnotationThread } from '../../../core/models';
-import { AnnotationService } from '../../../core/services/viewer/annotation.service';
+
+import { Annotation, AnnotationReply } from '../../../core/models';
 import { RoleService } from '../../../core/services/role.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { pageLabel } from '../../../../viewer-core/page-labels';
+import { AnnotationConversationService } from './annotation-conversation.service';
+import { AnnotationThreadCardComponent } from './annotation-thread-card.component';
 
+/**
+ * The comments on a document's annotations, and the box for adding one.
+ *
+ * <p>The requests and their failure states live in
+ * `AnnotationConversationService`; this renders them and decides which
+ * controls to offer.
+ */
 @Component({
   selector: 'app-annotation-thread',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule, AnnotationThreadCardComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [AnnotationConversationService],
   template: `
     <div class="flex flex-col h-full">
 
-      <!-- Thread list -->
       <div class="flex-1 overflow-y-auto p-3 space-y-4">
-        @for (thread of threads(); track thread.annotation.id) {
-          <div class="border border-gray-200 rounded-lg overflow-hidden">
-
-            <!-- Annotation header -->
-            <div class="flex items-start gap-2 p-3 bg-gray-50 border-b border-gray-200">
-              <div class="w-7 h-7 rounded-full bg-accent flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                {{ thread.annotation.authorName.charAt(0).toUpperCase() }}
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="text-xs font-semibold text-gray-800">{{ thread.annotation.authorName }}</span>
-                  <span class="text-xs text-gray-400">{{ pageLabel(thread.annotation.pageNumber) }}</span>
-                  <span class="ml-auto text-xs px-1.5 py-0.5 rounded font-semibold"
-                    [class]="thread.annotation.status === 'OPEN'
-                      ? 'bg-amber-100 text-amber-700'
-                      : 'bg-green-100 text-green-700'">
-                    {{ thread.annotation.status }}
-                  </span>
-                </div>
-                <div class="text-xs text-gray-600 mt-0.5">{{ thread.annotation.comment }}</div>
-                <div class="text-xs text-gray-400 mt-1">
-                  {{ thread.annotation.createdAt | date:'short' }}
-                </div>
-              </div>
-            </div>
-
-            <!-- Replies -->
-            @if (thread.replies.length > 0) {
-              <div class="divide-y divide-gray-100">
-                @for (reply of thread.replies; track reply.id) {
-                  <div class="group flex items-start gap-2 p-2.5 hover:bg-gray-50 transition-colors">
-                    <div class="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                      {{ reply.authorName.charAt(0).toUpperCase() }}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-2">
-                        <span class="text-xs font-semibold text-gray-700">{{ reply.authorName }}</span>
-                        <span class="text-xs text-gray-400">{{ reply.createdAt | date:'shortTime' }}</span>
-                        <span class="flex-1"></span>
-                        @if (canDelete(reply)) {
-                          <button (click)="deleteReply(thread.annotation.id, reply)"
-                            [disabled]="deletingReplyId() === reply.id"
-                            i18n-title="@@annotationThread.deleteReply"
-                            title="Delete reply"
-                            class="opacity-0 group-hover:opacity-100 text-xs text-gray-400
-                                   hover:text-red-600 disabled:opacity-40">✕</button>
-                        }
-                      </div>
-                      <div class="text-xs text-gray-600 mt-0.5 leading-relaxed">{{ reply.content }}</div>
-                    </div>
-                  </div>
-                }
-              </div>
-            }
-
-            <!-- Reply input -->
-            <div class="p-2 border-t border-gray-100 bg-white">
-              <div class="flex gap-2">
-                <input
-                  [(ngModel)]="replyInputs[thread.annotation.id]"
-                  (keydown.enter)="submitReply(thread.annotation)"
-                  i18n-placeholder="@@annotationThread.replyPlaceholder"
-                  placeholder="Reply..."
-                  class="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-accent" />
-                <button (click)="submitReply(thread.annotation)"
-                  [disabled]="!replyInputs[thread.annotation.id]?.trim()"
-                  i18n="Posts a reply to an annotation thread@@annotationThread.send"
-                  class="px-3 py-1.5 text-xs bg-accent text-white rounded disabled:opacity-40 hover:bg-blue-700">
-                  Send
-                </button>
-              </div>
-              <!-- Resolve button -->
-              @if (thread.annotation.status === 'OPEN') {
-                <button (click)="resolveThread(thread)"
-                  class="mt-1.5 text-xs text-green-600 hover:text-green-700 hover:underline">
-                  <span aria-hidden="true">✓</span>
-                  <ng-container i18n="Closes an annotation thread as dealt with@@annotationThread.resolve"
-                    >Mark as Resolved</ng-container
-                  >
-                </button>
-              }
-            </div>
-          </div>
+        @for (thread of conversation.threads(); track thread.annotation.id) {
+          <app-annotation-thread-card
+            [thread]="thread"
+            [draft]="draftFor(thread.annotation.id)"
+            [canDeleteAnyReply]="canDeleteAnyReply()"
+            [currentUser]="currentUser()"
+            [deletingReplyId]="conversation.deletingReplyId()"
+            (draftChange)="setDraft(thread.annotation.id, $event)"
+            (replySubmitted)="sendReply(thread.annotation.id)"
+            (replyDeleted)="deleteReply(thread.annotation.id, $event)"
+            (resolved)="conversation.resolve(thread.annotation.id)"
+          />
         }
 
-        @if (threads().length === 0) {
+        @if (conversation.threads().length === 0) {
           <div class="text-center text-gray-400 text-xs py-12">
             <div class="text-3xl mb-2" aria-hidden="true">💬</div>
             <ng-container i18n="Empty state for the annotation comments panel@@annotationThread.empty"
@@ -116,26 +51,44 @@ import { pageLabel } from '../../../../viewer-core/page-labels';
         }
       </div>
 
-      <!-- New annotation comment -->
+      <!--
+        A live region. Every failure in this panel used to be silent, and one
+        of them was worse than silent: a reply that did not post was shown as
+        though it had.
+      -->
+      <div role="alert" aria-live="assertive">
+        @if (conversation.failure()) {
+          <div class="mx-3 mb-2 p-2 text-xs rounded bg-red-50 border border-red-200 text-red-700">
+            {{ conversation.failure() }}
+          </div>
+        }
+      </div>
+
       <div class="border-t border-gray-200 p-3 flex-shrink-0 bg-white">
-        <div i18n="@@annotationThread.addCommentHeading" class="text-xs font-semibold text-gray-600 mb-2">Add Comment</div>
-        <textarea
+        <label for="new-annotation-comment"
+               i18n="@@annotationThread.addCommentHeading"
+               class="block text-xs font-semibold text-gray-600 mb-2">Add Comment</label>
+        <textarea id="new-annotation-comment"
           [(ngModel)]="newComment"
+          [ngModelOptions]="{ standalone: true }"
+          [attr.aria-describedby]="selectedAnnotationId() ? null : 'new-comment-hint'"
           i18n-placeholder="@@annotationThread.commentPlaceholder"
           placeholder="Add a comment to the selected annotation..."
           rows="2"
           class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded resize-none focus:outline-none focus:ring-1 focus:ring-accent mb-2">
         </textarea>
         <div class="flex justify-end">
-          <button (click)="postComment()"
+          <button type="button" (click)="postComment()"
             [disabled]="!newComment.trim() || !selectedAnnotationId()"
+            [title]="selectedAnnotationId() ? '' : selectFirstHint"
             i18n="Posts a new comment on the selected annotation@@annotationThread.post"
             class="px-3 py-1.5 text-xs bg-accent text-white rounded disabled:opacity-40 hover:bg-blue-700">
             Post
           </button>
         </div>
         @if (!selectedAnnotationId()) {
-          <div i18n="Explains why the Post button is unavailable@@annotationThread.selectFirst"
+          <div id="new-comment-hint"
+               i18n="Explains why the Post button is unavailable@@annotationThread.selectFirst"
                class="text-xs text-gray-400 mt-1">Select an annotation to comment on it</div>
         }
       </div>
@@ -143,129 +96,63 @@ import { pageLabel } from '../../../../viewer-core/page-labels';
   `
 })
 export class AnnotationThreadComponent implements OnInit, OnChanges {
-  pageLabel = pageLabel;
-
   @Input() annotations: Annotation[] = [];
   @Input() selectedAnnotationId = signal<number | null>(null);
 
-  private http = inject(HttpClient);
+  readonly conversation = inject(AnnotationConversationService);
   private auth = inject(AuthService);
-  private annotationService = inject(AnnotationService);
-  protected roleService     = inject(RoleService);
+  private roleService = inject(RoleService);
 
-  threads      = signal<AnnotationThread[]>([]);
-  replyInputs: Record<number, string> = {};
-  newComment   = '';
-  deletingReplyId = signal<number | null>(null);
+  /** What has been typed into each thread's reply box, keyed by annotation. */
+  private drafts: Record<number, string> = {};
+  newComment = '';
+
+  readonly selectFirstHint = $localize`:Tooltip on the disabled Post button@@annotationThread.selectFirstHint:Select an annotation to comment on it`;
 
   ngOnInit() {
-    this.buildThreads();
+    this.conversation.open(this.annotations);
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['annotations']) {
-      this.buildThreads();
-    }
+    if (changes['annotations']) this.conversation.open(this.annotations);
   }
 
-  private buildThreads() {
-    const threads = this.annotations.map(ann => ({
-      annotation: ann,
-      replies:    [] as AnnotationReply[]
-    }));
-    this.threads.set(threads);
-
-    // Load replies for each annotation
-    this.annotations.forEach(ann => {
-      this.annotationService.loadReplies(ann.id).subscribe({
-        next: replies => {
-          this.threads.update(ts =>
-            ts.map(t => t.annotation.id === ann.id ? { ...t, replies } : t)
-          );
-        },
-        error: () => { /* thread simply stays empty */ }
-      });
-    });
+  draftFor(annotationId: number): string {
+    return this.drafts[annotationId] ?? '';
   }
 
-  /**
-   * Replies are deletable by their author, and by anyone the role model
-   * grants delete rights. The server is the authority; this only decides
-   * whether to offer the control.
-   */
-  canDelete(reply: AnnotationReply): boolean {
-    return this.roleService.can('canDelete') || reply.authorName === this.auth.username();
+  setDraft(annotationId: number, said: string) {
+    this.drafts[annotationId] = said;
+  }
+
+  sendReply(annotationId: number) {
+    // The draft is cleared only once the server has it. It used to be
+    // cleared on the way out, so a refused reply took the words with it.
+    this.conversation.reply(
+      annotationId,
+      this.draftFor(annotationId),
+      () => (this.drafts[annotationId] = ''),
+    );
   }
 
   deleteReply(annotationId: number, reply: AnnotationReply) {
-    this.deletingReplyId.set(reply.id);
-    this.annotationService.deleteReply(reply.id).subscribe({
-      next: () => {
-        this.deletingReplyId.set(null);
-        this.threads.update(ts => ts.map(t =>
-          t.annotation.id === annotationId
-            ? { ...t, replies: t.replies.filter(r => r.id !== reply.id) }
-            : t
-        ));
-      },
-      error: () => this.deletingReplyId.set(null)
-    });
+    this.conversation.deleteReply(annotationId, reply);
   }
 
-  submitReply(annotation: Annotation) {
-    const content = this.replyInputs[annotation.id]?.trim();
-    if (!content) return;
+  /** Replies are deletable by their author, and by anyone granted the right. */
+  canDeleteAnyReply(): boolean {
+    return this.roleService.can('canDelete');
+  }
 
-    this.annotationService.addReply(annotation.id, content).subscribe({
-      next: reply => {
-        this.threads.update(ts =>
-          ts.map(t => t.annotation.id === annotation.id
-            ? { ...t, replies: [...t.replies, reply] }
-            : t)
-        );
-        this.replyInputs[annotation.id] = '';
-      },
-      error: () => {
-        // Optimistic UI fallback — show reply locally even if endpoint not ready
-        const tempReply: AnnotationReply = {
-          id: Date.now(),
-          annotationId: annotation.id,
-          authorName:
-            this.auth.username() ||
-            $localize`:Stands in for the signed-in user's name when it is not known@@annotationThread.selfAuthor:Me`,
-          content,
-          createdAt: new Date().toISOString()
-        };
-        this.threads.update(ts =>
-          ts.map(t => t.annotation.id === annotation.id
-            ? { ...t, replies: [...t.replies, tempReply] }
-            : t)
-        );
-        this.replyInputs[annotation.id] = '';
-      }
-    });
+  currentUser(): string | null {
+    return this.auth.username();
   }
 
   postComment() {
-    const annId = this.selectedAnnotationId();
-    if (!annId || !this.newComment.trim()) return;
-    const ann = this.annotations.find(a => a.id === annId);
-    if (!ann) return;
-    this.replyInputs[annId] = this.newComment;
-    this.submitReply(ann);
-    this.newComment = '';
-  }
+    const annotationId = this.selectedAnnotationId();
+    const said = this.newComment.trim();
+    if (!annotationId || !said) return;
 
-  resolveThread(thread: AnnotationThread) {
-    this.http.patch<Annotation>(`/api/annotations/${thread.annotation.id}/resolve`, {})
-      .subscribe({
-        next: updated => {
-          this.threads.update(ts =>
-            ts.map(t => t.annotation.id === updated.id
-              ? { ...t, annotation: updated }
-              : t)
-          );
-        }
-      });
+    this.conversation.reply(annotationId, said, () => (this.newComment = ''));
   }
 }
