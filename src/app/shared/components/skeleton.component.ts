@@ -17,7 +17,22 @@ import { CommonModule } from '@angular/common';
   standalone: true,
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { role: 'status' },
   template: `
+    <!--
+      The only part of this a screen reader can use.
+
+      Everything below is shaped boxes: it reads as nothing, so someone who
+      cannot see the shimmer was given no indication that anything was
+      happening at all — the page simply stayed empty until it did not
+      (§1A.2). The host carries role="status" so this sentence is announced
+      when the skeleton appears, and politely, because a load in progress is
+      not an interruption.
+    -->
+    <span class="sr-only" i18n="Announced while a section is still loading@@skeleton.loading"
+      >Loading…</span
+    >
+
     <!-- Card grid skeleton (document grid) -->
     @if (type === 'card') {
       <div class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">

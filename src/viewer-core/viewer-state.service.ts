@@ -242,7 +242,7 @@ export class ViewerStateService {
    */
   applyVersionCommit(version: number, summary = '') {
     this.currentVersion.set(version);
-    if (summary) this.processingMessage.set(`v${version} — ${summary}`);
+    if (summary) this.processingMessage.set(versionSummary(version, summary));
     this.reloadToken.update(token => token + 1);
   }
 
@@ -372,4 +372,19 @@ export class ViewerStateService {
     // without it redo would restore work the user has since diverged from.
     this.redoStack.set([]);
   }
+}
+
+/**
+ * What the shell says after an operation committed a new version.
+ *
+ * <p>A `$localize` message rather than a template literal, because this is
+ * read by a person. It was assembled in code as `v${version} — ${summary}`,
+ * which the extractor cannot see, so the one sentence confirming that
+ * someone's redaction or page deletion actually landed stayed in English
+ * whatever language the rest of the interface was in (§1.4). The dash and
+ * the ordering are part of the message for the same reason: neither survives
+ * translation as a fixed frame around two substitutions.
+ */
+function versionSummary(version: number, summary: string): string {
+  return $localize`:Confirms that an operation committed a new version of the document, and what it did@@viewerState.versionSummary:v${version}:version: — ${summary}:summary:`;
 }

@@ -500,6 +500,7 @@
     "dialog.cancel": "Cancel",
     "offline.disconnected": "You are offline — changes cannot be saved until the connection returns",
     "offline.reconnected": "Back online",
+    "skeleton.loading": "Loading…",
     "cadViewer.layersHeading": " Layers ",
     "cadViewer.showAllLayers": " All ",
     "cadViewer.hideAllLayers": " None ",
@@ -563,6 +564,7 @@
     "toolRail.label": "Markup tools",
     "toolRail.pdfOnly": "{$tool} is only available for PDF documents",
     "toolRail.hintWithCompletion": "{$tool} ({$key}) — {$completion}",
-    "toolRail.hint": "{$tool} ({$key})"
+    "toolRail.hint": "{$tool} ({$key})",
+    "viewerState.versionSummary": "v{$version} — {$summary}"
   }
 }
