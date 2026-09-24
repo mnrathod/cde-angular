@@ -20,7 +20,8 @@
     "i18n:extract": "ng extract-i18n",
     "check:i18n": "node scripts/check-i18n-catalogue.mjs",
     "check:i18n-markup": "node scripts/check-i18n-markup.mjs",
-    "test:scripts": "vitest run --config vitest.scripts.config.mjs"
+    "test:scripts": "vitest run --config vitest.scripts.config.mjs",
+    "check:bundle-budget": "node scripts/check-bundle-budget.mjs"
   },
   "private": true,
   "packageManager": "npm@10.9.7",
