@@ -1,9 +1,10 @@
 import { Injectable, ErrorHandler, inject, signal } from '@angular/core';
 import { RemoteLoggingService } from '../services/remote-logging.service';
 import { HttpErrorResponse } from '@angular/common/http';
-import { problemDetail } from './problem-detail';
+import { problemDetail, problemTraceId } from './problem-detail';
 import {
   messageForStatus,
+  referenceSuffix,
   staleApplicationDetail,
   staleApplicationMessage,
   unexpectedFaultMessage,
@@ -99,9 +100,18 @@ export class GlobalErrorHandler implements ErrorHandler {
    */
   private httpMessage(err: HttpErrorResponse): string {
     const explained = [400, 409, 422].includes(err.status);
-    return explained
+    const sentence = explained
       ? problemDetail(err, messageForStatus(err.status))
       : messageForStatus(err.status);
+
+    // The reference support will ask for, wherever the server sent one
+    // (§1.4). The in-place path through `problemMessage` has always appended
+    // it; the toast dropped it, which is the wrong way round — this is the
+    // path for failures nobody expected, so it is the one a reader is most
+    // likely to be reporting. Appended for every status, not only the three
+    // whose bodies are read: a 500 is exactly when the identifier matters.
+    const traceId = problemTraceId(err);
+    return traceId ? `${sentence} ${referenceSuffix(traceId)}` : sentence;
   }
 
   private log(appError: AppError, original: unknown): void {

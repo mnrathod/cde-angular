@@ -4,6 +4,7 @@ import { GlobalErrorHandler } from './global-error.handler';
 import { definitely } from '../../../testing/definitely';
 import {
   notFoundMessage,
+  serverErrorMessage,
   staleApplicationMessage,
   unexpectedFaultMessage,
 } from './error-wording';
@@ -102,5 +103,67 @@ describe('GlobalErrorHandler', () => {
     const ts     = definitely(handler.errors()[0]).timestamp;
     expect(ts.getTime()).toBeGreaterThanOrEqual(before.getTime());
     expect(ts.getTime()).toBeLessThanOrEqual(after.getTime());
+  });
+
+  describe('the reference a reader can quote to support (§1.4)', () => {
+    const traceId = '4f8a1c2e9b7d6a5f3e2d1c0b9a8f7e6d';
+
+    function failureCarrying(status: number, body: Record<string, unknown> = {}) {
+      return new HttpErrorResponse({
+        status,
+        statusText: 'Error',
+        error: { type: 'about:blank', status, traceId, ...body },
+      });
+    }
+
+    it('quotes it on a server fault, where it matters most', () => {
+      // A 500 reads no body for its wording, which is why the identifier
+      // used to be dropped here — leaving the reader nothing to give
+      // support for the one failure they cannot diagnose themselves.
+      handler.handleError(failureCarrying(500));
+
+      expect(definitely(handler.errors()[0]).message).toContain(traceId);
+    });
+
+    it('still says what happened before it says the reference', () => {
+      handler.handleError(failureCarrying(500));
+      const message = definitely(handler.errors()[0]).message;
+
+      expect(message).toContain('went wrong at our end');
+      expect(message.indexOf(traceId)).toBeGreaterThan(message.indexOf('wrong'));
+    });
+
+    it('quotes it alongside the sentence the server itself sent', () => {
+      handler.handleError(
+        failureCarrying(409, { detail: 'Someone else published revision P02.' })
+      );
+      const message = definitely(handler.errors()[0]).message;
+
+      expect(message).toContain('revision P02');
+      expect(message).toContain(traceId);
+    });
+
+    it('says nothing about a reference the server did not send', () => {
+      // A reference support cannot look up is worse than none: the reader
+      // reads out an identifier, and the conversation stops there.
+      handler.handleError(
+        new HttpErrorResponse({ status: 500, statusText: 'Error' })
+      );
+      const message = definitely(handler.errors()[0]).message;
+
+      expect(message).toBe(serverErrorMessage());
+    });
+
+    it('ignores a reference that is not a string', () => {
+      handler.handleError(
+        new HttpErrorResponse({
+          status: 500,
+          statusText: 'Error',
+          error: { traceId: { nested: 'object' } },
+        })
+      );
+
+      expect(definitely(handler.errors()[0]).message).toBe(serverErrorMessage());
+    });
   });
 });
