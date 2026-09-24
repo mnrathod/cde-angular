@@ -37,7 +37,26 @@ const outputPath = join(repoRoot, 'THIRD-PARTY-NOTICES.txt');
 const ALLOWED = new Set([
   'Apache-2.0', 'MIT', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC',
   'EPL-2.0', 'MPL-2.0', 'CDDL-1.0', 'CDDL-1.1',
-  'PostgreSQL', 'Unlicense', 'CC0-1.0', '0BSD'
+  'PostgreSQL', 'Unlicense', 'CC0-1.0', '0BSD',
+
+  // The two §2.1 does not name, added deliberately and recorded in
+  // docs/licences.md §3.6. Both are permissive, both discharge their only
+  // obligation through this file, and neither is the kind of licence §2.1's
+  // exclusions are aimed at.
+  //
+  // BlueOak-1.0.0 (lru-cache) is the Blue Oak Model License: a plain-language
+  // equivalent of MIT and BSD-2-Clause with an express patent grant, which
+  // §17.3 prefers over MIT's and BSD's silence on patents. No copyleft, no
+  // field-of-use restriction, no source-disclosure obligation.
+  //
+  // CC-BY-4.0 (caniuse-lite) is Creative Commons Attribution 4.0, and the
+  // package is a dataset — browser support tables — for which CC-BY is the
+  // conventional licence. It is specifically not CC-BY-SA, which is
+  // share-alike, and not CC-BY-NC or -ND, whose non-commercial and
+  // no-derivatives terms are the field-of-use restrictions §2.1 forbids.
+  // §2.1's "source available non-OSI" exclusion is aimed at BSL and the
+  // Elastic Licence, not at permissive Creative Commons terms.
+  'BlueOak-1.0.0', 'CC-BY-4.0'
 ]);
 
 /**

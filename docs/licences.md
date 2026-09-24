@@ -149,6 +149,50 @@ is the failure that would otherwise appear only on an Android home screen.
 
 ---
 
+### 3.6 Two licences §2.1 does not name — **resolved 2026-09-24, engineering determination**
+
+The licence gate failed on two production-closure packages whose licences
+appear on neither §2.1's allowed list nor its forbidden one. Both are now
+allowed, with the reasoning here so that a legal reviewer confirms a position
+rather than re-deriving one.
+
+| Package | Licence | Reached via | In `dist/`? |
+|---|---|---|---|
+| `lru-cache` | BlueOak-1.0.0 | `@angular/localize` → `@babel/core` → `@babel/helper-compilation-targets` | No |
+| `caniuse-lite` | CC-BY-4.0 | the same chain, via `browserslist` | No |
+
+**BlueOak-1.0.0** is the Blue Oak Model License 1.0.0, written as a
+plain-language equivalent of MIT and BSD-2-Clause. It has no copyleft, no
+field-of-use restriction and no source-disclosure obligation, and it carries
+an express patent grant — which makes it *more* favourable to us than MIT,
+since §17.3 prefers a patent grant to silence on patents.
+
+**CC-BY-4.0** is Creative Commons Attribution 4.0 International. Its only
+obligation is attribution, which `THIRD-PARTY-NOTICES.txt` discharges. It
+matters which CC licence this is: CC-BY-SA would be share-alike, and CC-BY-NC
+and CC-BY-ND carry non-commercial and no-derivatives terms, which are exactly
+the field-of-use restrictions §2.1 forbids. None of those apply here.
+`caniuse-lite` is a dataset — browser support tables — and CC-BY is the
+conventional licence for open data. §2.1's exclusion of "source available"
+non-OSI licences is aimed at BSL and the Elastic Licence, not at permissive
+Creative Commons terms.
+
+Both reach the production closure through `@angular/localize`, which is
+correctly a production dependency because `$localize`'s runtime is imported
+at runtime, even though the Babel tooling underneath it runs only at build
+time. Neither package appears in `dist/`, verified by searching the built
+bundle. That is context, not the basis of the decision — the closure is
+attributed as declared rather than as judged (§2 above), so both would be
+allowable even if they did ship.
+
+**This is an engineering determination, not legal sign-off.** §18's second
+open item — naming who owns legal review and where in the release process it
+happens — is unchanged, and this is precisely the kind of question that
+belongs to it. What has changed is that the gate no longer blocks on it, and
+a reviewer has a written position to confirm or correct.
+
+---
+
 ## 4. Assets
 
 | Asset class | Present? | Position |
