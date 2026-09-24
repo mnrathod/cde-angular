@@ -6,6 +6,15 @@
  * and because getting it *stuck* is the failure that matters. A banner that
  * keeps saying "you are offline" after the connection came back is worse than
  * no banner, and nothing about the markup makes that visible.
+ *
+ * <p>The previous version of this file carried a case named "does not claim
+ * everything synced while work is still queued", which set a queue length by
+ * hand and asserted the banner stayed quiet. It passed, and it guarded
+ * nothing: no code path ever put anything in that queue, so the only state
+ * the application could actually reach was the other branch — the one that
+ * said "all changes synced" after syncing nothing. A test that reaches a
+ * state the product cannot is not a weaker test, it is a test of a different
+ * program. Every state below is one connectivity alone can produce.
  */
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
@@ -23,22 +32,9 @@ describe('OfflineBannerComponent', () => {
   });
 
   /** Renders the given connectivity state and returns the visible text. */
-  function render(state: {
-    online: boolean;
-    wasOffline?: boolean;
-    pending?: number;
-  }): string {
+  function render(state: { online: boolean; wasOffline?: boolean }): string {
     offline.isOnline.set(state.online);
     offline.wasOffline.set(state.wasOffline ?? false);
-    offline.pendingOps.set(
-      Array.from({ length: state.pending ?? 0 }, (_unused, index) => ({
-        id: `synthetic-${index}`,
-        url: '/api/synthetic',
-        method: 'POST' as const,
-        timestamp: new Date(0),
-        retries: 0,
-      })),
-    );
     fixture.detectChanges();
     return fixture.nativeElement.textContent ?? '';
   }
@@ -56,41 +52,31 @@ describe('OfflineBannerComponent', () => {
 
   it('announces a dropped connection assertively', () => {
     // role="alert" rather than status: this interrupts, because work done
-    // from here on may not reach the server.
+    // from here on will not reach the server at all.
     render({ online: false });
 
     expect(bannerWithRole('alert')?.textContent).toContain('You are offline');
   });
 
-  it('says nothing about pending work when there is none', () => {
-    expect(render({ online: false })).not.toContain('pending');
+  it('tells the reader their changes cannot be saved', () => {
+    // The sentence that matters. Saying only "you are offline" leaves the
+    // reader to guess whether the application is holding their work.
+    expect(render({ online: false })).toContain('cannot be saved');
   });
 
-  it('counts one pending change without pluralising it', () => {
-    // The reason this is an ICU plural and not string concatenation: "1
-    // pendings" is wrong in English, and the rules are not the same in every
-    // language.
-    expect(render({ online: false, pending: 1 })).toContain('1 pending');
+  it('never promises that anything will sync', () => {
+    // The defect this replaced. Nothing is queued and nothing is replayed,
+    // so a reader who believes otherwise keeps working and loses it.
+    const text = render({ online: false });
+
+    expect(text).not.toContain('sync');
   });
 
-  it('counts several pending changes', () => {
-    expect(render({ online: false, pending: 3 })).toContain('3 pending');
-  });
+  it('confirms reconnection without claiming anything was sent', () => {
+    const text = render({ online: true, wasOffline: true });
 
-  it('confirms reconnection once everything has been sent', () => {
-    render({ online: true, wasOffline: true, pending: 0 });
-
-    expect(bannerWithRole('status')?.textContent).toContain('all changes synced');
-  });
-
-  it('does not claim everything synced while work is still queued', () => {
-    // The lie worth guarding against: the connection is back but the queue
-    // has not drained, and telling someone their work is saved when it is
-    // not is the one thing this banner must never do.
-    const text = render({ online: true, wasOffline: true, pending: 2 });
-
-    expect(text).toContain('Back online');
-    expect(text).not.toContain('all changes synced');
+    expect(bannerWithRole('status')?.textContent).toContain('Back online');
+    expect(text).not.toContain('synced');
   });
 
   it('stops warning once the connection returns', () => {
@@ -100,5 +86,14 @@ describe('OfflineBannerComponent', () => {
     render({ online: true, wasOffline: true });
 
     expect(bannerWithRole('alert')).toBeNull();
+  });
+
+  it('marks the decorative indicators as decorative', () => {
+    // A pulsing dot and a tick announce as nothing useful, and the
+    // sentence beside each already carries the meaning.
+    render({ online: false });
+    const dot = fixture.nativeElement.querySelector('[aria-hidden="true"]');
+
+    expect(dot).not.toBeNull();
   });
 });

@@ -1,114 +1,46 @@
-import { Injectable, signal, effect } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 
 /**
- * OfflineService
- * Tracks network connectivity and provides offline-aware state.
- * The Angular service worker (ngsw) handles actual caching.
- * This service handles:
- *   1. Detecting online/offline transitions
- *   2. Showing offline banners
- *   3. Queuing write operations for later sync
+ * Whether the browser can currently reach the network.
+ *
+ * <p>Two signals, read by the offline banner: whether we are online now, and
+ * whether connectivity was ever lost during this session — the second is what
+ * lets the banner say "you are back" rather than staying silent about a gap
+ * the reader noticed. Caching of responses is the Angular service worker's
+ * job and is configured in `ngsw-config.json`, not here.
+ *
+ * <p>This used to carry a queue of writes to replay when connectivity
+ * returned: `queue()`, a retry counter, and a `localStorage` copy of the
+ * pending operations. Nothing ever called `queue()`, so none of it had run,
+ * and three things were wrong with it that only running it would have found.
+ *
+ * <p>`loadQueue()` was never called from anywhere, so the queue was written
+ * to storage and never read back — the persistence existed only to survive a
+ * reload, which is the one thing it did not do. The service-worker
+ * registration destructured `SwUpdate` and discarded it. And the storage key
+ * was a bare `cde_pending_ops`, with no tenant in it, holding full request
+ * URLs and bodies: §5.6 requires every key touching tenant data to be tenant
+ * namespaced and calls one that is not a security defect. Replaying a write
+ * queued under one tenant against whichever session happened to be current
+ * is precisely the failure that rule exists to prevent.
+ *
+ * <p>Offline write-and-replay may well be worth building. It should be built
+ * deliberately, against §5.6 and §7.8's idempotency rules, rather than
+ * inherited from a draft that had never executed.
  */
 @Injectable({ providedIn: 'root' })
 export class OfflineService {
 
-  readonly isOnline   = signal(navigator.onLine);
-  readonly wasOffline = signal(false);  // user was offline this session
-  readonly pendingOps = signal<PendingOperation[]>([]);
+  readonly isOnline = signal(navigator.onLine);
+
+  /** Whether connectivity has been lost at any point this session. */
+  readonly wasOffline = signal(false);
 
   constructor() {
-    window.addEventListener('online',  () => {
-      this.isOnline.set(true);
-      this.syncPendingOps();
-    });
+    window.addEventListener('online', () => this.isOnline.set(true));
     window.addEventListener('offline', () => {
       this.isOnline.set(false);
       this.wasOffline.set(true);
     });
-
-    // Register Angular service worker update
-    this.registerSwUpdate();
   }
-
-  /**
-   * Queue an operation to be synced when back online.
-   */
-  queue(op: Omit<PendingOperation, 'id' | 'timestamp'>) {
-    const pending: PendingOperation = {
-      ...op,
-      id:        crypto.randomUUID(),
-      timestamp: new Date(),
-      retries:   0
-    };
-    this.pendingOps.update(ops => [...ops, pending]);
-    this.persistQueue();
-  }
-
-  /**
-   * Retry all pending operations now that we're online.
-   */
-  private async syncPendingOps() {
-    const ops = this.pendingOps();
-    if (!ops.length) return;
-
-    for (const op of ops) {
-      try {
-        const res = await fetch(op.url, {
-          method:  op.method,
-          headers: { 'Content-Type': 'application/json', ...op.headers },
-          body:    op.body ? JSON.stringify(op.body) : undefined
-        });
-        if (res.ok) {
-          this.pendingOps.update(all => all.filter(o => o.id !== op.id));
-        } else {
-          this.incrementRetries(op.id);
-        }
-      } catch {
-        this.incrementRetries(op.id);
-      }
-    }
-    this.persistQueue();
-  }
-
-  private incrementRetries(id: string) {
-    this.pendingOps.update(ops =>
-      ops.map(o => o.id === id
-        ? { ...o, retries: o.retries + 1 }
-        : o
-      ).filter(o => o.retries < 5)  // drop after 5 failures
-    );
-  }
-
-  private persistQueue() {
-    try {
-      localStorage.setItem('cde_pending_ops',
-        JSON.stringify(this.pendingOps()));
-    } catch { /* storage full */ }
-  }
-
-  private loadQueue() {
-    try {
-      const saved = localStorage.getItem('cde_pending_ops');
-      if (saved) this.pendingOps.set(JSON.parse(saved));
-    } catch { /* ignore */ }
-  }
-
-  private async registerSwUpdate() {
-    if (!('serviceWorker' in navigator)) return;
-    try {
-      const { SwUpdate } = await import('@angular/service-worker');
-      // SW update notification handled in AppComponent
-    } catch { /* SW not available in dev */ }
-  }
-}
-
-export interface PendingOperation {
-  id:        string;
-  url:       string;
-  method:    'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  body?:     unknown;
-  headers?:  Record<string, string>;
-  label?:    string;   // human-readable description
-  timestamp: Date;
-  retries:   number;
 }
