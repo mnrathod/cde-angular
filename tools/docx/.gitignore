@@ -1,9 +1,10 @@
 # The document build installs `docx` here by hand — see README.md for why it is
-# deliberately absent from the application's package.json. None of that install
-# belongs in the repository.
+# deliberately absent from the application's package.json.
+#
+# The manifest and the lockfile ARE committed, and the installed tree is not.
+# An unpinned dependency is an unpinned dependency whether or not a human
+# types the command that installs it, and these documents go to customers.
 node_modules/
-package.json
-package-lock.json
 # Rendered output lives in docs/, not beside the generator.
 *.docx
 *.pdf

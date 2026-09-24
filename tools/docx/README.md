@@ -43,11 +43,24 @@ It builds documents; it has no business in the Angular dependency graph, where
 it would be audited, scanned and shipped as though the product used it. Install
 it here, locally, when you need to rebuild.
 
-This does mean the repository names a dependency that no lockfile pins, which
-§0.3 would normally have something to say about. The position taken is that a
-documentation build tool run by hand is not a supply-chain surface in the way an
-application dependency is. If that judgement is wrong, the fix is a lockfile in
-this directory rather than an entry in the app's manifest.
+`package.json` and `package-lock.json` here are **committed**, so the version
+and the whole resolved tree are pinned. They were both ignored until
+2026-09-24, on the reasoning that a documentation build tool run by hand is
+not a supply-chain surface the way an application dependency is. That
+reasoning does not hold: being run by hand changes who types the command, not
+what gets installed, and these documents go to customers. A compromised or
+re-licensed release would have been picked up silently on the next rebuild
+with nothing to compare against (§9.1, §17.2).
+
+The installed tree stays out of the repository. `npm ci` in this directory
+reproduces it.
+
+The tree is 22 packages, all permissive: MIT and ISC throughout, except
+`jszip` (`MIT OR GPL-3.0-or-later` — we take the MIT grant), `pako`
+(`MIT AND Zlib`, both permissive) and `sax` (`BlueOak-1.0.0`, per
+docs/licences.md §3.6). Nothing on §2.1's forbidden list. These are not
+redistributed — the documents are output, not a derivative of the
+generator's dependencies — so no attribution obligation attaches to them.
 
 ## Structure
 
