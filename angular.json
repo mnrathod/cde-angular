@@ -63,6 +63,9 @@
             ],
             "styles": [
               "src/styles.css"
+            ],
+            "allowedCommonJsDependencies": [
+              "@stomp/stompjs"
             ]
           },
           "configurations": {
@@ -131,7 +134,12 @@
               "text-summary",
               "lcov"
             ],
-            "coverageThresholds": { "statements": 61, "branches": 58, "functions": 50, "lines": 62 }
+            "coverageThresholds": {
+              "statements": 61,
+              "branches": 58,
+              "functions": 50,
+              "lines": 62
+            }
           }
         },
         "extract-i18n": {
