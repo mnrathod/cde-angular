@@ -135,10 +135,10 @@
               "lcov"
             ],
             "coverageThresholds": {
-              "statements": 61,
-              "branches": 58,
-              "functions": 50,
-              "lines": 62
+              "statements": 73,
+              "branches": 70,
+              "functions": 60,
+              "lines": 75
             }
           }
         },
