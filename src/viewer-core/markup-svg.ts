@@ -22,9 +22,33 @@ export function shapeToSvg(s: ShapeData, zoom = 1): string {
   const sw     = s.strokeWidth;
   const fill   = `${s.color}${Math.round((s.opacity || 0) * 255).toString(16).padStart(2,'0')}`;
 
+  /*
+   * Every geometry field on ShapeData is optional, and a shape reaches here
+   * without one routinely: mid-drag before the second point exists, and from
+   * an embed host's own store, which §5.12 says is not trusted.
+   *
+   * This function defended the fields it did arithmetic on — `s.width||0` and
+   * the rest — and interpolated the others straight in, so an incomplete shape
+   * rendered `x1="undefined"`. That is not an error anything reports: the
+   * attribute is invalid, the element is dropped, and the shape vanishes from
+   * an exported drawing with nothing to say it was ever there.
+   *
+   * `shapeToPrimitives` had the fallbacks all along. The pair's own spec
+   * compares element names against a fully-populated fixture, so it could not
+   * see a disagreement that only appears when a field is missing.
+   *
+   * `s.x2` and `s.y2` are still read raw further down, by `callout`, which
+   * offsets its tail from the anchor when they are absent — defaulting them to
+   * zero here would move that tail to the corner of the page.
+   */
+  const x  = s.x  ?? 0, y  = s.y  ?? 0;
+  const x1 = s.x1 ?? 0, y1 = s.y1 ?? 0;
+  const x2 = s.x2 ?? 0, y2 = s.y2 ?? 0;
+  const cx = s.cx ?? 0, cy = s.cy ?? 0, r = s.r ?? 0;
+
   switch (s.tool) {
     case 'line':
-      return `<line data-id="${s.id}" x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round"/>`;
+      return `<line data-id="${s.id}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round"/>`;
 
     case 'arrow': {
       const dx = (s.x2||0) - (s.x1||0), dy = (s.y2||0) - (s.y1||0);
@@ -34,29 +58,29 @@ export function shapeToSvg(s: ShapeData, zoom = 1): string {
       const ax = (s.x2||0) - ux*hs, ay = (s.y2||0) - uy*hs;
       const px = -uy*hs*0.5, py = ux*hs*0.5;
       return `<g data-id="${s.id}" stroke="${stroke}" fill="${stroke}">
-        <line x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke-width="${sw}" stroke-linecap="round"/>
-        <polygon points="${s.x2},${s.y2} ${ax+px},${ay+py} ${ax-px},${ay-py}"/>
+        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke-width="${sw}" stroke-linecap="round"/>
+        <polygon points="${x2},${y2} ${ax+px},${ay+py} ${ax-px},${ay-py}"/>
       </g>`;
     }
 
     case 'rect':
-      return `<rect data-id="${s.id}" x="${s.x}" y="${s.y}" width="${s.width||0}" height="${s.height||0}" stroke="${stroke}" stroke-width="${sw}" fill="${fill}" rx="2"/>`;
+      return `<rect data-id="${s.id}" x="${x}" y="${y}" width="${s.width||0}" height="${s.height||0}" stroke="${stroke}" stroke-width="${sw}" fill="${fill}" rx="2"/>`;
 
     case 'highlight':
-      return `<rect data-id="${s.id}" x="${s.x}" y="${s.y}" width="${s.width||0}" height="${s.height||2}" fill="#FFFF0066" stroke="none"/>`;
+      return `<rect data-id="${s.id}" x="${x}" y="${y}" width="${s.width||0}" height="${s.height||2}" fill="#FFFF0066" stroke="none"/>`;
 
     case 'redact':
       // Live drag preview only — committed regions render separately in
       // PDF-point space (see ViewerStateService.redactionRegions).
-      return `<rect data-id="${s.id}" x="${s.x}" y="${s.y}" width="${s.width||0}" height="${s.height||0}" fill="#000000" stroke="#000000"/>`;
+      return `<rect data-id="${s.id}" x="${x}" y="${y}" width="${s.width||0}" height="${s.height||0}" fill="#000000" stroke="#000000"/>`;
 
     case 'formfield':
       // Live drag preview only — placed drafts render separately in
       // PDF-point space (see ViewerStateService.formFieldDrafts).
-      return `<rect data-id="${s.id}" x="${s.x}" y="${s.y}" width="${s.width||0}" height="${s.height||0}" fill="#3b82f622" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4 3" rx="2"/>`;
+      return `<rect data-id="${s.id}" x="${x}" y="${y}" width="${s.width||0}" height="${s.height||0}" fill="#3b82f622" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4 3" rx="2"/>`;
 
     case 'circle':
-      return `<circle data-id="${s.id}" cx="${s.cx}" cy="${s.cy}" r="${s.r||0}" stroke="${stroke}" stroke-width="${sw}" fill="${fill}"/>`;
+      return `<circle data-id="${s.id}" cx="${cx}" cy="${cy}" r="${s.r||0}" stroke="${stroke}" stroke-width="${sw}" fill="${fill}"/>`;
 
     case 'ellipse': {
       const rx = (s.width||0)/2, ry = (s.height||0)/2;
@@ -65,10 +89,10 @@ export function shapeToSvg(s: ShapeData, zoom = 1): string {
 
     // Text-markup tools: drag a box over the target text region.
     case 'underline':
-      return `<line data-id="${s.id}" x1="${s.x}" y1="${(s.y||0)+(s.height||0)}" x2="${(s.x||0)+(s.width||0)}" y2="${(s.y||0)+(s.height||0)}" stroke="${stroke}" stroke-width="${Math.max(sw,2)}"/>`;
+      return `<line data-id="${s.id}" x1="${x}" y1="${(s.y||0)+(s.height||0)}" x2="${(s.x||0)+(s.width||0)}" y2="${(s.y||0)+(s.height||0)}" stroke="${stroke}" stroke-width="${Math.max(sw,2)}"/>`;
 
     case 'strikeout':
-      return `<line data-id="${s.id}" x1="${s.x}" y1="${(s.y||0)+(s.height||0)/2}" x2="${(s.x||0)+(s.width||0)}" y2="${(s.y||0)+(s.height||0)/2}" stroke="${stroke}" stroke-width="${Math.max(sw,2)}"/>`;
+      return `<line data-id="${s.id}" x1="${x}" y1="${(s.y||0)+(s.height||0)/2}" x2="${(s.x||0)+(s.width||0)}" y2="${(s.y||0)+(s.height||0)/2}" stroke="${stroke}" stroke-width="${Math.max(sw,2)}"/>`;
 
     case 'squiggly': {
       const x0 = s.x||0, yBase = (s.y||0)+(s.height||0), w = s.width||0;
@@ -83,7 +107,7 @@ export function shapeToSvg(s: ShapeData, zoom = 1): string {
     case 'note':
       return `<g data-id="${s.id}">
         <rect x="${(s.x||0)-9}" y="${(s.y||0)-9}" width="18" height="18" rx="3" fill="#FFD54A" stroke="${stroke}" stroke-width="1.5"/>
-        <text x="${s.x}" y="${(s.y||0)+4}" text-anchor="middle" font-size="12">📝</text>
+        <text x="${x}" y="${(s.y||0)+4}" text-anchor="middle" font-size="12">📝</text>
         <title>${escapeXml(s.text||'')}</title>
       </g>`;
 
@@ -120,7 +144,7 @@ export function shapeToSvg(s: ShapeData, zoom = 1): string {
     case 'stamp':
       return `<g data-id="${s.id}">
         <rect x="${(s.x||0)-2}" y="${(s.y||0)-14}" width="${((s.text||'').length*7+10)||60}" height="18" fill="rgba(255,255,255,0.85)" rx="2"/>
-        <text x="${s.x}" y="${s.y}" fill="${stroke}" font-size="13" font-family="Arial,sans-serif" font-weight="${s.tool==='stamp'?'bold':'normal'}">${escapeXml(s.text||'')}</text>
+        <text x="${x}" y="${y}" fill="${stroke}" font-size="13" font-family="Arial,sans-serif" font-weight="${s.tool==='stamp'?'bold':'normal'}">${escapeXml(s.text||'')}</text>
       </g>`;
 
 
@@ -129,11 +153,11 @@ export function shapeToSvg(s: ShapeData, zoom = 1): string {
       const txt = escapeXml(s.text||'');
       const boxW = Math.max(txt.length * 7 + 16, 80), boxH = 22;
       return `<g data-id="${s.id}">
-        <line x1="${s.x}" y1="${s.y}" x2="${tx}" y2="${ty+boxH/2}" stroke="${stroke}" stroke-width="${sw}"/>
+        <line x1="${x}" y1="${y}" x2="${tx}" y2="${ty+boxH/2}" stroke="${stroke}" stroke-width="${sw}"/>
         <rect x="${tx}" y="${ty}" width="${boxW}" height="${boxH}" rx="3"
           fill="rgba(255,255,255,0.92)" stroke="${stroke}" stroke-width="${sw}"/>
         <text x="${tx+8}" y="${ty+15}" fill="${stroke}" font-size="12" font-family="Arial">${txt}</text>
-        <circle cx="${s.x}" cy="${s.y}" r="3" fill="${stroke}"/>
+        <circle cx="${x}" cy="${y}" r="3" fill="${stroke}"/>
       </g>`;
     }
 
