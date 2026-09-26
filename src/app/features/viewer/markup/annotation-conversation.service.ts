@@ -28,26 +28,35 @@ export class AnnotationConversationService {
   readonly failure = signal("");
 
   /**
-   * Rebuilds the threads for these annotations and loads each one's replies.
+   * Rebuilds the threads for these annotations and loads their replies.
    *
-   * <p>One request per annotation, which is an N+1 against §7.2's "one
-   * screen, one request". It needs a batch endpoint on the server to fix
-   * and is recorded rather than hidden; a thread whose replies fail to load
-   * now says so instead of looking like a thread with no replies.
+   * <p>One request for the whole panel. This used to make one per annotation
+   * — an N+1 against §7.2's "one screen, one request", so a drawing with
+   * forty comments opened forty connections, and a reader on a slow link
+   * watched the threads fill in one at a time. The server now answers with
+   * every reply on the document at once, each carrying the annotation it
+   * belongs to, so grouping happens here.
+   *
+   * <p>A failure is still reported rather than shown as an absence: a thread
+   * whose replies could not be loaded says so, instead of looking like a
+   * thread nobody has replied to.
    */
   open(annotations: readonly Annotation[]): void {
     this.failure.set("");
     this.threads.set(annotations.map((annotation) => ({ annotation, replies: [] })));
+    if (annotations.length === 0) return;
 
-    for (const annotation of annotations) {
-      this.annotations.loadReplies(annotation.id).subscribe({
-        next: (replies) => this.replaceReplies(annotation.id, () => replies),
-        error: (err: unknown) => this.report(
-          err,
-          $localize`:Shown when the replies under an annotation cannot be loaded@@annotationThread.repliesUnavailable:Some replies could not be loaded. They may still be there — reopen this panel to try again.`,
-        ),
-      });
-    }
+    this.annotations.loadRepliesForDocument(documentIdOf(annotations)).subscribe({
+      next: (replies) => this.threads.update((threads) =>
+        threads.map((thread) => ({
+          ...thread,
+          replies: replies.filter((reply) => reply.annotationId === thread.annotation.id),
+        }))),
+      error: (err: unknown) => this.report(
+        err,
+        $localize`:Shown when the replies under an annotation cannot be loaded@@annotationThread.repliesUnavailable:Some replies could not be loaded. They may still be there — reopen this panel to try again.`,
+      ),
+    });
   }
 
   reply(annotationId: number, content: string, onSent: () => void): void {
@@ -116,4 +125,16 @@ export class AnnotationConversationService {
   private report(err: unknown, fallback: string): void {
     this.failure.set(problemMessage(err, fallback));
   }
+}
+
+/**
+ * Which document this panel is showing.
+ *
+ * <p>Taken from the markup rather than passed in, because the panel is
+ * opened with the annotations it is about and every one of them belongs to
+ * the same document — the viewer shows one at a time. Reading it off the
+ * first is not a shortcut: there is no second document it could be.
+ */
+function documentIdOf(annotations: readonly Annotation[]): number {
+  return annotations[0]!.documentId;
 }

@@ -59,15 +59,64 @@ describe("the conversation under an annotation", () => {
 
   afterEach(() => httpMock.verify());
 
-  /** Opens one annotation and settles its reply load. */
+  /** Opens one annotation and settles the document's reply load. */
   function openOne(replies: AnnotationReply[] = []) {
     conversation.open([annotation(1)]);
-    httpMock.expectOne("/api/annotations/1/replies").flush(replies);
+    httpMock.expectOne("/api/annotations/document/1/replies").flush(replies);
   }
 
   function repliesShown(): readonly AnnotationReply[] {
     return conversation.threads()[0]?.replies ?? [];
   }
+
+  describe("opening the panel", () => {
+    it("asks for the whole document's replies in one request", () => {
+      // It used to ask per thread. Forty comments on a drawing meant forty
+      // requests, against §7.2's "one screen, one request", and a reader on
+      // a slow link watched the threads fill in one at a time.
+      conversation.open([annotation(1), annotation(2), annotation(3)]);
+
+      httpMock.expectOne("/api/annotations/document/1/replies").flush([]);
+      httpMock.verify();
+    });
+
+    it("gives each thread its own replies", () => {
+      conversation.open([annotation(1), annotation(2)]);
+
+      httpMock.expectOne("/api/annotations/document/1/replies")
+        .flush([reply(9, 1), reply(10, 2), reply(11, 1)]);
+
+      expect(conversation.threads()[0]?.replies.map((each) => each.id)).toEqual([9, 11]);
+      expect(conversation.threads()[1]?.replies.map((each) => each.id)).toEqual([10]);
+    });
+
+    it("leaves a thread empty when nothing replied to it", () => {
+      conversation.open([annotation(1), annotation(2)]);
+
+      httpMock.expectOne("/api/annotations/document/1/replies").flush([reply(9, 1)]);
+
+      expect(conversation.threads()[1]?.replies).toEqual([]);
+    });
+
+    it("does not attach a reply belonging to markup that is not shown", () => {
+      // The server answers for the document; the panel may be showing a
+      // filtered subset of its markup. A reply landing in the wrong thread
+      // reads as somebody having answered a different comment.
+      conversation.open([annotation(1)]);
+
+      httpMock.expectOne("/api/annotations/document/1/replies")
+        .flush([reply(9, 1), reply(99, 77)]);
+
+      expect(conversation.threads()[0]?.replies.map((each) => each.id)).toEqual([9]);
+    });
+
+    it("asks for nothing at all when there is no markup", () => {
+      conversation.open([]);
+
+      httpMock.verify();
+      expect(conversation.threads()).toEqual([]);
+    });
+  });
 
   describe("posting a reply", () => {
     it("shows the reply the server accepted", () => {
@@ -172,7 +221,7 @@ describe("the conversation under an annotation", () => {
   describe("loading the replies", () => {
     it("says when they could not be read, rather than showing an empty thread", () => {
       conversation.open([annotation(1)]);
-      httpMock.expectOne("/api/annotations/1/replies")
+      httpMock.expectOne("/api/annotations/document/1/replies")
         .flush({ detail: "Nope" }, { status: 500, statusText: "Server Error" });
 
       expect(conversation.failure()).not.toBe("");

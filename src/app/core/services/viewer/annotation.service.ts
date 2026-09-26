@@ -51,6 +51,20 @@ export class AnnotationService {
     return this.http.get<AnnotationReply[]>(`/api/annotations/${annotationId}/replies`);
   }
 
+  /**
+   * Every reply on a document's markup, in one request.
+   *
+   * <p>The review panel opens the whole conversation, and it used to do that
+   * with one request per thread — forty comments on a drawing meant forty
+   * requests, which is the N+1 §7.2's "one screen, one request" exists to
+   * prevent. Each reply carries its own `annotationId`, so grouping is the
+   * caller's to do and is cheap.
+   */
+  loadRepliesForDocument(documentId: number): Observable<AnnotationReply[]> {
+    return this.http.get<AnnotationReply[]>(
+      `/api/annotations/document/${documentId}/replies`);
+  }
+
   addReply(annotationId: number, content: string): Observable<AnnotationReply> {
     return this.http.post<AnnotationReply>(
       `/api/annotations/${annotationId}/replies`, { content }
