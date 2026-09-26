@@ -1,6 +1,59 @@
-import { Injectable, inject, isDevMode } from '@angular/core';
+import { Injectable, InjectionToken, inject, isDevMode } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../services/auth.service';
+
+/**
+ * Whether a fault report may leave the browser at all.
+ *
+ * <p>A token rather than a call to `isDevMode()` inside the service, for two
+ * reasons.
+ *
+ * <p>The first is §9.3, which lists "no telemetry egress" among the things an
+ * air-gapped deployment requires. `isDevMode()` cannot express that: an
+ * air-gapped deployment is a production build, so the check passed and every
+ * caught fault attempted an outbound POST. A deployment can now say no, by
+ * serving `<meta name="telemetry" content="off">`, and the absence of that tag
+ * keeps the existing behaviour for everyone else.
+ *
+ * <p>The second is that a decision taken inside a method is a decision no test
+ * can reach. This service's spec used to consist of five cases asserting that
+ * `log()` did not throw, with a comment explaining that dev mode made it a
+ * no-op — so the payload, the rate limit and the third-party path had never
+ * run once.
+ */
+export const TELEMETRY_ENABLED = new InjectionToken<boolean>(
+  'cde.telemetry.enabled',
+  {
+    providedIn: 'root',
+    factory: () => telemetryPermitted(
+      isDevMode(),
+      document.querySelector<HTMLMetaElement>('meta[name="telemetry"]')?.content ?? null,
+    ),
+  },
+);
+
+/**
+ * The rule the token applies, as a function of its two inputs.
+ *
+ * <p>Separate from the factory because the factory reads the environment, and
+ * a rule that can only be reached through `isDevMode()` and the DOM is a rule
+ * no test can put a case to — which is how the opt-out below came to be
+ * written and then verified by nothing. Providing the token directly, as this
+ * service's own spec does, steps over the rule entirely.
+ *
+ * @param isDevelopment  whether this is a development build
+ * @param telemetrySetting  the `telemetry` meta tag's content, or null when
+ *                          the deployment serves no such tag
+ */
+export function telemetryPermitted(
+  isDevelopment: boolean,
+  telemetrySetting: string | null,
+): boolean {
+  if (isDevelopment) return false;
+  // Opt-out rather than opt-in: absence means "send", so adding this does not
+  // silently stop every deployment that was already reporting faults.
+  return telemetrySetting?.trim().toLowerCase() !== 'off';
+}
 
 export interface RemoteLogEvent {
   level:      'error' | 'warning' | 'info';
@@ -31,6 +84,7 @@ export interface RemoteLogEvent {
 export class RemoteLoggingService {
   private http = inject(HttpClient);
   private auth = inject(AuthService);
+  private telemetryEnabled = inject(TELEMETRY_ENABLED);
 
   // Rate limiting: max 10 errors per minute
   private readonly MAX_PER_MIN = 10;
@@ -42,8 +96,11 @@ export class RemoteLoggingService {
    * Silently fails if the endpoint is unavailable — never throws.
    */
   log(event: Omit<RemoteLogEvent, 'url' | 'userAgent' | 'timestamp' | 'username'>): void {
-    if (isDevMode()) {
-      // In dev, just log to console (don't spam remote endpoint)
+    if (!this.telemetryEnabled) {
+      // Nothing leaves the browser — a developer's own broken build would
+      // otherwise fill the shared store with faults nobody will fix, and an
+      // air-gapped deployment must not attempt the call at all (§9.3). The
+      // console still gets it, because it is the only record left.
       console.debug('[RemoteLog]', event.level.toUpperCase(), event.message);
       return;
     }

@@ -3,9 +3,10 @@
 Settings this application reads, per §13: type, default, whether it is
 required, and whether it is a secret.
 
-There is exactly one so far. Angular has no server-side environment to read
-from, so configuration arrives as an Angular provider — supplied by whoever
-bootstraps the application, which for the embeddable viewer is the host.
+Angular has no server-side environment to read from, so configuration arrives
+one of two ways: as an Angular provider, supplied by whoever bootstraps the
+application, or as a `<meta>` tag on the served page, which is what a
+deployment can change without rebuilding the bundle.
 
 ---
 
@@ -80,3 +81,81 @@ backend must be configured to expect:
 - **Content Security Policy.** The host page's `connect-src` must allow this
   origin, and its `frame-ancestors` governs whether the viewer can be framed
   at all.
+
+
+---
+
+## `telemetry` (meta tag)
+
+| | |
+|---|---|
+| Type | String — `off`, or absent |
+| Default | Absent, which means fault reports are sent |
+| Required | No |
+| Secret | No |
+| Declared in | `src/app/core/services/remote-logging.service.ts` (`TELEMETRY_ENABLED`) |
+
+Whether a caught fault may be reported off the browser.
+
+```html
+<meta name="telemetry" content="off">
+```
+
+**Opt-out, not opt-in.** An absent tag means reports are sent, so adding this
+did not silently stop every deployment that was already reporting faults.
+`off` is the only value that disables it, in any case and with any surrounding
+whitespace; anything else permits sending, so a typo cannot quietly silence a
+deployment's error reporting.
+
+**Why it exists.** §9.3 requires an air-gapped deployment to make no telemetry
+egress. The check before this was `isDevMode()`, which cannot express that —
+an air-gapped deployment is a production build, so the check passed and every
+caught fault attempted an outbound POST to `/api/logs/errors` and, where a DSN
+was configured, to a third party. A development build still sends nothing,
+regardless of this tag.
+
+With reporting off, the fault still reaches the browser console, which is then
+the only record of it.
+
+---
+
+## `sentry-dsn` (meta tag)
+
+| | |
+|---|---|
+| Type | String — a Sentry DSN, e.g. `https://key@errors.example.com/42` |
+| Default | Absent, which means no third party is contacted |
+| Required | No |
+| Secret | No — a DSN is a public ingestion key, not a credential |
+| Declared in | `src/app/core/services/remote-logging.service.ts` |
+
+An external error service to send fault reports to, **in addition** to the
+internal `/api/logs/errors` endpoint. The internal endpoint is always used
+when reporting is on; this is not an alternative to it.
+
+Absent by default, which is what §6.1 requires of a third-party integration:
+off unless a deployment turns it on. An unreadable value is ignored and does
+not stop the internal report — a misconfiguration is not a reason to lose the
+fault.
+
+Setting this makes the error service a **sub-processor** (§6.1, §10.1's
+register): it belongs in the sub-processor register, in the DPA, and in the
+tenant-facing Trust Centre, and its region has to satisfy the tenant's
+residency requirement. Leave it absent for any deployment where that has not
+been established.
+
+---
+
+## `app-version` (meta tag)
+
+| | |
+|---|---|
+| Type | String — a release identifier |
+| Default | `1.0.0` |
+| Required | No |
+| Secret | No |
+| Declared in | `src/app/core/services/remote-logging.service.ts` |
+
+The release a fault report is attributed to. A stack trace from an unknown
+build is a stack trace against unknown line numbers, so a deployment that
+ships source maps to an error service wants this set to match them.
