@@ -5,7 +5,7 @@ import {
 import { FormsModule } from '@angular/forms';
 
 import { Annotation, AnnotationReply } from '../../../core/models';
-import { RoleService } from '../../../core/services/role.service';
+import { Permission, RoleService } from '../../../core/services/role.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { AnnotationConversationService } from './annotation-conversation.service';
 import { AnnotationThreadCardComponent } from './annotation-thread-card.component';
@@ -141,7 +141,7 @@ export class AnnotationThreadComponent implements OnInit, OnChanges {
 
   /** Replies are deletable by their author, and by anyone granted the right. */
   canDeleteAnyReply(): boolean {
-    return this.roleService.can('canDelete');
+    return this.roleService.can(Permission.WriteMarkup);
   }
 
   currentUser(): string | null {

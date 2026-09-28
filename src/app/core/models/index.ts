@@ -18,7 +18,13 @@ export interface RegisterRequest {
   // for here would be granted to whoever asked. The role comes back on the
   // AuthResponse; the organisation comes from the invitation, or is created.
 }
-export interface AuthResponse  { token: string; username: string; role: string; }
+export interface AuthResponse {
+  token:    string;
+  username: string;
+  role:     string;
+  /** Every permission the account holds, e.g. `document:write`. */
+  permissions: string[];
+}
 
 // ── Project ─────────────────────────────────────────────────────
 export type ProjectPhase = 'CONCEPT' | 'DESIGN' | 'CONSTRUCTION' | 'HANDOVER' | 'OPERATION';

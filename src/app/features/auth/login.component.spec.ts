@@ -22,7 +22,11 @@ import { LoginComponent } from "./login.component";
 const SESSION: AuthResponse = {
   token: "a-token",
   username: "someone",
-  role: "MEMBER",
+  // A real role, and the permissions the server sends with it. "MEMBER" was
+  // not one this platform has, which is the same fiction that let the role
+  // handling drift far enough to hide the upload control from engineers.
+  role: "ENGINEER",
+  permissions: ["document:read", "document:write"],
 };
 
 describe("the sign-in card", () => {

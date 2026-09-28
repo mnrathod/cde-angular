@@ -16,7 +16,7 @@ import {
 import { Document, DocumentStatus } from "../../core/models";
 import { DocumentService } from "../../core/services/document.service";
 import { ProjectService } from "../../core/services/project.service";
-import { RoleService } from "../../core/services/role.service";
+import { Permission, RoleService } from "../../core/services/role.service";
 import { SkeletonComponent } from "../../shared/components/skeleton.component";
 import {
   DOCUMENT_STATUSES,
@@ -67,7 +67,7 @@ import {
               data-testid="document-card"
               class="group bg-white rounded border border-gray-200 shadow-sm cursor-pointer hover:border-accent hover:-translate-y-0.5 hover:shadow-md transition-all overflow-hidden relative"
             >
-              @if (roles.can("canDelete")) {
+              @if (roles.can(Permission.WriteDocument)) {
                 <button
                   (click)="deleteRequested.emit(doc); $event.stopPropagation()"
                   i18n-title="@@shell.deleteDocumentHint"
@@ -97,7 +97,7 @@ import {
                   {{ doc.drawingNumber || doc.documentType }}{{ revisionSuffix(doc) }}
                 </div>
                 <div class="flex items-center justify-between mt-1.5 gap-1">
-                  @if (roles.can("canApprove")) {
+                  @if (roles.can(Permission.WriteDocument)) {
                     <select
                       [value]="doc.status"
                       (click)="$event.stopPropagation()"
@@ -136,6 +136,8 @@ export class DocumentGridComponent {
   documents = inject(DocumentService);
   projects = inject(ProjectService);
   roles = inject(RoleService);
+  /** Exposed so the template can name a permission. */
+  readonly Permission = Permission;
 
   readonly statuses = DOCUMENT_STATUSES;
   labelFor = statusLabel;

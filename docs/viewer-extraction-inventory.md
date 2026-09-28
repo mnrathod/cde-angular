@@ -124,8 +124,16 @@ auth method, `auth.username()`, in three places, for annotation attribution.
 There is no token handling in the viewer. Replacing it with a host-supplied
 display name is close to trivial, and `auth.service` need not move.
 
-**Permissions.** `role.service` is imported once. Worth confirming what it
-gates before assuming it is as small as auth.
+**Permissions.** `role.service` is imported once inside the viewer, by
+`annotation-thread`, to decide whether replies other than your own may be
+deleted. Answered rather than left open, because the answer changed: the
+service no longer holds a role-to-permission table of its own — it reads the
+permission list the server sends with the session, so a host embedding the
+viewer must supply that list (or an empty one, which hides the control) rather
+than a role name the viewer would interpret. The previous table had drifted to
+the point of naming three roles the platform has never had while missing two it
+does, which is the argument against the host passing a role and this code
+deciding what it means.
 
 **Collaboration is same-origin by construction.** `collaboration.service`
 builds its socket URL as:

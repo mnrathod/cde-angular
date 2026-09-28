@@ -14,7 +14,7 @@ import {
 
 import { Project } from "../../core/models";
 import { ProjectService } from "../../core/services/project.service";
-import { RoleService } from "../../core/services/role.service";
+import { Permission, RoleService } from "../../core/services/role.service";
 import { phaseChipStyle, phaseLabel } from "./project-vocabulary";
 
 @Component({
@@ -32,7 +32,7 @@ import { phaseChipStyle, phaseLabel } from "./project-vocabulary";
         >
           Projects
         </h2>
-        @if (roles.can("canCreateProject")) {
+        @if (roles.can(Permission.WriteProject)) {
           <button
             (click)="createRequested.emit()"
             i18n-title="@@shell.newProjectHint"
@@ -79,7 +79,7 @@ import { phaseChipStyle, phaseLabel } from "./project-vocabulary";
               >
                 {{ project.name }}
               </button>
-              @if (roles.can("canCreateProject")) {
+              @if (roles.can(Permission.WriteProject)) {
                 <button
                   (click)="editRequested.emit(project); $event.stopPropagation()"
                   i18n-title="@@shell.editProjectHint"
@@ -89,7 +89,7 @@ import { phaseChipStyle, phaseLabel } from "./project-vocabulary";
                   ✎
                 </button>
               }
-              @if (roles.can("canDelete")) {
+              @if (roles.can(Permission.WriteProject)) {
                 <button
                   (click)="
                     deleteRequested.emit(project); $event.stopPropagation()
@@ -137,6 +137,8 @@ export class ProjectListComponent {
 
   projects = inject(ProjectService);
   roles = inject(RoleService);
+  /** Exposed so the template can name a permission. */
+  readonly Permission = Permission;
 
   labelFor = phaseLabel;
   chipStyleFor = phaseChipStyle;

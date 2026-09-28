@@ -38,7 +38,8 @@ describe('RegisterFormComponent', () => {
   const sentBody = () => {
     const request = http.expectOne('/api/auth/register');
     const body = request.request.body as Record<string, unknown>;
-    request.flush({ token: 't', username: 'j.okafor', role: 'ADMIN' });
+    request.flush({ token: 't', username: 'j.okafor', role: 'ADMIN',
+                    permissions: ['document:read', 'document:write'] });
     return body;
   };
 

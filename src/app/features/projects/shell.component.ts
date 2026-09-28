@@ -20,7 +20,7 @@ import { Router } from "@angular/router";
 import { Document, Project } from "../../core/models";
 import { DocumentService } from "../../core/services/document.service";
 import { ProjectService } from "../../core/services/project.service";
-import { RoleService } from "../../core/services/role.service";
+import { Permission, RoleService } from "../../core/services/role.service";
 import {
   DeleteConfirmationComponent,
   DeletionTarget,
@@ -81,7 +81,7 @@ type OpenDialog =
                     >Compare</ng-container
                   >
                 </button>
-                @if (roles.can("canUpload")) {
+                @if (roles.can(Permission.WriteDocument)) {
                   <button
                     (click)="dialog.set({ kind: 'upload' })"
                     class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-accent hover:bg-blue-700 text-white rounded transition-colors"
@@ -130,6 +130,8 @@ type OpenDialog =
 })
 export class ShellComponent implements OnInit {
   roles = inject(RoleService);
+  /** Exposed so the template can name a permission. */
+  readonly Permission = Permission;
   projects = inject(ProjectService);
 
   private documents = inject(DocumentService);

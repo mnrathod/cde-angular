@@ -9,6 +9,8 @@ import { AuthResponse, LoginRequest, RegisterRequest } from '../models';
 export interface SessionResponse {
   username: string;
   role: string;
+  /** Every permission the account holds, e.g. `document:write`. */
+  permissions: string[];
 }
 
 /**
@@ -38,6 +40,7 @@ export class AuthService {
 
   private _username = signal<string | null>(null);
   private _role     = signal<string | null>(null);
+  private _permissions = signal<ReadonlySet<string>>(new Set());
 
   /**
    * Whether the session has been asked about yet.
@@ -51,12 +54,29 @@ export class AuthService {
 
   readonly username   = this._username.asReadonly();
   readonly role       = this._role.asReadonly();
+
+  /**
+   * What this account may do, as the server says it.
+   *
+   * <p>Sent by the server rather than derived here from the role. The
+   * browser used to keep its own role-to-permission table, and it had drifted
+   * from the real one badly enough to be a defect in its own right: it knew
+   * roles named PROJECT_MANAGER, EDITOR and GUEST, which this platform has
+   * never had, and did not know ENGINEER or REVIEWER, which it does. Both
+   * fell through a fallback to VIEWER — so the two roles that do most of the
+   * work were shown an interface with upload, delete and annotate removed.
+   *
+   * <p>A second copy of an authorisation rule is a copy that can disagree
+   * with the first, and this one did. There is now one, and it is the
+   * server's.
+   */
+  readonly permissions = this._permissions.asReadonly();
   readonly resolved   = this._resolved.asReadonly();
   readonly isLoggedIn = computed(() => this._username() !== null);
 
   login(req: LoginRequest) {
     return this.http.post<AuthResponse>('/api/auth/login', req).pipe(
-      tap(res => this.adopt(res.username, res.role))
+      tap(res => this.adopt(res.username, res.role, res.permissions))
     );
   }
 
@@ -67,7 +87,7 @@ export class AuthService {
    */
   register(req: RegisterRequest) {
     return this.http.post<AuthResponse>('/api/auth/register', req).pipe(
-      tap(res => this.adopt(res.username, res.role))
+      tap(res => this.adopt(res.username, res.role, res.permissions))
     );
   }
 
@@ -81,7 +101,7 @@ export class AuthService {
    */
   restoreSession(): Observable<boolean> {
     return this.http.get<SessionResponse>('/api/auth/session').pipe(
-      tap(session => this.adopt(session.username, session.role)),
+      tap(session => this.adopt(session.username, session.role, session.permissions)),
       map(() => true),
       catchError(() => {
         this.forget();
@@ -109,15 +129,20 @@ export class AuthService {
     });
   }
 
-  private adopt(username: string, role: string) {
+  private adopt(username: string, role: string, permissions: string[] | undefined) {
     this._username.set(username);
     this._role.set(role);
+    // An older server that sends no list leaves the set empty, which hides
+    // the controls it cannot vouch for rather than showing controls whose
+    // requests would be refused.
+    this._permissions.set(new Set(permissions ?? []));
     this._resolved.set(true);
   }
 
   private forget() {
     this._username.set(null);
     this._role.set(null);
+    this._permissions.set(new Set());
     this._resolved.set(true);
   }
 }

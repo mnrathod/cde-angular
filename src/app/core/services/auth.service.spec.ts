@@ -28,6 +28,7 @@ describe('AuthService', () => {
     token: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiJ9.synthetic',
     username: 'admin',
     role: 'ADMIN',
+    permissions: ['document:read', 'document:write', 'tenant.user:manage'],
   };
 
   const credentials = { username: 'admin', password: 'a-synthetic-test-password' };
@@ -99,7 +100,8 @@ describe('AuthService', () => {
     // The cookie survives a reload but script cannot read it, so the only way
     // to find out who is signed in is to ask.
     service.restoreSession().subscribe();
-    httpMock.expectOne('/api/auth/session').flush({ username: 'admin', role: 'ADMIN' });
+    httpMock.expectOne('/api/auth/session')
+      .flush({ username: 'admin', role: 'ADMIN', permissions: ['document:read'] });
     tick();
 
     expect(service.isLoggedIn()).toBe(true);
