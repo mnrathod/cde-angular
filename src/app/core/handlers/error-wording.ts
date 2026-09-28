@@ -23,8 +23,17 @@ export function sessionExpiredMessage(): string {
   return $localize`:Shown when the session is no longer valid@@error.sessionExpired:Your session has expired. Please sign in again.`;
 }
 
+/**
+ * <p>Says what to do next, which §1.4 asks of every error message and which
+ * "You do not have permission to do this." did not. The addition matters more
+ * than it used to: the whole document surface was gated on nothing but being
+ * signed in, so a 403 was very nearly unreachable there and the wording was
+ * never really read. Now that each endpoint checks a permission, this is the
+ * sentence somebody sees when their role does not carry one — and the only
+ * useful next step is a person, not a retry.
+ */
 export function forbiddenMessage(): string {
-  return $localize`:Shown when the account may not do what it asked@@error.forbidden:You do not have permission to do this.`;
+  return $localize`:Shown when the account may not do what it asked@@error.forbidden:You do not have permission to do this. Ask an administrator of your organisation if you need it.`;
 }
 
 export function notFoundMessage(): string {

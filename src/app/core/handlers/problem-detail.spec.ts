@@ -116,6 +116,18 @@ describe('problemMessage', () => {
       .toBe(forbiddenMessage());
   });
 
+  it('tells somebody refused what to do about it', () => {
+    // The case above compares the function with itself, so it would pass over
+    // any wording at all — including a sentence that names the problem and
+    // stops there, which is what this one said. §1.4 asks for what happened,
+    // why, and what to do next, and a refusal's only useful next step is a
+    // person.
+    const refusal = problemMessage({ status: 403, error: null }, 'OCR failed.');
+
+    expect(refusal).toMatch(/permission/i);
+    expect(refusal).toMatch(/administrator/i);
+  });
+
   it('prefers what the server said about a refusal over the generic sentence', () => {
     // A 403 is not always "you lack the permission" — registration being
     // invitation-only is a 403 the server explains precisely. Answering with
