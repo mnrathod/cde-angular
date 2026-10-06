@@ -63,16 +63,31 @@ module.exports = [
        + 'messages and their hints; required fields say so to assistive technology rather than '
        + 'only showing an asterisk.'),
   bullet('Long operations and their results are announced through live regions.'),
+  bullet('The embedded toolbar is marked as a group of named buttons rather than a toolbar. It '
+       + 'used to claim `role="toolbar"`, which promises arrow-key navigation over a single tab '
+       + 'stop that the row does not implement — so a screen-reader user was told it was a '
+       + 'toolbar, pressed the arrows, and nothing moved. If your own audit checks ARIA roles '
+       + 'against their behaviour, this is one fewer finding than the last release would have '
+       + 'given you.'),
   note('**And what we cannot.** No axe run, no Lighthouse budget, no screen-reader pass against '
      + 'the supported matrix, and no CI gate producing any of them. One known functional gap: '
      + '**markup shapes cannot yet be created or moved without a pointer**, which is an SC 2.5.7 '
      + 'failure in the annotation layer specifically. If your customers annotate drawings and '
      + 'your bid claims AA, raise this with us before you sign.'),
 
-  p('**Localisation.** The viewer has no hardcoded user-facing strings. Everything a reader sees '
-  + 'carries a stable message id and a translator note, extracted to a committed catalogue — 552 '
-  + 'messages — with two CI gates keeping it honest: one fails if the catalogue drifts from '
-  + 'source, the other if a template grows text a translator will never see.'),
+  p('**Localisation.** Everything a reader sees carries a stable message id and a translator '
+  + 'note, extracted to a committed catalogue — 585 messages — with two CI gates keeping it '
+  + 'honest: one fails if the catalogue drifts from source, the other if a template grows text a '
+  + 'translator will never see.'),
+  note('**The last issue of this guide said there were no hardcoded strings left. Nine were found '
+     + 'after it shipped,** and six of them were in the embedded viewer — the surface *your* '
+     + 'application frames, so the English appeared inside your translated interface. They are '
+     + 'fixed. They are mentioned because of what they say about the gates rather than about the '
+     + 'nine: all nine sat where neither gate looks, in expression operands and return statements '
+     + 'rather than in template text or a `$localize` call. The catalogue is complete as far as two '
+     + 'mechanical sweeps can see, and a string placed where neither looks will still get through. '
+     + 'If you are selling into a non-English market, spot-check the embedded surface in your '
+     + 'target locale rather than taking the catalogue’s completeness on trust.'),
   note('**We ship the source catalogue, not translations.** The messages are English and there '
      + 'are no other locales in the repository. If you sell into a market that needs French or '
      + 'Arabic, you supply the translated catalogue; the mechanism to consume it is Angular’s '

@@ -477,16 +477,52 @@ buttons bound to empty method bodies; required form fields marked only by an
 about; and status icons announced as "white heavy check mark" beside a badge
 that already said the status.
 
+A later pass found one more of the same family, and it is the one a buyer's
+auditor is most likely to meet: **the embedded toolbar declared
+`role="toolbar"` without implementing it.** That role promises arrow-key
+navigation over a single tab stop, and the row is a set of ordinary buttons each
+with its own tab stop. A screen-reader user is told it is a toolbar, presses the
+arrows, and nothing moves — worse off than one told it is a group of named
+buttons, which is what §1A.2 means by bad ARIA being worse than none. It is
+`role="group"` now, which promises only what is there.
+
+The full viewer's own command bar had already reached that conclusion and written
+it down in a comment two directories away. A rule recorded in a comment beside
+one component does not reach the next person writing another, which is why it is
+in this document and asserted in both components' specs.
+
 None of these would have been caught by axe. **This is the argument for §1A.5's
 position that automated checks are a floor, not conformance** — and it is worth
 quoting to a buyer who asks what our VPAT rests on.
 
 ### 9.4 Localisation
 
-There are no hardcoded user-facing strings left in the application. Every
-sentence a reader sees is an `i18n` attribute or a `$localize` call carrying a
-stable message id and a translator note, extracted to a committed catalogue at
-`src/locale/messages.json` — 552 messages at this issue.
+Every sentence a reader sees is an `i18n` attribute or a `$localize` call
+carrying a stable message id and a translator note, extracted to a committed
+catalogue at `src/locale/messages.json` — 585 messages at this issue, up from 552.
+
+**The last issue of this document said there were none left, and that was wrong
+by nine.** They were found by writing specs over two panels that had none, not by
+either gate, and the shape of them says why both gates missed them:
+
+- Three in the version-history panel — one inside a `confirm()`, two set on an
+  error signal.
+- Six in the embed viewer — three of them operands of a template expression
+  (`phase() === 'loading' ? 'Opening the document…' : '…'`), three returned from
+  a method.
+
+None was template *text*, which is what `check:i18n-markup` sweeps for, and none
+was a `$localize` call, which is what the extractor collects. A string in an
+expression operand or a return statement is invisible to both. The embed viewer is
+the worst place in the product for it, too: it renders inside a customer's own
+application, so the English appeared framed by their translated interface.
+
+The gates have not been widened to catch this class, and saying so is more useful
+than implying they have. What would catch it is a lint rule against bare string
+literals reaching a template binding or a user-visible signal, which is a
+different kind of check from either existing gate. Until then the honest statement
+is the one above: the catalogue is complete as far as two mechanical sweeps can
+see, and a string placed where neither looks will still get through.
 
 Two gates hold it, and both run in CI:
 
@@ -633,16 +669,36 @@ Angular 22 with TypeScript strict **and** `noUncheckedIndexedAccess`. Third-part
 JavaScript is bundled, never loaded from a CDN — §5.12 A08, and it is also what
 makes air-gapped deployment possible.
 
-**The environment note in the last issue of this document was wrong, and the
-correction matters because that note qualified every test claim in it.** It
-said `ng test` and `ng build` require Node ≥ 22.22.3, that the development
-container runs 22.22.2, and that specs needing Angular TestBed therefore could
-not run at all. The version facts are right — `@angular/build` does declare
-`^22.22.3` and the container is on 22.22.2 — but the conclusion is not. npm's
-engine range is advisory unless `engine-strict` is set, and it is not set here.
-`ng test` and `ng build --configuration production` both run, and have been
-running throughout the work described in this issue: **909 specs pass, and the
-production build is clean.** TestBed specs are the majority of them.
+**The Node version note has now been wrong twice, in opposite directions, and
+the facts are worth stating carefully because they qualify every test claim in
+this document.**
+
+The issue before last said `ng test` cannot run on Node 22.22.2 at all. The last
+issue corrected that to "npm's engine range is advisory unless `engine-strict` is
+set" and reported the suite running. Both are half right, and the half that
+matters is this: **npm's `engines` check is advisory, and the Angular CLI's own
+runtime check is not.** They are two different gates. `npm ci` installs happily;
+`ng test` then prints
+
+```
+Node.js version v22.22.2 detected.
+The Angular CLI requires a minimum Node.js version of v22.22.3 or v24.15.0 …
+```
+
+and exits without running anything. So whether the suite runs depends entirely on
+which Node is on `PATH`, not on `engine-strict`.
+
+The development container ships 22.22.2 at `/opt/node22`, which is 0.0.1 below the
+floor. **Running the suite there requires a newer Node** — `nvm install 24` and
+putting it first on `PATH` is enough, and that is how the figures below were
+measured. A fresh container needs it again; nothing in the repository pins it.
+Recorded at this length because a 0.0.1 shortfall that stops the entire test
+suite, with an error message about npm engines nowhere in it, is exactly the kind
+of thing the next person loses an hour to.
+
+On a Node that satisfies it, `ng test` and `ng build --configuration production`
+both run: **2,180 specs pass, and the production build is clean.** TestBed specs
+are the majority of them.
 
 That correction is load-bearing in an unwelcome direction. Several components
 had never been type-checked against their own templates, because `ng test` does
@@ -656,7 +712,44 @@ What remains true: the demo's end-to-end tests drive a stub viewer rather than
 the real one, so **the `/embed` route still has not been rendered by Angular
 inside a host frame on an installed deployment** (§13).
 
-### 12.1 Gates
+### 12.1 Coverage
+
+**§14's figures are now the gate.** `angular.json` requires 90% line and 85%
+branch — the standard itself — where it previously required 78/78, which was a
+figure the suite happened to reach rather than one anybody had chosen.
+
+Measured: **90.26% line (5,574/6,175) and 85.62% branch (2,781/3,248)**, with
+statements at 87.5% and functions at 74.9%, both also gated at their measured
+values so neither can fall.
+
+Two things about reading that number honestly.
+
+**The denominator grew while the work was done** — from 5,375 lines to 6,175. The
+builder's `coverageInclude` filters rather than forces inclusion, so v8 counts a
+file only once something imports it, and each new spec pulls in its component's
+whole dependency tree. Coverage therefore *fell* before it rose: the first few
+specs took the reported figure from 79.4% down to 76.2% by making eight hundred
+previously invisible lines visible. The figure now covers substantially more of
+the application than the 79.4% it started from did, which is the opposite of how
+a rising coverage number usually reads.
+
+**The figure is a floor and not the point**, and §14 says so: high coverage with
+weak assertions is worse than honest lower coverage. Every assertion written to
+reach it was checked by deliberately breaking the thing it guards and confirming
+it failed only the cases that name it — nineteen deliberate weakenings in all,
+across the markup engine, the focus trap, the live-region directive, the tool
+rail, the redaction panel, the version-history panel, the form panels, the
+project shell, the visual comparison and the embed viewer. That is also how the
+nine untranslated strings in §9.4 and the `role="toolbar"` defect in §9.3 were
+found. Neither was failing anything.
+
+Where the remaining 10% sits: the PDF markup layer's pointer handling, the
+collaboration service's socket lifecycle, the embed page's stroke session, and
+`pdf-engine.service`'s rendering paths — all of them code whose behaviour is a
+canvas or a socket rather than a return value, and none of them untested by
+accident.
+
+### 12.2 Gates
 
 Each of these fails loudly rather than warning, and each exists because the
 thing it checks is otherwise invisible in a diff.
@@ -673,7 +766,8 @@ thing it checks is otherwise invisible in a diff.
 | `check:served-assets` | Nothing in the built bundle is unreachable code |
 | `test:scripts` | The gate scripts themselves have tests, so a gate cannot pass by being broken |
 
-**Five of these nine now run in CI**, against four last time. The platform's
+**Five of these nine now run in CI**, against four last time. The CI Node is not
+the container's, so the version trap above does not reach the pipeline. The platform's
 `Jenkinsfile` runs `npm ci`, `tsc --build --force --noEmit`,
 `check:no-remote-code`, `check:i18n`, `check:i18n-markup`, `test:scripts`,
 `ng build` and `ng test` against this repository. `check:attribution`,
@@ -758,12 +852,35 @@ quoted above are the ones the inventory states unambiguously and that a design
 decision actually turns on; the breakdown needs re-deriving before it goes in
 front of a customer.
 
-**A library in shape, never built as one.** `viewer-core` has its manifest, its
-ng-packagr configuration and its own `angular.json` project, so
-`ng build viewer-core` is a real target. The last issue said it could not run
-here for the Node reason in §12; that reason was wrong, so the honest statement
-is now simply that nobody has run it. The `UNLICENSED` marker is still
-deliberate and still means no publish decision has been taken.
+**A library in shape, never built as one — and now with a known reason.**
+`viewer-core` has its manifest, its ng-packagr configuration and its own
+`angular.json` project, so `ng build viewer-core` is a real target. The last two
+issues of this document gave two different wrong accounts of it: first that it
+could not run for the Node reason, then that the Node reason was wrong so nobody
+had run it.
+
+It has now been run, on a Node that satisfies §12's floor. **It fails, with 53
+errors, all of them the same one:** `Cannot find name '$localize'`, across ten of
+the `viewer-core` files.
+
+The cause is one line. `tsconfig.app.json` carries
+`"types": ["@angular/localize"]`, which is what puts the `$localize` global in
+scope; `tsconfig.lib.json` carries `"types": []`, which clears it. The library
+sources are the application sources, so every `$localize` call in them is an
+unresolved name under the library's own compiler options.
+
+**That line has deliberately not been changed**, because adding the type would
+make the build succeed and produce an artifact nobody has decided to publish —
+and it would decide something on the way. A library published with `$localize`
+calls still in it requires every consumer to run Angular's localize transform over
+our code, which is a packaging contract to offer a host CDE, not a compiler
+setting to flip while correcting a document. The alternatives — extracting the
+strings to an injected catalogue, or shipping the library pre-localised per locale
+— are the same decision seen from two other sides.
+
+So the honest statement is now specific rather than absent: the target exists, it
+does not build, the reason is understood and small, and what it is waiting on is
+the publish decision the `UNLICENSED` marker already records as untaken.
 
 **Accessibility evidence.** The artefacts exist in
 `cde-platform/docs/accessibility/` — an accessibility statement, a VPAT 2.5 INT

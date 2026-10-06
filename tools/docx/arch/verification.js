@@ -23,15 +23,25 @@ module.exports = [
   p('Angular 22 with TypeScript strict **and** `noUncheckedIndexedAccess`. Third-party JavaScript '
   + 'is bundled, never loaded from a CDN — §5.12 A08, and it is also what makes air-gapped '
   + 'deployment possible.'),
-  note('**The environment note in the last issue of this document was wrong, and the correction '
-     + 'matters because that note qualified every test claim in it.** It said `ng test` and '
-     + '`ng build` require Node ≥ 22.22.3, that the development container runs 22.22.2, and that '
-     + 'specs needing Angular TestBed therefore could not run at all. The version facts are right '
-     + '— `@angular/build` does declare `^22.22.3` and the container is on 22.22.2 — but the '
-     + 'conclusion is not. npm’s engine range is advisory unless `engine-strict` is set, and it is '
-     + 'not set here. `ng test` and `ng build --configuration production` both run, and have been '
-     + 'running throughout the work described in this issue: **909 specs pass, and the production '
-     + 'build is clean.** TestBed specs are the majority of them.'),
+  note('**The Node version note has now been wrong twice, in opposite directions, and the facts '
+     + 'are worth stating carefully because they qualify every test claim in this document.** The '
+     + 'issue before last said `ng test` cannot run on Node 22.22.2 at all. The last issue '
+     + 'corrected that to “npm’s engine range is advisory unless `engine-strict` is set” and '
+     + 'reported the suite running. Both are half right, and the half that matters is this: '
+     + '**npm’s `engines` check is advisory, and the Angular CLI’s own runtime check is not.** They '
+     + 'are two different gates. `npm ci` installs happily; `ng test` then reports the detected '
+     + 'version, states that the CLI requires v22.22.3 or v24.15.0, and exits without running '
+     + 'anything. Whether the suite runs depends entirely on which Node is on `PATH`, not on '
+     + '`engine-strict`.'),
+  p('The development container ships 22.22.2, which is 0.0.1 below the floor, so **running the '
+  + 'suite there requires a newer Node** — installing 24 and putting it first on `PATH` is enough, '
+  + 'and that is how the figures below were measured. A fresh container needs it again; nothing in '
+  + 'the repository pins it. Recorded at this length because a 0.0.1 shortfall that stops the '
+  + 'entire test suite, with an error message about npm engines nowhere in it, is exactly the kind '
+  + 'of thing the next person loses an hour to.'),
+  p('On a Node that satisfies it, `ng test` and `ng build --configuration production` both run: '
+  + '**2,180 specs pass, and the production build is clean.** TestBed specs are the majority of '
+  + 'them.'),
   p('That correction is load-bearing in an unwelcome direction. Several components had never been '
   + 'type-checked against their own templates, because `ng test` does not type-check a component '
   + 'no spec imports and `tsc --noEmit` does not check Angular templates at all. Only '
@@ -42,7 +52,31 @@ module.exports = [
   + 'so **the `/embed` route still has not been rendered by Angular inside a host frame on an '
   + 'installed deployment** (§13).'),
 
-  h2('12.1  Gates'),
+  h2('12.1  Coverage'),
+  p('**§14’s figures are now the gate.** `angular.json` requires 90% line and 85% branch — the '
+  + 'standard itself — where it previously required 78/78, which was a figure the suite happened '
+  + 'to reach rather than one anybody had chosen. Measured: **90.26% line (5,574/6,175) and 85.62% '
+  + 'branch (2,781/3,248)**, with statements at 87.5% and functions at 74.9%, both also gated at '
+  + 'their measured values so neither can fall.'),
+  note('**The denominator grew while the work was done** — from 5,375 lines to 6,175. The '
+     + 'builder’s `coverageInclude` filters rather than forces inclusion, so v8 counts a file only '
+     + 'once something imports it, and each new spec pulls in its component’s whole dependency '
+     + 'tree. Coverage therefore *fell* before it rose: the first few specs took the reported '
+     + 'figure from 79.4% down to 76.2% by making eight hundred previously invisible lines '
+     + 'visible. The figure now covers substantially more of the application than the 79.4% it '
+     + 'started from did, which is the opposite of how a rising coverage number usually reads.'),
+  p('**The figure is a floor and not the point**, and §14 says so: high coverage with weak '
+  + 'assertions is worse than honest lower coverage. Every assertion written to reach it was '
+  + 'checked by deliberately breaking the thing it guards and confirming it failed only the cases '
+  + 'that name it — nineteen deliberate weakenings in all. That is also how the nine untranslated '
+  + 'strings in section 9.4 and the `role="toolbar"` defect in section 9.3 were found. Neither was '
+  + 'failing anything.'),
+  p('Where the remaining 10% sits: the PDF markup layer’s pointer handling, the collaboration '
+  + 'service’s socket lifecycle, the embed page’s stroke session, and `pdf-engine.service`’s '
+  + 'rendering paths — all of them code whose behaviour is a canvas or a socket rather than a '
+  + 'return value, and none of them untested by accident.'),
+
+  h2('12.2  Gates'),
   p('Each of these fails loudly rather than warning, and each exists because the thing it checks '
   + 'is otherwise invisible in a diff.'),
   table([2900, 6846], [
@@ -132,11 +166,26 @@ module.exports = [
      + 'unambiguously and that a design decision actually turns on; **the partition needs '
      + 're-deriving before it goes in front of a customer**, and no number here should be quoted '
      + 'as a complete breakdown until it does.'),
-  p('**A library in shape, never built as one.** `viewer-core` has its manifest, its ng-packagr '
-  + 'configuration and its own `angular.json` project, so `ng build viewer-core` is a real '
-  + 'target. The last issue said it could not run here for the Node reason in section 12; that '
-  + 'reason was wrong, so the honest statement is now simply that nobody has run it. The '
-  + '`UNLICENSED` marker is still deliberate and still means no publish decision has been taken.'),
+  p('**A library in shape, never built as one — and now with a known reason.** `viewer-core` has '
+  + 'its manifest, its ng-packagr configuration and its own `angular.json` project, so '
+  + '`ng build viewer-core` is a real target. The last two issues gave two different wrong '
+  + 'accounts of it: first that it could not run for the Node reason, then that the Node reason '
+  + 'was wrong so nobody had run it.'),
+  p('It has now been run, on a Node that satisfies section 12’s floor. **It fails, with 53 errors, '
+  + 'all of them the same one:** `Cannot find name \'$localize\'`, across ten of the `viewer-core` '
+  + 'files. The cause is one line — `tsconfig.app.json` carries `"types": ["@angular/localize"]`, '
+  + 'which is what puts the `$localize` global in scope, and `tsconfig.lib.json` carries '
+  + '`"types": []`, which clears it. The library sources are the application sources, so every '
+  + '`$localize` call in them is an unresolved name under the library’s own compiler options.'),
+  note('**That line has deliberately not been changed**, because adding the type would make the '
+     + 'build succeed and produce an artefact nobody has decided to publish — and it would decide '
+     + 'something on the way. A library published with `$localize` calls still in it requires every '
+     + 'consumer to run Angular’s localize transform over our code, which is a packaging contract '
+     + 'to offer a host CDE, not a compiler setting to flip while correcting a document. The '
+     + 'alternatives — extracting the strings to an injected catalogue, or shipping the library '
+     + 'pre-localised per locale — are the same decision seen from two other sides. The target '
+     + 'exists, it does not build, the reason is understood and small, and what it waits on is the '
+     + 'publish decision the `UNLICENSED` marker already records as untaken.'),
   p('**Accessibility evidence.** The artefacts exist in `cde-platform/docs/accessibility/` — an '
   + 'accessibility statement, a VPAT 2.5 INT conformance report, and a screen-reader matrix — and '
   + 'all three say the same thing about themselves: the statement is a draft not fit to publish, '

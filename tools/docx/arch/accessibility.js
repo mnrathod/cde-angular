@@ -49,15 +49,40 @@ module.exports = [
   + 'method bodies; required form fields marked only by an `aria-hidden` asterisk; validation '
   + 'messages not tied to the control they were about; and status icons announced as “white heavy '
   + 'check mark” beside a badge that already said the status.'),
+  p('A later pass found one more of the same family, and it is the one a buyer’s auditor is most '
+  + 'likely to meet: **the embedded toolbar declared `role="toolbar"` without implementing it.** '
+  + 'That role promises arrow-key navigation over a single tab stop, and the row is a set of '
+  + 'ordinary buttons each with its own tab stop. A screen-reader user is told it is a toolbar, '
+  + 'presses the arrows, and nothing moves — worse off than one told it is a group of named '
+  + 'buttons, which is what §1A.2 means by bad ARIA being worse than none. It is `role="group"` '
+  + 'now, which promises only what is there.'),
+  p('The full viewer’s own command bar had already reached that conclusion and written it down in '
+  + 'a comment two directories away. A rule recorded in a comment beside one component does not '
+  + 'reach the next person writing another, which is why it is in this document and asserted in '
+  + 'both components’ specs.'),
   note('None of these would have been caught by axe. **This is the argument for §1A.5’s position '
      + 'that automated checks are a floor, not conformance** — and it is worth quoting to a buyer '
      + 'who asks what our VPAT rests on.'),
 
   h2('9.4  Localisation'),
-  p('There are no hardcoded user-facing strings left in the application. Every sentence a reader '
-  + 'sees is an `i18n` attribute or a `$localize` call carrying a stable message id and a '
-  + 'translator note, extracted to a committed catalogue at `src/locale/messages.json` — **552 '
-  + 'messages at this issue.**'),
+  p('Every sentence a reader sees is an `i18n` attribute or a `$localize` call carrying a stable '
+  + 'message id and a translator note, extracted to a committed catalogue at '
+  + '`src/locale/messages.json` — **585 messages at this issue,** up from 552.'),
+  note('**The last issue of this document said there were none left, and that was wrong by nine.** '
+     + 'They were found by writing specs over two panels that had none, not by either gate. Three '
+     + 'were in the version-history panel — one inside a `confirm()`, two set on an error signal — '
+     + 'and six in the embed viewer, three of them operands of a template expression and three '
+     + 'returned from a method. None was template *text*, which is what `check:i18n-markup` sweeps '
+     + 'for, and none was a `$localize` call, which is what the extractor collects. A string in an '
+     + 'expression operand or a return statement is invisible to both. The embed viewer is the '
+     + 'worst place in the product for it: it renders inside a customer’s own application, so the '
+     + 'English appeared framed by their translated interface.'),
+  p('The gates have not been widened to catch this class, and saying so is more useful than '
+  + 'implying they have. What would catch it is a lint rule against bare string literals reaching '
+  + 'a template binding or a user-visible signal, which is a different kind of check from either '
+  + 'existing gate. Until then the honest statement is that the catalogue is complete as far as '
+  + 'two mechanical sweeps can see, and a string placed where neither looks will still get '
+  + 'through.'),
   p('Two gates hold it, and both run in CI. `check:i18n` regenerates the catalogue and fails on '
   + 'any difference, the same contract §3.5 imposes on the OpenAPI spec and for the same reason: '
   + 'a generated file nothing compares to its source rots, and a stale catalogue ships an '
