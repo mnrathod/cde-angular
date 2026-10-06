@@ -12,52 +12,7 @@
  */
 import { buildModelScene } from "./model-scene";
 import { ModelGeometry } from "../../../../viewer-core/model-geometry";
-
-/** A 10 x 4 x 6 box centred on the origin, in the model's own units. */
-const EXTENT = { x: 10, y: 4, z: 6 };
-const LARGEST = 10;
-
-function fakeThree() {
-  const vector = () => ({ x: 0, y: 0, z: 0, copy(other: any) { Object.assign(this, other); } });
-  class Box3 {
-    expandByObject() { return this; }
-    getCenter(target: any) { return Object.assign(target, { x: 0, y: 0, z: 0 }); }
-    getSize(target: any) { return Object.assign(target, EXTENT); }
-    min = { y: -2 };
-  }
-  return {
-    WebGLRenderer: class {
-      domElement = document.createElement("canvas");
-      setSize() {} setPixelRatio() {} setClearColor() {} render() {} dispose() {}
-    },
-    Scene: class { add() {} },
-    PerspectiveCamera: class {
-      // Coordinates land on camera.position, exactly as three.js does it.
-      position = {
-        x: 0, y: 0, z: 0,
-        set(x: number, y: number, z: number) { Object.assign(this, { x, y, z }); },
-      };
-      aspect = 1; near = 0; far = 0;
-      updateProjectionMatrix() {}
-    },
-    AmbientLight: class {},
-    DirectionalLight: class { position = { set() {} }; },
-    OrbitControls: class {
-      enableDamping = false;
-      target = vector();
-      update() {} dispose() {}
-    },
-    GridHelper: class { scale = { setScalar() {} }; position = { y: 0 }; },
-    Mesh: class { constructor(public geometry: unknown, public material: unknown) {} },
-    BufferGeometry: class { setAttribute() {} setIndex() {} addGroup() {} },
-    BufferAttribute: class {},
-    MeshPhongMaterial: class { wireframe = false; visible = true; },
-    Color: class {},
-    DoubleSide: 2,
-    Box3,
-    Vector3: function () { return vector(); } as unknown as new () => unknown,
-  };
-}
+import { FAKE_MODEL_LARGEST_EXTENT, fakeThree } from "../../../../testing/fake-three";
 
 const GEOMETRY: ModelGeometry = {
   positions: new Float32Array([0, 0, 0]),
@@ -91,8 +46,8 @@ describe("moving the camera around a model", () => {
 
     // Offsets are multiples of the model's longest side, so a door handle
     // and a terminal building are both framed rather than one of them.
-    expect(at.x).toBeCloseTo(LARGEST * 1.2);
-    expect(at.z).toBeCloseTo(LARGEST * 1.2);
+    expect(at.x).toBeCloseTo(FAKE_MODEL_LARGEST_EXTENT * 1.2);
+    expect(at.z).toBeCloseTo(FAKE_MODEL_LARGEST_EXTENT * 1.2);
   });
 
   it("puts the camera back after it has been moved", () => {
@@ -101,8 +56,8 @@ describe("moving the camera around a model", () => {
 
     viewport.resetView();
 
-    expect(at.x).toBeCloseTo(LARGEST * 1.2);
-    expect(at.y).toBeCloseTo(LARGEST * 0.8);
+    expect(at.x).toBeCloseTo(FAKE_MODEL_LARGEST_EXTENT * 1.2);
+    expect(at.y).toBeCloseTo(FAKE_MODEL_LARGEST_EXTENT * 0.8);
   });
 
   it("looks straight down for the top view", () => {
@@ -110,7 +65,7 @@ describe("moving the camera around a model", () => {
 
     viewport.lookFrom("top");
 
-    expect(at.y).toBeCloseTo(LARGEST * 2);
+    expect(at.y).toBeCloseTo(FAKE_MODEL_LARGEST_EXTENT * 2);
     expect(at.x).toBe(0);
   });
 
@@ -130,7 +85,7 @@ describe("moving the camera around a model", () => {
 
     viewport.lookFrom("front");
 
-    expect(at.z).toBeCloseTo(LARGEST * 2);
+    expect(at.z).toBeCloseTo(FAKE_MODEL_LARGEST_EXTENT * 2);
     expect(at.x).toBe(0);
     expect(at.y).toBe(0);
   });
@@ -140,7 +95,7 @@ describe("moving the camera around a model", () => {
 
     viewport.lookFrom("side");
 
-    expect(at.x).toBeCloseTo(LARGEST * 2);
+    expect(at.x).toBeCloseTo(FAKE_MODEL_LARGEST_EXTENT * 2);
     expect(at.z).toBe(0);
   });
 
@@ -158,8 +113,8 @@ describe("moving the camera around a model", () => {
     const { viewport } = sceneFor();
     const camera = viewport.camera as { near: number; far: number };
 
-    expect(camera.near).toBeCloseTo(LARGEST * 0.001);
-    expect(camera.far).toBeCloseTo(LARGEST * 100);
+    expect(camera.near).toBeCloseTo(FAKE_MODEL_LARGEST_EXTENT * 0.001);
+    expect(camera.far).toBeCloseTo(FAKE_MODEL_LARGEST_EXTENT * 100);
   });
 
   it("stops drawing when it is disposed", () => {

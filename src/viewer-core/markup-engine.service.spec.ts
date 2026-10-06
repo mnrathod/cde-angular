@@ -393,3 +393,299 @@ describe('MarkupEngineService', () => {
     });
   });
 });
+
+/**
+ * The branches that decide whether a drawn shape is kept, and what the pointer
+ * is over.
+ *
+ * <p>These are the two places where a wrong answer is silent. A shape that
+ * fails the minimum-size check is discarded without a word — correct for the
+ * stray click that produced a one-pixel rectangle, and wrong for a legitimate
+ * mark the rule happens to exclude, because the reader draws it, sees nothing
+ * appear, and concludes the tool is broken. Hit testing is the same in reverse:
+ * a tolerance that is too tight means a line nobody can select, and one that
+ * ignores a tool entirely means a shape that cannot be deleted once drawn.
+ *
+ * <p>So every tool is covered rather than a representative few. The switch arms
+ * are what differ between tools, and a tool missing from one of them falls to a
+ * default that is wrong for it in a way nothing else reveals.
+ */
+describe('deciding whether a drawn shape is worth keeping', () => {
+  let engine: MarkupEngineService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [MarkupEngineService] });
+    engine = TestBed.inject(MarkupEngineService);
+  });
+
+  const shape = (over: Partial<ShapeData>): ShapeData =>
+    ({ tool: 'rect', pageNumber: 1, ...over }) as ShapeData;
+
+  describe('a shape dragged out', () => {
+    it('keeps a rectangle big enough to see', () => {
+      expect(engine.hasMinimumSize(shape({ tool: 'rect', width: 40, height: 20 }))).toBe(true);
+    });
+
+    it('discards a rectangle that is only a click', () => {
+      // A stray click on the rectangle tool leaves a 0x0 shape that renders as
+      // nothing and sits in the annotation list for ever.
+      expect(engine.hasMinimumSize(shape({ tool: 'rect', width: 0, height: 0 }))).toBe(false);
+    });
+
+    it('discards a rectangle with width but no height', () => {
+      // A drag along one axis. Invisible either way, and both dimensions have to
+      // be checked — one alone keeps a zero-area shape half the time.
+      expect(engine.hasMinimumSize(shape({ tool: 'rect', width: 40, height: 1 }))).toBe(false);
+    });
+
+    it('discards a rectangle with height but no width', () => {
+      expect(engine.hasMinimumSize(shape({ tool: 'rect', width: 1, height: 40 }))).toBe(false);
+    });
+
+    for (const tool of ['highlight', 'redact', 'formfield', 'ellipse',
+                        'underline', 'strikeout', 'squiggly'] as MarkupTool[]) {
+      it(`applies the same size rule to ${tool}`, () => {
+        // They share one arm, so a tool left out of it falls to the default —
+        // which returns true, keeping every accidental click as a shape.
+        expect(engine.hasMinimumSize(shape({ tool, width: 40, height: 20 }))).toBe(true);
+        expect(engine.hasMinimumSize(shape({ tool, width: 1, height: 1 }))).toBe(false);
+      });
+    }
+
+    it('keeps a circle with a real radius', () => {
+      expect(engine.hasMinimumSize(shape({ tool: 'circle', r: 20 }))).toBe(true);
+    });
+
+    it('discards a circle of no radius', () => {
+      expect(engine.hasMinimumSize(shape({ tool: 'circle', r: 0 }))).toBe(false);
+    });
+
+    it('keeps a line long enough to see', () => {
+      expect(engine.hasMinimumSize(shape({ tool: 'line', x1: 0, y1: 0, x2: 50, y2: 0 }))).toBe(true);
+    });
+
+    it('discards a line that goes nowhere', () => {
+      expect(engine.hasMinimumSize(shape({ tool: 'line', x1: 10, y1: 10, x2: 11, y2: 10 }))).toBe(false);
+    });
+
+    it('measures a diagonal line by its length, not by either axis', () => {
+      // 3-4-5: neither axis exceeds the threshold on its own at this scale, and
+      // the line is plainly visible.
+      expect(engine.hasMinimumSize(shape({ tool: 'line', x1: 0, y1: 0, x2: 3, y2: 4 }))).toBe(true);
+    });
+
+    it('applies the same rule to an arrow', () => {
+      expect(engine.hasMinimumSize(shape({ tool: 'arrow', x1: 0, y1: 0, x2: 50, y2: 0 }))).toBe(true);
+      expect(engine.hasMinimumSize(shape({ tool: 'arrow', x1: 0, y1: 0, x2: 1, y2: 0 }))).toBe(false);
+    });
+
+    it('a line with no coordinates at all is discarded rather than kept', () => {
+      expect(engine.hasMinimumSize(shape({ tool: 'line' }))).toBe(false);
+    });
+  });
+
+  describe('a shape built from points', () => {
+    const withPoints = (tool: MarkupTool, count: number): ShapeData =>
+      shape({ tool, points: Array.from({ length: count }, (_, i) => ({ x: i * 10, y: i * 10 })) });
+
+    it('keeps freehand with a stroke in it', () => {
+      expect(engine.hasMinimumSize(withPoints('freehand', 5))).toBe(true);
+    });
+
+    it('discards freehand that is two points, which is a click and a twitch', () => {
+      expect(engine.hasMinimumSize(withPoints('freehand', 2))).toBe(false);
+    });
+
+    it('keeps a polygon of three points, which is the fewest that enclose anything', () => {
+      expect(engine.hasMinimumSize(withPoints('polygon', 3))).toBe(true);
+    });
+
+    it('discards a polygon of two points, which is a line', () => {
+      expect(engine.hasMinimumSize(withPoints('polygon', 2))).toBe(false);
+    });
+
+    it('keeps a polyline of two points, because it encloses nothing by design', () => {
+      // The difference between the two: a polyline is open, so two points is a
+      // whole shape. Sharing the polygon rule would discard every two-point
+      // polyline the reader drew.
+      expect(engine.hasMinimumSize(withPoints('polyline', 2))).toBe(true);
+    });
+
+    it('discards a polyline of one point', () => {
+      expect(engine.hasMinimumSize(withPoints('polyline', 1))).toBe(false);
+    });
+
+    it('applies the polygon rule to a cloud', () => {
+      expect(engine.hasMinimumSize(withPoints('cloud', 3))).toBe(true);
+      expect(engine.hasMinimumSize(withPoints('cloud', 2))).toBe(false);
+    });
+
+    it('keeps a dimension once it has both ends', () => {
+      expect(engine.hasMinimumSize(withPoints('dimension', 2))).toBe(true);
+      expect(engine.hasMinimumSize(withPoints('dimension', 1))).toBe(false);
+    });
+
+    it('needs three points for an area, since two cannot enclose one', () => {
+      expect(engine.hasMinimumSize(withPoints('area', 3))).toBe(true);
+      expect(engine.hasMinimumSize(withPoints('area', 2))).toBe(false);
+    });
+
+    it('needs two points to calibrate, which is what a known distance is', () => {
+      expect(engine.hasMinimumSize(withPoints('calibrate', 2))).toBe(true);
+      expect(engine.hasMinimumSize(withPoints('calibrate', 1))).toBe(false);
+    });
+
+    it('needs two points for a radius', () => {
+      expect(engine.hasMinimumSize(withPoints('radius', 2))).toBe(true);
+      expect(engine.hasMinimumSize(withPoints('radius', 1))).toBe(false);
+    });
+
+    it('a points shape with no points is discarded rather than kept', () => {
+      expect(engine.hasMinimumSize(shape({ tool: 'freehand' }))).toBe(false);
+    });
+  });
+
+  describe('a shape with no size of its own', () => {
+    it('is kept, because its content is what makes it worth keeping', () => {
+      // A note or a stamp is placed rather than dragged. Applying a size rule to
+      // one would discard every comment somebody typed.
+      expect(engine.hasMinimumSize(shape({ tool: 'note', x: 10, y: 10 }))).toBe(true);
+      expect(engine.hasMinimumSize(shape({ tool: 'stamp', x: 10, y: 10 }))).toBe(true);
+    });
+  });
+});
+
+describe('finding the shape under the pointer', () => {
+  let engine: MarkupEngineService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [MarkupEngineService] });
+    engine = TestBed.inject(MarkupEngineService);
+  });
+
+  const rect = (over: Partial<ShapeData> = {}): ShapeData =>
+    ({ tool: 'rect', pageNumber: 1, x: 100, y: 100, width: 50, height: 40, ...over }) as ShapeData;
+
+  it('finds a rectangle the pointer is inside', () => {
+    expect(engine.hitTest([rect()], { x: 120, y: 120 })).not.toBeNull();
+  });
+
+  it('finds nothing where there is nothing', () => {
+    expect(engine.hitTest([rect()], { x: 500, y: 500 })).toBeNull();
+  });
+
+  it('forgives a near miss, because a 1px target cannot be hit with a mouse', () => {
+    // §1A.2 asks for targets of at least 24px; a drawn shape cannot be made
+    // bigger, so the tolerance is what makes a thin one selectable at all.
+    expect(engine.hitTest([rect()], { x: 96, y: 120 })).not.toBeNull();
+  });
+
+  it('does not forgive a miss well outside the tolerance', () => {
+    expect(engine.hitTest([rect()], { x: 50, y: 120 })).toBeNull();
+  });
+
+  it('takes the topmost shape where two overlap', () => {
+    // Shapes are drawn in order, so the last one is on top — selecting the one
+    // underneath would be selecting something the reader cannot see.
+    const under = rect({ id: 'under' } as Partial<ShapeData>);
+    const over = rect({ id: 'over' } as Partial<ShapeData>);
+
+    expect(engine.hitTest([under, over], { x: 120, y: 120 })).toBe(over);
+  });
+
+  it('finds a circle by its distance from the centre', () => {
+    const circle = { tool: 'circle', pageNumber: 1, cx: 200, cy: 200, r: 30 } as ShapeData;
+
+    expect(engine.hitTest([circle], { x: 215, y: 200 })).not.toBeNull();
+    expect(engine.hitTest([circle], { x: 300, y: 200 })).toBeNull();
+  });
+
+  it('finds a line along its length rather than only at its ends', () => {
+    // A bounding-box test would select a diagonal line from anywhere in the
+    // rectangle it spans, which for a long one is most of the page.
+    const line = { tool: 'line', pageNumber: 1, x1: 0, y1: 0, x2: 200, y2: 0 } as ShapeData;
+
+    expect(engine.hitTest([line], { x: 100, y: 2 })).not.toBeNull();
+  });
+
+  it('does not find a line from across the box it spans', () => {
+    const diagonal = { tool: 'line', pageNumber: 1, x1: 0, y1: 0, x2: 200, y2: 200 } as ShapeData;
+
+    expect(engine.hitTest([diagonal], { x: 200, y: 0 })).toBeNull();
+  });
+
+  it('finds an arrow the same way as a line', () => {
+    const arrow = { tool: 'arrow', pageNumber: 1, x1: 0, y1: 0, x2: 200, y2: 0 } as ShapeData;
+
+    expect(engine.hitTest([arrow], { x: 100, y: 2 })).not.toBeNull();
+  });
+
+  for (const tool of ['highlight', 'formfield', 'ellipse',
+                      'underline', 'strikeout', 'squiggly'] as MarkupTool[]) {
+    it(`finds a ${tool} by its box`, () => {
+      // Each shares the rectangle arm. One left out of it is a shape that can be
+      // drawn and then never selected, so never deleted.
+      expect(engine.hitTest([rect({ tool })], { x: 120, y: 120 })).not.toBeNull();
+    });
+  }
+
+  it('finds nothing in an empty page', () => {
+    expect(engine.hitTest([], { x: 10, y: 10 })).toBeNull();
+  });
+
+  it('respects a tolerance given explicitly', () => {
+    expect(engine.hitTest([rect()], { x: 80, y: 120 }, 2)).toBeNull();
+    expect(engine.hitTest([rect()], { x: 80, y: 120 }, 30)).not.toBeNull();
+  });
+
+  it('a shape with no coordinates is not treated as covering the origin', () => {
+    // Defaulting a missing x to 0 makes an incomplete shape a 0x0 box at the
+    // corner, which would then swallow clicks there.
+    const incomplete = { tool: 'rect', pageNumber: 1 } as ShapeData;
+
+    expect(engine.hitTest([incomplete], { x: 300, y: 300 })).toBeNull();
+  });
+});
+
+describe('reading shapes back from stored markup', () => {
+  let engine: MarkupEngineService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [MarkupEngineService] });
+    engine = TestBed.inject(MarkupEngineService);
+  });
+
+  it('reads back what it wrote', () => {
+    const shapes = [{ tool: 'rect', pageNumber: 1, x: 1, y: 2, width: 3, height: 4 }] as ShapeData[];
+
+    expect(engine.parseShapesJson(engine.shapesToJson(shapes))).toEqual(shapes);
+  });
+
+  it('accepts a bare array, which is what earlier versions stored', () => {
+    // Markup saved before the envelope existed is still on documents, and
+    // refusing it would lose every annotation on them.
+    expect(engine.parseShapesJson('[{"tool":"rect","pageNumber":1}]')).toHaveLength(1);
+  });
+
+  it('returns nothing for markup that is not readable', () => {
+    // A truncated column, or a column holding something else entirely. Throwing
+    // here would take down the viewer rather than losing the overlay.
+    expect(engine.parseShapesJson('{ not json')).toEqual([]);
+  });
+
+  it('returns nothing for an envelope whose shapes are not a list', () => {
+    expect(engine.parseShapesJson('{"shapes":"all of them"}')).toEqual([]);
+  });
+
+  it('returns nothing for valid JSON that is not markup at all', () => {
+    expect(engine.parseShapesJson('42')).toEqual([]);
+  });
+
+  it('returns nothing for an empty column', () => {
+    expect(engine.parseShapesJson('')).toEqual([]);
+  });
+
+  it('writes a version into the envelope, so a later reader can tell what it has', () => {
+    expect(JSON.parse(engine.shapesToJson([]))).toMatchObject({ version: '1.0' });
+  });
+});

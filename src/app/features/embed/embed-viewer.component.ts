@@ -37,7 +37,16 @@ import { ProblemDetail } from './embed-protocol';
   template: `
     <div class="shell">
       @if (session.phase() === 'ready') {
-        <div class="toolbar" role="toolbar"
+        <!--
+          role="group", not role="toolbar". The toolbar role promises arrow-key
+          navigation over a single tab stop, and this row does not implement it —
+          each button is its own tab stop. A row of named buttons is already
+          conformant without the role, and declaring it without the behaviour
+          leaves a screen-reader user pressing arrows that do nothing (§1A.2:
+          bad ARIA is worse than none). The full viewer's command bar carries the
+          same reasoning and the same comment.
+        -->
+        <div class="toolbar" role="group"
              i18n-aria-label="@@embedViewer.toolbarLabel" aria-label="Document tools">
           <span class="name">{{ session.documentName() }}</span>
 
@@ -84,8 +93,7 @@ import { ProblemDetail } from './embed-protocol';
         </div>
       } @else {
         <div class="state" role="status">
-          <p>{{ session.phase() === 'loading' ? 'Opening the document…'
-                                              : 'Waiting for the host application…' }}</p>
+          <p>{{ session.phase() === 'loading' ? openingLabel : waitingLabel }}</p>
         </div>
       }
     </div>
@@ -146,6 +154,22 @@ export class EmbedViewerComponent implements OnInit, OnDestroy {
     { id: 'arrow', label: $localize`:Embedded-viewer markup tool that draws an arrow. Short — the embedded toolbar is narrower than the full one.@@embedTool.arrow:Arrow` },
   ] as const;
 
+  /**
+   * The sentences this component says, which were plain string literals.
+   *
+   * <p>Three were in the template as expression operands and three in
+   * `describe()`, so none of them was reachable by a sweep of the markup — and
+   * this is the component a host frames inside their own product, which makes it
+   * the most visible place in the product for untranslated English to sit. §1.4
+   * allows none of them.
+   */
+  readonly openingLabel = $localize`:Shown while the document is being fetched inside a framed viewer@@embedViewer.opening:Opening the document…`;
+  readonly waitingLabel = $localize`:Shown while the framed viewer waits for the host application's first message@@embedViewer.waiting:Waiting for the host application…`;
+  readonly askingToSignLabel = $localize`:Shown while the framed viewer waits for the host to sign@@embedViewer.askingToSign:Asking the host to sign…`;
+  readonly signedLabel = $localize`:Shown when the host signed the document@@embedViewer.signed:The host signed the document.`;
+  readonly refusedLabel = $localize`:Shown when the host declined a request it was entitled to decline@@embedViewer.refused:The host did not permit that.`;
+  readonly couldNotCompleteLabel = $localize`:Shown when the host could not finish a request for a reason it did not give@@embedViewer.couldNotComplete:The host could not complete that.`;
+
   readonly pageNumbers = computed(() =>
     Array.from({ length: this.state.totalPages() }, (_unused, index) => index + 1));
 
@@ -175,15 +199,18 @@ export class EmbedViewerComponent implements OnInit, OnDestroy {
    * notice, not an alert.
    */
   async requestSignature(): Promise<void> {
-    this.notice.set('Asking the host to sign…');
+    this.notice.set(this.askingToSignLabel);
     const outcome = await this.session.requestOperation('document.sign');
     this.notice.set(this.describe(outcome.status, outcome.problem));
   }
 
   private describe(status: string, problem?: ProblemDetail): string {
-    if (status === 'applied') return 'The host signed the document.';
+    if (status === 'applied') return this.signedLabel;
+    // The host's own reason first, when it gave one: it knows why it refused and
+    // we do not. §6.1 treats a refusal as expected rather than as a fault, so
+    // neither branch reads as an error.
     return problem?.detail ?? (status === 'refused'
-      ? 'The host did not permit that.'
-      : 'The host could not complete that.');
+      ? this.refusedLabel
+      : this.couldNotCompleteLabel);
   }
 }

@@ -103,6 +103,32 @@ export class VersionHistoryComponent {
   readonly restoreLabel = $localize`:Makes an earlier version current again@@versionHistory.restore:Restore`;
   readonly restoringLabel = $localize`:Restore button while the request is in flight@@versionHistory.restoring:Restoring...`;
 
+  /**
+   * The three sentences this panel says when something goes wrong or needs
+   * confirming.
+   *
+   * <p>They were plain string literals — one in a `confirm()`, two set on the
+   * error signal. §1.4 allows no hardcoded user-facing strings, and these are
+   * the kind that escape a sweep of the markup because none of them is in a
+   * template: a reader on a translated build met three sentences of English in
+   * the middle of their own language, at the moment something had just failed.
+   */
+  readonly loadFailedMessage = $localize`:Shown when the version history could not be fetched@@versionHistory.loadFailed:The version history could not be loaded. Try again, or quote the trace id to support.`;
+
+  readonly restoreFailedMessage = $localize`:Shown when restoring an earlier version did not work@@versionHistory.restoreFailed:That version could not be restored. The document is unchanged — try again, or quote the trace id to support.`;
+
+  /**
+   * Asked before an earlier version is made current again.
+   *
+   * <p>It says what will happen rather than only asking whether to proceed:
+   * restoring copies the version forward rather than rewinding, so nothing in
+   * the history is lost, and a reader who does not know that reasonably hesitates
+   * over the one control that would undo a bad step.
+   */
+  confirmRestore(version: number): string {
+    return $localize`:Confirmation before making an earlier version current again@@versionHistory.confirmRestore:Restore version ${version}:version:? It is copied forward as a new version, so nothing in the history is lost.`;
+  }
+
   constructor() {
     // Reload whenever an operation commits — the panel is the record of those
     // commits, so it would be stale the moment it mattered most.
@@ -124,7 +150,7 @@ export class VersionHistoryComponent {
         this.loading.set(false);
       },
       error: (err: unknown) => {
-        this.error.set(problemMessage(err, 'Could not load version history.'));
+        this.error.set(problemMessage(err, this.loadFailedMessage));
         this.loading.set(false);
       }
     });
@@ -143,10 +169,7 @@ export class VersionHistoryComponent {
   }
 
   restore(version: DocumentVersion) {
-    if (!confirm(
-      `Restore version ${version.version}?\n\n` +
-      'It is copied forward as a new version — nothing in the history is lost.'
-    )) return;
+    if (!confirm(this.confirmRestore(version.version))) return;
 
     this.restoring.set(version.version);
     this.versionService.restore(this.state.documentId(), version.version).subscribe({
@@ -157,7 +180,7 @@ export class VersionHistoryComponent {
       },
       error: () => {
         this.restoring.set(null);
-        this.error.set('Restore failed.');
+        this.error.set(this.restoreFailedMessage);
       }
     });
   }
