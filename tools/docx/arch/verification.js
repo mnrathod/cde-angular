@@ -97,31 +97,49 @@ module.exports = [
       { t: 'No component template carries user-facing text a translator will never see' }] },
     { cells: [{ t: 'check:served-assets' },
       { t: 'Nothing in the built bundle is unreachable code' }] },
+    { cells: [{ t: 'check:bundle-budget' },
+      { t: 'The initial bundle, three.js and pdf.js each stay inside their §7.1 budget — currently 122.8 kB / 250, 187.2 kB / 200 and 149.3 kB / 160' }] },
     { cells: [{ t: 'test:scripts' },
       { t: 'The gate scripts themselves have tests, so a gate cannot pass by being broken' }] }
   ]),
   caption('Table 6 — The repository’s own gates.'),
-  p('**Five of these nine now run in CI**, against four last time. The platform’s `Jenkinsfile` '
-  + 'runs `npm ci`, `tsc --build --force --noEmit`, `check:no-remote-code`, `check:i18n`, '
-  + '`check:i18n-markup`, `test:scripts`, `ng build` and `ng test` against this repository. '
-  + '`check:attribution`, `check:icons`, `check:samples`, `check:served-assets` and `test:demo` '
-  + 'exist, pass locally, and guard nothing until a pipeline stage calls them. A gate nothing '
-  + 'runs is documentation.'),
+  p('**Four of these ten run in CI.** The last issue said five, and its own next sentence listed '
+  + 'four — the headline was a miscount of the prose beneath it. The CI Node is not the '
+  + 'container’s, so the version trap above does not reach the pipeline. The platform’s '
+  + '`Jenkinsfile` runs `npm ci`, `tsc --build --force --noEmit`, `check:no-remote-code`, '
+  + '`check:i18n`, `check:i18n-markup`, `test:scripts`, `ng build --configuration production` '
+  + 'and `ng test` against this repository. `check:attribution`, `check:icons`, `check:samples`, '
+  + '`check:served-assets`, `check:bundle-budget` and `test:demo` exist, pass locally, and guard '
+  + 'nothing until a pipeline stage calls them. A gate nothing runs is documentation.'),
+  p('The count is ten rather than nine because `check:bundle-budget` was missing from the table '
+  + 'above — it has existed and passed since the budgets were set, and a gate absent from the '
+  + 'list of gates is one nobody will think to wire up.'),
   note('One correction to the `tsc` line in the last issue: the pipeline passes `--build --force`, '
      + 'not a bare `--noEmit`. `tsconfig.json` carries `"files": []` and project references, so '
      + '`tsc --noEmit` type-checks nothing at all and exits 0 — proven by putting a type error in '
      + 'a production file and watching it pass. **A gate that cannot fail is worse than no gate, '
      + 'because it is quoted.**'),
-  note('**`check:attribution` is currently failing, and it is not this issue’s doing.** Two '
-     + 'transitive packages carry licences on neither §2.1’s allowed nor its forbidden list: '
-     + '`caniuse-lite` (CC-BY-4.0, a browser-support dataset) and `lru-cache` (BlueOak-1.0.0, an '
-     + 'OSI-approved permissive licence). Both arrive only through `@angular/build` and '
-     + '`@angular/cli`, which are devDependencies, but the lockfile marks them '
-     + 'production-reachable so the generator counts them. Neither is forbidden and both look '
-     + 'shippable; adding a licence to the allow-list is a policy decision rather than an '
-     + 'engineering one, so the generator refuses to write `THIRD-PARTY-NOTICES.txt` over an '
-     + 'unresolved violation rather than assert a position nobody took. **This blocks §17.6’s '
-     + 'release checklist until someone rules on it.**'),
+  note('**`check:attribution` passes, and the last issue of this document was wrong to say '
+     + 'otherwise — twice over.** It reported the gate failing on two packages whose licences '
+     + 'sit on neither §2.1’s allowed nor its forbidden list, `caniuse-lite` (CC-BY-4.0) and '
+     + '`lru-cache` (BlueOak-1.0.0), and concluded that this blocked §17.6’s release '
+     + 'checklist until somebody ruled on it. Somebody had already ruled on it: the determination '
+     + 'is recorded in `docs/licences.md` §3.6, dated 2026-09-24, and both licences are '
+     + 'allowed — BlueOak-1.0.0 is a plain-language equivalent of MIT and BSD-2-Clause that '
+     + 'additionally carries a patent grant, which §17.3 prefers to silence on patents, and '
+     + 'CC-BY-4.0’s only obligation is attribution, which `THIRD-PARTY-NOTICES.txt` '
+     + 'discharges. The gate now writes 119 components across seven licences and reports the file '
+     + 'current.'),
+  note('Its account of *why* was also wrong, and in a way worth correcting rather than deleting. '
+     + 'It said both packages arrive “only through `@angular/build` and `@angular/cli`, which '
+     + 'are devDependencies”. They do not: they reach the production closure through '
+     + '`@angular/localize`, which is correctly a production dependency because `$localize`’s '
+     + 'runtime is imported at runtime even though the Babel tooling underneath it runs only at '
+     + 'build time. That distinction is the whole reason the gate counted them, and “the '
+     + 'lockfile marks them production-reachable” described the symptom as though it were an '
+     + 'accident of the lockfile rather than a true fact about the dependency. '
+     + '**§17.6’s release checklist is not blocked by this.** What it is still waiting on '
+     + 'is the six gates above that nothing in a pipeline calls.'),
 
   h1('13.  What this architecture does not yet have'),
   lead('Stated plainly, and shorter than it was. The gap between “the viewer works” and “a CDE can '
