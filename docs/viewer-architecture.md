@@ -241,7 +241,7 @@ forging the field. The test that works posts a `viewer.markupCreated` carrying
 `author: "Someone Else"` and asserts the host stores the name from its own
 session instead.
 
-Eight Playwright tests drive the demo in a real browser against a stub viewer
+Ten Playwright tests drive the demo in a real browser against a stub viewer
 on a third origin. They earn their keep: three defects no unit test could reach
 were found there — a captured `contentWindow` going stale across navigation, an
 author `display` rule beating the user agent's `[hidden] { display: none }` so
@@ -457,9 +457,33 @@ Two drag-only interactions have since been given a keyboard route:
   visual handle drawn over it, so it answers arrow keys, Home and End.
 
 **The remaining gap is the markup layer**, and it is the same one as last time:
-`updateShape` still has no `callout` case, so a callout box cannot be dragged
-at all, and no shape can yet be created or moved without a pointer. This is the
-largest accessibility item outstanding and it is not a small one.
+no shape can yet be created or moved without a pointer. This is the largest
+accessibility item outstanding and it is not a small one.
+
+The callout half of that sentence is fixed, and the sentence was wrong about
+why. It read: `updateShape` still has no `callout` case, so a callout box
+cannot be dragged at all. The first clause was true and the inference from it
+was not — acting on it would have changed nothing. `pointerDown` routed a
+callout by `isTextTool`, which answers "does this shape carry words" rather
+than "is this put down by a click or by a drag", so a callout took the click
+path and `updateShape` was never reached for one at all. Adding the missing
+case on its own would have been inert, which is the trap in a gap recorded with
+a plausible cause attached: the next person fixes the cause and ships no
+change. Those are two different questions and now have two predicates.
+
+A callout has two positions — the anchor on the feature and the label clear of
+it — so it is now the one text tool placed by dragging: press on the detail,
+pull the label to where it should sit, and the words are asked for on release,
+which is also the only order a modal prompt permits. Before this every label
+sat at the seeded offset of eighty right and forty up: on a crowded drawing
+usually over the detail being annotated, near a page edge off the page, and no
+gesture moved it. A click that never moves still places a callout at that
+offset, so the gesture that already existed is extended rather than replaced.
+
+**This is not an accessibility improvement and must not be counted as one.** It
+adds a drag to a layer that was already wholly pointer-dependent. The label's
+only pointer-free outcome is the seeded offset, which is a fallback and not the
+equivalent SC 2.5.7 asks for.
 
 ### 9.3 Defects that were not on anyone's list
 
@@ -697,8 +721,21 @@ suite, with an error message about npm engines nowhere in it, is exactly the kin
 of thing the next person loses an hour to.
 
 On a Node that satisfies it, `ng test` and `ng build --configuration production`
-both run: **2,180 specs pass, and the production build is clean.** TestBed specs
+both run: **2,185 specs pass, and the production build is clean.** TestBed specs
 are the majority of them.
+
+**`test:demo` has a second trap of the same shape, and it reads as a missing
+install rather than a mismatch.** Playwright resolves its browser by build
+number, so the pinned `@playwright/test` asks for a specific one — currently
+1234 — and a container that ships a different build (this one ships 1194) fails
+every test in the gate with *Executable doesn't exist*, followed by an
+invitation to run `playwright install`. Running it is the wrong move here:
+`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` is set deliberately and the download would
+not be permitted anyway. The browser that is present works — all ten tests pass
+against build 1194 once it is reachable under the path the pin expects. Nothing
+in the repository should encode that path, because it is a property of one
+container and not of the project; it is written down here so the next person
+reads the error as a version mismatch rather than as a broken gate.
 
 That correction is load-bearing in an unwelcome direction. Several components
 had never been type-checked against their own templates, because `ng test` does
@@ -718,7 +755,7 @@ inside a host frame on an installed deployment** (§13).
 branch — the standard itself — where it previously required 78/78, which was a
 figure the suite happened to reach rather than one anybody had chosen.
 
-Measured: **90.26% line (5,574/6,175) and 85.62% branch (2,781/3,248)**, with
+Measured: **90.28% line (5,583/6,184) and 85.64% branch (2,786/3,253)**, with
 statements at 87.5% and functions at 74.9%, both also gated at their measured
 values so neither can fall.
 
@@ -760,7 +797,7 @@ thing it checks is otherwise invisible in a diff.
 | `check:attribution` | `THIRD-PARTY-NOTICES.txt` regenerates to exactly what is committed. It regenerates and asks git, rather than checking the file exists — the backend learned that distinction the hard way, with a shipped attribution naming a version it no longer had |
 | `check:icons` | The application icons and favicon match their generator byte for byte, and the mark stays inside the maskable safe zone |
 | `check:samples` | The demo's three sample documents match their generator byte for byte |
-| `test:demo` | Eight Playwright tests drive the demo host in a real browser |
+| `test:demo` | Ten Playwright tests drive the demo host in a real browser |
 | `check:i18n` | The committed message catalogue regenerates to exactly what is in the tree. It captures the extractor's stderr rather than inheriting it, because duplicate message ids are reported there and exit 0 regardless — two source strings sharing an id means one of them ships the wrong words in every translated language |
 | `check:i18n-markup` | No component template carries user-facing text a translator will never see |
 | `check:served-assets` | Nothing in the built bundle is unreachable code |

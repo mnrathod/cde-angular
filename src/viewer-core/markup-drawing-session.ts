@@ -75,7 +75,7 @@ export class MarkupDrawingSession {
     const tool = this.state.activeTool();
     const point = this.markup.getSvgPoint(event, surface.overlay);
 
-    if (this.markup.isTextTool(tool)) {
+    if (this.markup.isClickPlacedTextTool(tool)) {
       this.drawTextShape(point, tool, surface);
       return;
     }
@@ -110,7 +110,19 @@ export class MarkupDrawingSession {
 
     this.dragging = false;
     this.activeShape.set(null);
-    if (this.markup.hasMinimumSize(shape)) this.surface?.commit(shape);
+    if (!this.markup.hasMinimumSize(shape)) return;
+
+    // A drag-placed text shape — a callout — has its two positions now and
+    // still needs its words. Asking after the drag rather than before it is
+    // also the only order that works: the prompt is modal, so nothing can be
+    // dragged while it is open.
+    if (this.markup.isTextTool(shape.tool)) {
+      const text = this.askForText(shape.tool);
+      if (!text?.trim()) return;
+      this.surface?.commit({ ...shape, text });
+      return;
+    }
+    this.surface?.commit(shape);
   }
 
   doubleClick(event: MouseEvent): void {

@@ -113,6 +113,13 @@ export class MarkupEngineService {
       }
       case 'freehand': case 'cloud':
         return { ...shape, points: [...(shape.points || []), pt] };
+      case 'callout':
+        // A callout has two positions: the anchor, which marks the feature
+        // being annotated and stays where the pointer went down, and the label
+        // box, which `x2`/`y2` carry. The drag places the label — pressing on a
+        // crowded detail and pulling its label into clear space is the whole
+        // gesture, and it is why this tool is the one text tool that drags.
+        return { ...shape, x2: pt.x, y2: pt.y };
       default:
         return shape;
     }
@@ -158,6 +165,29 @@ export class MarkupEngineService {
 
   isTextTool(tool: MarkupTool): boolean {
     return MarkupEngineService.TEXT_TOOLS.includes(tool);
+  }
+
+  /**
+   * Text tools placed by a single click, which is all of them except `callout`.
+   *
+   * <p>{@link isTextTool} answers "does this shape carry words", which is what
+   * asking for them needs. Placing them needs a different question — "is this
+   * put down by a click or by a drag" — and `isTextTool` was standing in for
+   * it. That put `callout` on the click path, where {@link updateShape} is
+   * never reached, so every callout's label stayed at {@link startShape}'s
+   * fixed offset of eighty right and forty up. On a crowded drawing that is
+   * usually on top of the detail being annotated, near a page edge it is off
+   * the page, and no gesture moved it.
+   *
+   * <p>Two predicates rather than one because the two answers genuinely differ
+   * for one tool, and a single list cannot hold both without lying about one of
+   * them.
+   */
+  private static readonly CLICK_PLACED_TEXT_TOOLS: MarkupTool[] =
+    ['text', 'stamp', 'note'];
+
+  isClickPlacedTextTool(tool: MarkupTool): boolean {
+    return MarkupEngineService.CLICK_PLACED_TEXT_TOOLS.includes(tool);
   }
 
   /** Vertex tools that end on a fixed click count rather than a double-click. */

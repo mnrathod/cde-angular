@@ -40,8 +40,19 @@ module.exports = [
   + 'entire test suite, with an error message about npm engines nowhere in it, is exactly the kind '
   + 'of thing the next person loses an hour to.'),
   p('On a Node that satisfies it, `ng test` and `ng build --configuration production` both run: '
-  + '**2,180 specs pass, and the production build is clean.** TestBed specs are the majority of '
+  + '**2,185 specs pass, and the production build is clean.** TestBed specs are the majority of '
   + 'them.'),
+  note('**`test:demo` has a second trap of the same shape, and it reads as a missing install '
+     + 'rather than a mismatch.** Playwright resolves its browser by build number, so the pinned '
+     + '`@playwright/test` asks for a specific one — currently 1234 — and a container '
+     + 'that ships a different build (this one ships 1194) fails every test in the gate with '
+     + '*Executable doesn\u2019t exist*, followed by an invitation to run `playwright install`. '
+     + 'Running it is the wrong move here: `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` is set deliberately '
+     + 'and the download would not be permitted anyway. The browser that is present works — '
+     + 'all ten tests pass against build 1194 once it is reachable under the path the pin expects. '
+     + 'Nothing in the repository should encode that path, because it is a property of one '
+     + 'container and not of the project; it is written down here so the next person reads the '
+     + 'error as a version mismatch rather than as a broken gate.'),
   p('That correction is load-bearing in an unwelcome direction. Several components had never been '
   + 'type-checked against their own templates, because `ng test` does not type-check a component '
   + 'no spec imports and `tsc --noEmit` does not check Angular templates at all. Only '
@@ -55,8 +66,8 @@ module.exports = [
   h2('12.1  Coverage'),
   p('**§14’s figures are now the gate.** `angular.json` requires 90% line and 85% branch — the '
   + 'standard itself — where it previously required 78/78, which was a figure the suite happened '
-  + 'to reach rather than one anybody had chosen. Measured: **90.26% line (5,574/6,175) and 85.62% '
-  + 'branch (2,781/3,248)**, with statements at 87.5% and functions at 74.9%, both also gated at '
+  + 'to reach rather than one anybody had chosen. Measured: **90.28% line (5,583/6,184) and 85.64% '
+  + 'branch (2,786/3,253)**, with statements at 87.5% and functions at 74.9%, both also gated at '
   + 'their measured values so neither can fall.'),
   note('**The denominator grew while the work was done** — from 5,375 lines to 6,175. The '
      + 'builder’s `coverageInclude` filters rather than forces inclusion, so v8 counts a file only '
@@ -90,7 +101,7 @@ module.exports = [
     { cells: [{ t: 'check:samples' },
       { t: 'The demo’s three sample documents match their generator byte for byte' }] },
     { cells: [{ t: 'test:demo' },
-      { t: 'Eight Playwright tests drive the demo host in a real browser' }] },
+      { t: 'Ten Playwright tests drive the demo host in a real browser' }] },
     { cells: [{ t: 'check:i18n' },
       { t: 'The committed message catalogue regenerates to exactly what is in the tree. It captures the extractor\u2019s stderr rather than inheriting it, because duplicate message ids are reported there and it exits 0 regardless \u2014 two source strings sharing an id means one of them ships the wrong words in every translated language' }] },
     { cells: [{ t: 'check:i18n-markup' },

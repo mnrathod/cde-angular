@@ -33,10 +33,29 @@ module.exports = [
        + 'carries a pair of move buttons that name the page they move.'),
   bullet('**The comparison wipe** was a drag-only divider. It is a range input with the visual '
        + 'handle drawn over it, so it answers arrow keys, Home and End.'),
-  note('**The remaining gap is the markup layer**, and it is the same one as last time: '
-     + '`updateShape` still has no `callout` case, so a callout box cannot be dragged at all, and '
-     + 'no shape can yet be created or moved without a pointer. This is the largest accessibility '
-     + 'item outstanding and it is not a small one.'),
+  note('**The remaining gap is the markup layer**, and it is the same one as last time: no shape '
+     + 'can yet be created or moved without a pointer. This is the largest accessibility item '
+     + 'outstanding and it is not a small one.'),
+  p('The callout half of that sentence is fixed, and the sentence was wrong about why. It read: '
+  + '`updateShape` still has no `callout` case, so a callout box cannot be dragged at all. The '
+  + 'first clause was true and the inference from it was not — acting on it would have changed '
+  + 'nothing. `pointerDown` routed a callout by `isTextTool`, which answers “does this shape '
+  + 'carry words” rather than “is this put down by a click or by a drag”, so a '
+  + 'callout took the click path and `updateShape` was never reached for one at all. Adding the '
+  + 'missing case on its own would have been inert, which is the trap in a gap recorded with a '
+  + 'plausible cause attached: the next person fixes the cause and ships no change. Those are two '
+  + 'different questions and now have two predicates.'),
+  p('A callout has two positions — the anchor on the feature and the label clear of it — '
+  + 'so it is now the one text tool placed by dragging: press on the detail, pull the label to '
+  + 'where it should sit, and the words are asked for on release, which is also the only order a '
+  + 'modal prompt permits. Before this every label sat at the seeded offset of eighty right and '
+  + 'forty up: on a crowded drawing usually over the detail being annotated, near a page edge off '
+  + 'the page, and no gesture moved it. A click that never moves still places a callout at that '
+  + 'offset, so the gesture that already existed is extended rather than replaced.'),
+  note('**This is not an accessibility improvement and must not be counted as one.** It adds a '
+     + 'drag to a layer that was already wholly pointer-dependent. The label’s only '
+     + 'pointer-free outcome is the seeded offset, which is a fallback and not the equivalent '
+     + 'SC 2.5.7 asks for.'),
 
   h2('9.3  Defects that were not on anyone’s list'),
   p('A pass over the panels found a class of failure worth naming, because it is invisible to an '

@@ -125,7 +125,7 @@ module.exports = [
      + 'sends an author and the test asserted an outcome rather than forging the field. The test '
      + 'that works posts a `viewer.markupCreated` carrying `author: "Someone Else"` and asserts '
      + 'the host stores the name from its own session instead.'),
-  p('Eight Playwright tests drive the demo in a real browser against a stub viewer on a third '
+  p('Ten Playwright tests drive the demo in a real browser against a stub viewer on a third '
   + 'origin. They earn their keep: three defects no unit test could reach were found there — a '
   + 'captured `contentWindow` going stale across navigation, an author `display` rule beating the '
   + 'user agent’s `[hidden] { display: none }` so a placeholder swallowed every click, and the '

@@ -6,8 +6,9 @@
  * computes the wrong number, or loses the text, looks entirely right.
  */
 import { TestBed } from "@angular/core/testing";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MarkupEngineService } from "./markup-engine.service";
 import { MarkupDrawingSession } from "./markup-drawing-session";
 import {
   RecordingSurface,
@@ -146,11 +147,99 @@ describe("MarkupDrawingSession", () => {
 
       for (const tool of tools) {
         state.activeTool.set(tool);
+        // `pointerUp` as well as down, because a callout is asked for at the
+        // end of its drag rather than at the start — see the callout group
+        // below. The other three ask on the click and ignore the release.
         session.pointerDown(pointerAt(50, 50));
+        session.pointerUp();
       }
 
       expect(new Set(asked).size).toBe(tools.length);
       expect(asked.every((question) => question.trim().length > 0)).toBe(true);
+    });
+
+    /**
+     * A callout is the one text tool with two positions — the anchor on the
+     * feature and the label somewhere clear of it — so it is the one placed by
+     * dragging rather than by a single click.
+     *
+     * <p>It used to be routed by `isTextTool`, which answers a different
+     * question, and so was placed by a click like the other three. That left
+     * every label at the fixed offset `startShape` seeds it with: on a crowded
+     * drawing usually on top of the detail being annotated, near a page edge
+     * off the page, and no gesture moved it.
+     */
+    describe("a callout's label", () => {
+      beforeEach(() => vi.stubGlobal("prompt", () => "SEE DETAIL B"));
+
+      it("lands where the drag ended", () => {
+        state.activeTool.set("callout");
+
+        dragFrom(100, 100, 300, 40);
+
+        const callout = surface.committed[0]!;
+        expect(callout.x2).toBe(300);
+        expect(callout.y2).toBe(40);
+      });
+
+      it("leaves the anchor on the feature the drag started from", () => {
+        // The anchor is the point the leader line comes from. If the drag moved
+        // it too, the callout would stop pointing at anything.
+        state.activeTool.set("callout");
+
+        dragFrom(100, 100, 300, 40);
+
+        const callout = surface.committed[0]!;
+        expect(callout.x).toBe(100);
+        expect(callout.y).toBe(100);
+      });
+
+      it("still falls back to the seeded offset for a click that never moves", () => {
+        // Placing a callout with a plain click worked before the drag existed
+        // and has to keep working, or the change breaks the gesture it extends.
+        state.activeTool.set("callout");
+
+        session.pointerDown(pointerAt(100, 100));
+        session.pointerUp();
+
+        const callout = surface.committed[0]!;
+        expect(callout.x2).toBe(180);
+        expect(callout.y2).toBe(60);
+      });
+
+      it("asks for the words after the drag, not before it", () => {
+        // The prompt is modal, so asking on pointerDown would block the drag
+        // that positions the label — the label could then only ever sit at the
+        // seeded offset, which is the defect this replaced. Asserted as an
+        // order of events rather than an end state, because a stubbed prompt
+        // returns instantly and so leaves the end state identical either way.
+        const order: string[] = [];
+        const engine = TestBed.inject(MarkupEngineService);
+        const realUpdate = engine.updateShape.bind(engine);
+        vi.spyOn(engine, "updateShape").mockImplementation((shape, point) => {
+          order.push("positioned");
+          return realUpdate(shape, point);
+        });
+        vi.stubGlobal("prompt", () => {
+          order.push("asked");
+          return "SEE DETAIL B";
+        });
+        state.activeTool.set("callout");
+
+        dragFrom(100, 100, 300, 40);
+
+        expect(order).toEqual(["positioned", "asked"]);
+        expect(surface.committed[0]?.text).toBe("SEE DETAIL B");
+      });
+
+      it("places nothing when the prompt is dismissed after the drag", () => {
+        state.activeTool.set("callout");
+        vi.stubGlobal("prompt", () => null);
+
+        dragFrom(100, 100, 300, 40);
+
+        expect(surface.committed).toEqual([]);
+      });
     });
 
     it("does not leave the drag flag set behind a text tool", () => {
