@@ -101,9 +101,16 @@ module.exports = [
   + 'read it.'),
 
   h2('5.4  Events you can hook, and what each is honestly for'),
-  p('Fourteen message types run viewer → host. Four exist purely so you can **record** what a '
+  p('Thirteen message types run viewer → host. Four exist purely so you can **record** what a '
   + 'reader did without polling us or inferring it from markup traffic — and the inference is '
   + 'wrong in ways that are not obvious, which is why they exist.'),
+  note('The last issue of this guide said fourteen, and it was counting one that never arrives. '
+     + '`viewer.resized` was specified, listed in the protocol\u2019s own event table with a '
+     + 'payload shape, and sent by no code path \u2014 so a host that sized its frame to content '
+     + 'waited for an event that never came, with nothing erroring to say why. It has been '
+     + 'removed from the protocol rather than left as a promise, and a CI gate now refuses any '
+     + 'declared message type that nothing sends. If you want the frame to follow the content, '
+     + 'measure it from your own page.'),
   table([2500, 2600, 4646], [
     { header: true, cells: [{ t: 'You want to know' }, { t: 'Listen to' }, { t: 'What to watch out for' }] },
     { cells: [{ t: 'A document was opened' }, { t: 'viewer.opened' },

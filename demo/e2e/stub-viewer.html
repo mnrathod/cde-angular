@@ -31,6 +31,7 @@
 <button type="button" id="draw">Emit markup</button>
 <button type="button" id="sign">Request document.sign</button>
 <button type="button" id="read-on">Read page 2, then page 1 again</button>
+<button type="button" id="select">Select / deselect the markup</button>
 <button type="button" id="close">Close the document</button>
 
 <script type="module">
@@ -39,6 +40,8 @@
   const parentOrigin = new URLSearchParams(location.search).get('parentOrigin');
 
   let counter = 0;
+  /** The last markup this stub drew, so selection has something to point at. */
+  let lastMarkupId = null;
   const send = (type, payload, replyTo) => {
     const message = { protocol: PROTOCOL, type, id: `stub-${++counter}`, payload };
     if (replyTo) message.replyTo = replyTo;
@@ -88,9 +91,10 @@
   });
 
   document.getElementById('draw').addEventListener('click', () => {
+    lastMarkupId = `m-${Date.now()}`;
     send('viewer.markupCreated', {
       markup: {
-        markupId: `m-${Date.now()}`,
+        markupId: lastMarkupId,
         page: 2,
         type: 'CLOUD',
         shapeData: '{"points":[[10,10],[40,40]]}',
@@ -109,6 +113,18 @@
     // deduplication exists to prevent (§6.3).
     send('viewer.pageRendered', { page: 2, widthPx: 800, heightPx: 1130, zoom: 1, externalId });
     send('viewer.pageRendered', { page: 1, widthPx: 1600, heightPx: 2260, zoom: 2, externalId });
+  });
+
+  let selected = false;
+  document.getElementById('select').addEventListener('click', () => {
+    // Toggles, because the clear is the half a host is most likely to get
+    // wrong: `markupId` is null when the reader deselects, and a host that
+    // treats that as a selection leaves the last row highlighted for ever.
+    selected = !selected;
+    send('viewer.selectionChanged', {
+      markupId: selected ? lastMarkupId : null,
+      externalId,
+    });
   });
 
   document.getElementById('close').addEventListener('click', () => {

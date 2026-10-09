@@ -22,7 +22,7 @@ export type ViewerMessageType =
   | 'viewer.markupLoaded'
   | 'viewer.markupCreated' | 'viewer.markupUpdated' | 'viewer.markupDeleted'
   | 'viewer.operationRequest' | 'viewer.selectionChanged'
-  | 'viewer.viewChanged' | 'viewer.pageRendered' | 'viewer.resized';
+  | 'viewer.viewChanged' | 'viewer.pageRendered';
 
 /**
  * Why a document stopped being shown.

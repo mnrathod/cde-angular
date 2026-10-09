@@ -174,3 +174,29 @@ test('surfaces markup its own store holds but the viewer cannot draw', async ({ 
 
   await expect(page.locator('#log')).toContainText('viewer sent viewer.markupLoaded');
 });
+
+test('highlights the stored row the reader has selected, and clears it again', async ({ page }) => {
+  // `viewer.selectionChanged` is documented as part of the protocol and was
+  // the one documented event this demo neither handled nor summarised, so an
+  // integrator reading the demo as the reference would have omitted it.
+  await page.goto('/');
+  await page.getByLabel('Display name').fill('B. Reviewer');
+  await page.getByRole('button', { name: 'sample-drawing.pdf' }).click();
+  await expect(page.locator('#log')).toContainText('viewer.loaded');
+
+  const viewer = page.frameLocator('#viewer-frame');
+  await viewer.getByRole('button', { name: 'Emit markup' }).click();
+  const row = page.locator('#markup-rows tr').first();
+  await expect(row).not.toHaveAttribute('aria-current', 'true');
+
+  await viewer.getByRole('button', { name: 'Select / deselect the markup' }).click();
+
+  await expect(row).toHaveAttribute('aria-current', 'true');
+  // §1A.2: the highlight is not the only thing that says which row this is.
+  await expect(row).toContainText('Selected.');
+
+  await viewer.getByRole('button', { name: 'Select / deselect the markup' }).click();
+
+  await expect(row).not.toHaveAttribute('aria-current', 'true');
+  await expect(row).not.toContainText('Selected.');
+});

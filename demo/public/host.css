@@ -189,6 +189,13 @@ iframe {
 .markup-table th { font-size: 13px; color: var(--ink-soft); }
 .markup-table .empty td { color: var(--ink-soft); font-style: italic; }
 
+/* The row whose markup the reader has selected in the viewer
+   (`viewer.selectionChanged`). Two cues, not one: §1A.2 forbids colour as the
+   sole carrier of meaning, so the left edge changes shape as well as tone, and
+   host.js renders a visually-hidden "Selected" for assistive technology. */
+.markup-table tr.selected td { background: var(--accent); color: var(--accent-ink); }
+.markup-table tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent-ink); }
+
 .visually-hidden {
   position: absolute;
   width: 1px; height: 1px;

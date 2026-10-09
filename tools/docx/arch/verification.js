@@ -107,7 +107,7 @@ module.exports = [
     { cells: [{ t: 'check:samples' },
       { t: 'The demo’s three sample documents match their generator byte for byte' }] },
     { cells: [{ t: 'test:demo' },
-      { t: 'Ten Playwright tests drive the demo host in a real browser' }] },
+      { t: 'Eleven Playwright tests drive the demo host in a real browser' }] },
     { cells: [{ t: 'check:i18n' },
       { t: 'The committed message catalogue regenerates to exactly what is in the tree. It captures the extractor\u2019s stderr rather than inheriting it, because duplicate message ids are reported there and it exits 0 regardless \u2014 two source strings sharing an id means one of them ships the wrong words in every translated language' }] },
     { cells: [{ t: 'check:i18n-markup' },
@@ -116,11 +116,13 @@ module.exports = [
       { t: 'Nothing in the built bundle is unreachable code' }] },
     { cells: [{ t: 'check:bundle-budget' },
       { t: 'The initial bundle, three.js and pdf.js each stay inside their §7.1 budget — currently 122.8 kB / 250, 187.2 kB / 200 and 149.3 kB / 160' }] },
+    { cells: [{ t: 'check:embed-protocol' },
+      { t: 'The embed protocol’s three self-descriptions agree: every type in the ViewerMessageType union is sent by production code and has a row in the authority’s event table, and nothing is sent or documented from outside it' }] },
     { cells: [{ t: 'test:scripts' },
       { t: 'The gate scripts themselves have tests, so a gate cannot pass by being broken' }] }
   ]),
   caption('Table 6 — The repository’s own gates.'),
-  p('**All ten now run in CI**, where four did when this document was last issued. The CI Node '
+  p('**All eleven now run in CI**, where four did when this document was last issued. The CI Node '
   + 'is not the container\u2019s, so the version trap above does not reach the pipeline. The '
   + 'platform\u2019s `Jenkinsfile` runs `npm ci`, `tsc --build --force --noEmit` and `ng test` '
   + 'against this repository, and every gate in the table: `check:no-remote-code`, `check:i18n`, '
@@ -133,7 +135,7 @@ module.exports = [
      + 'naming rather than the fix: **a gate nothing runs is documentation.** Each was written '
      + 'because the thing it checks is otherwise invisible in a diff, and then left where nothing '
      + 'could fail on it.'),
-  p('The count is ten rather than nine because `check:bundle-budget` was missing from the table '
+  p('The count was ten rather than nine because `check:bundle-budget` was missing from the table '
   + 'above — it has existed and passed since the budgets were set, and a gate absent from the '
   + 'list of gates is one nobody will think to wire up.'),
   p('Two of the placements are load-bearing rather than tidy. `check:served-assets` and '

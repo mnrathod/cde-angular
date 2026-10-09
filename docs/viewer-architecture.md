@@ -191,8 +191,8 @@ the part that knows no backend exists.
 | `embed-viewer.component.ts` | The `/embed` route component. No auth guard, deliberately — the viewer authenticates nobody |
 | `markup-wire-format.ts` | Translation between the viewer's `ShapeData` and the protocol's `Markup` — the only part of the session with no session state, so it tests against the two representations directly |
 
-**Fourteen message types run viewer → host and six run host → viewer.** Four of
-the fourteen are lifecycle events — `viewer.opened`, `viewer.unloaded`,
+**Thirteen message types run viewer → host and six run host → viewer.** Four of
+the thirteen are lifecycle events — `viewer.opened`, `viewer.unloaded`,
 `viewer.markupLoaded` and `viewer.pageRendered` — added after the first
 integrations asked how to record what a reader did. None is required: a host can
 ignore every one and still open documents and collect markup. Adding them was
@@ -241,14 +241,56 @@ forging the field. The test that works posts a `viewer.markupCreated` carrying
 `author: "Someone Else"` and asserts the host stores the name from its own
 session instead.
 
-Ten Playwright tests drive the demo in a real browser against a stub viewer
+Eleven Playwright tests drive the demo in a real browser against a stub viewer
 on a third origin. They earn their keep: three defects no unit test could reach
 were found there — a captured `contentWindow` going stale across navigation, an
 author `display` rule beating the user agent's `[hidden] { display: none }` so
 a placeholder swallowed every click, and the page and the server disagreeing
 about the viewer's origin.
 
-### 4.3 What the embed cannot open
+Four, now. The eleventh test exists because **the demo was missing a documented
+event, and the demo is what an integrator reads instead of the
+specification.** `viewer.selectionChanged` is in the protocol's event table and
+is genuinely sent by `embed-session.service.ts`, and the demo neither handled
+it nor summarised it in its log — so a host built by copying the reference
+integration would have omitted it without anything saying so. It now
+highlights the stored row whose markup the reader has selected, which is what a
+real host does with it, and clears the highlight when the selection goes to
+`null` — the half most likely to be got wrong, because a host that treats a
+clear as a selection leaves the last row highlighted for ever.
+
+### 4.3 A documented event that nothing sent
+
+Checking the demo against the protocol found the drift running the other way
+too, and worse. **`viewer.resized` was declared in the `ViewerMessageType`
+union and documented in `docs/viewer-embed-protocol.md` — the file
+`embed-protocol.ts` names as the authority — with a payload shape of
+`{ contentHeightPx }` and guidance on when a host should ignore it. No code
+path ever sent it.**
+
+A host implementing the published protocol would wire a handler, size its frame
+to the content, and wait for an event that never arrives. Nothing errors. The
+frame simply never resizes, and the integrator looks for the bug in their own
+code, because the document they are working from says the event exists.
+
+No test could have caught it: the event nothing sends is also the event nothing
+asserts, so the suite was green and the protocol was wrong. What catches it is a
+comparison between the three places the protocol describes itself — the union,
+the `send` calls, and the authority's event table — which is now the
+`check:embed-protocol` gate in §12.2. It was verified by putting the defect back
+and watching it fail, and it names the consequence rather than the discrepancy:
+*a host that handles it waits for an event that never arrives.*
+
+The event is removed rather than implemented, and that is a deliberate choice
+with an open question behind it. The viewer paginates and scrolls internally, so
+"content height" has no single meaning — one page, all pages, or the current fit
+— and the answer is entangled with whether the viewer should ever manage its own
+scrolling, which changes the accessibility story around focus and scroll
+containers. **That decision is open; advertising the event before it is made is
+not a way of keeping it open.** A host that wants the frame to follow the
+content measures it from its own page.
+
+### 4.4 What the embed cannot open
 
 **Only PDF renders in an embedded frame today.** `embed-session.service.ts`
 treats `application/pdf` as directly renderable and refuses everything else
@@ -805,14 +847,15 @@ thing it checks is otherwise invisible in a diff.
 | `check:attribution` | `THIRD-PARTY-NOTICES.txt` regenerates to exactly what is committed. It regenerates and asks git, rather than checking the file exists — the backend learned that distinction the hard way, with a shipped attribution naming a version it no longer had |
 | `check:icons` | The application icons and favicon match their generator byte for byte, and the mark stays inside the maskable safe zone |
 | `check:samples` | The demo's three sample documents match their generator byte for byte |
-| `test:demo` | Ten Playwright tests drive the demo host in a real browser |
+| `test:demo` | Eleven Playwright tests drive the demo host in a real browser |
 | `check:i18n` | The committed message catalogue regenerates to exactly what is in the tree. It captures the extractor's stderr rather than inheriting it, because duplicate message ids are reported there and exit 0 regardless — two source strings sharing an id means one of them ships the wrong words in every translated language |
 | `check:i18n-markup` | No component template carries user-facing text a translator will never see |
 | `check:served-assets` | Nothing in the built bundle is unreachable code |
 | `check:bundle-budget` | The initial bundle, three.js and pdf.js each stay inside their §7.1 budget — currently 122.8 kB / 250, 187.2 kB / 200 and 149.3 kB / 160 |
+| `check:embed-protocol` | The embed protocol's three self-descriptions agree: every type in the `ViewerMessageType` union is sent by production code and has a row in the authority's event table, and nothing is sent or documented from outside it |
 | `test:scripts` | The gate scripts themselves have tests, so a gate cannot pass by being broken |
 
-**All ten now run in CI**, where four did when this document was last issued.
+**All eleven now run in CI**, where four did when this document was last issued.
 The CI Node is not the container's, so the version trap above does not reach
 the pipeline. The platform's `Jenkinsfile` runs `npm ci`,
 `tsc --build --force --noEmit` and `ng test` against this repository, and every
@@ -828,10 +871,11 @@ state worth naming rather than the fix: **a gate nothing runs is
 documentation.** Each was written because the thing it checks is otherwise
 invisible in a diff, and then left where nothing could fail on it.
 
-The count is ten rather than nine because `check:bundle-budget` was missing
+The count was ten rather than nine because `check:bundle-budget` was missing
 from the table above — it has existed and passed since the budgets were set,
 and a gate absent from the list of gates is one nobody will think to wire up,
-which is exactly what had happened to it.
+which is exactly what had happened to it. It is eleven now because
+`check:embed-protocol` is new; §4 says what it was written for.
 
 Two of the placements are load-bearing rather than tidy. `check:served-assets`
 and `check:bundle-budget` sit after the production build in the same shell, so
@@ -900,7 +944,7 @@ allow-list against its own tests, the served document against a real browser —
 and the whole has never run. This is the next thing to do and the thing most
 likely to surface something nobody predicted.
 
-**The embed opens PDF and nothing else.** §4.3. The conversion service exists;
+**The embed opens PDF and nothing else.** §4.4. The conversion service exists;
 the embed path does not call it.
 
 **Collaboration has no identity in an embed.** Live cursors and presence ride a

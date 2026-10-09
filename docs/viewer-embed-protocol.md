@@ -232,7 +232,6 @@ Two consequences worth knowing before you deploy:
 | `viewer.selectionChanged` | `{ markupId \| null }` | Selection moved |
 | `viewer.viewChanged` | `{ page, zoom, rotation }` | The user navigated. Throttled to 4/s |
 | `viewer.pageRendered` | `{ page, widthPx, heightPx, zoom, externalId }` | A page is on screen. Once per page per document — see §6.3 |
-| `viewer.resized` | `{ contentHeightPx }` | For hosts sizing the frame to content |
 
 **Every one of these is optional to handle.** §9's minimum integration needs
 `viewer.ready` and nothing else; the rest exist so a host can record what
@@ -489,8 +488,21 @@ have it — the one loose end "no identity" leaves (ADR 14, consequences). It is
 outside this protocol until it is solved, so live cursors and presence do not
 work in an embedded deployment.
 
-**Content-height reporting.** `viewer.resized` assumes a host that sizes the
-frame to content. A host that gives the frame a fixed height should ignore it.
-Whether we also support a `ui.fit` mode where the viewer manages its own
-scrolling is unsettled, and the answer changes the accessibility story around
-focus and scroll containers.
+**Content-height reporting is not in this protocol.** A `viewer.resized`
+message carrying `contentHeightPx` was specified here and listed in the event
+table above, and no code ever sent it. A host that implemented it wired a
+handler, sized its frame to content, and waited for an event that never came —
+nothing errored, the frame simply never resized. The row and the type have been
+removed rather than left as a promise, and a CI gate now refuses any declared
+message type that nothing sends, so this cannot recur silently.
+
+Give the frame a height. If you want it to follow the content, measure the
+frame from your own page; the viewer will not tell you.
+
+Reinstating it is a real option and a larger question than a message. The
+viewer paginates and scrolls internally, so "content height" has no single
+meaning — one page, all pages, or the current fit — and the answer is entangled
+with whether we support a `ui.fit` mode where the viewer manages its own
+scrolling, which changes the accessibility story around focus and scroll
+containers. That decision is open. What is not open is advertising the event
+before it is made.

@@ -159,6 +159,17 @@ function appendNote(text) {
  */
 const pagesSeen = new Set();
 
+/**
+ * Which stored markup the reader currently has selected, or null.
+ *
+ * `viewer.selectionChanged` is documented as part of the protocol and was the
+ * one documented event this demo neither handled nor summarised — so an
+ * integrator reading this file as the reference would have omitted it without
+ * noticing. Highlighting the row is what a real host does with it: it tells
+ * the reader which of their stored annotations is the one on screen.
+ */
+let selectedMarkupId = null;
+
 /** A short, human summary. Never the whole payload — logs are read, not parsed. */
 function summarise(message) {
   const payload = message.payload ?? {};
@@ -172,6 +183,9 @@ function summarise(message) {
     return payload.rejected
       ? `${payload.count} rendered, ${payload.rejected} rejected`
       : `${payload.count} rendered`;
+  }
+  if (message.type === 'viewer.selectionChanged') {
+    return payload.markupId ? String(payload.markupId) : 'cleared';
   }
   if (message.type === 'viewer.operationRequest') return payload.operation ?? '';
   if (message.type === 'host.operationResult') return payload.status ?? '';
@@ -201,9 +215,25 @@ function renderMarkupTable() {
 
   for (const markup of stored) {
     const row = document.createElement('tr');
+    const isSelected = selectedMarkupId !== null && markup.markupId === selectedMarkupId;
+    if (isSelected) {
+      row.className = 'selected';
+      // aria-current carries the state programmatically, and the word is
+      // rendered for a screen reader to read, because §1A.2 does not allow a
+      // highlight to be the only thing that says which row this is.
+      row.setAttribute('aria-current', 'true');
+    }
+    let first = true;
     for (const value of [markup.page, markup.type, markup.comment || '—', markup.author]) {
       const cell = document.createElement('td');
       cell.textContent = String(value);
+      if (first && isSelected) {
+        const marker = document.createElement('span');
+        marker.className = 'visually-hidden';
+        marker.textContent = 'Selected. ';
+        cell.prepend(marker);
+      }
+      first = false;
       row.append(cell);
     }
 
@@ -287,6 +317,7 @@ function load(entry) {
   });
 
   host.on('viewer.unloaded', (message) => {
+    selectedMarkupId = null;
     appendNote(`document ${message.payload.reason}; ${pagesSeen.size} page(s) seen`);
   });
 
@@ -304,6 +335,14 @@ function load(entry) {
 
   host.on('viewer.markupDeleted', (message) => {
     store.remove(entry.externalId, message.payload.markupId);
+    renderMarkupTable();
+  });
+
+  host.on('viewer.selectionChanged', (message) => {
+    // Null when the reader deselects, which is why this reads the payload
+    // rather than assuming a selection: treating a clear as a selection of
+    // "null" would leave the last row highlighted for ever.
+    selectedMarkupId = message.payload.markupId ?? null;
     renderMarkupTable();
   });
 

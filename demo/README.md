@@ -94,6 +94,7 @@ unit test in this repository beforehand.
 | Open `sample-specification.docx` | `viewer.opened` **then** `viewer.error` — the open is announced before the outcome is known |
 | Open one document, then another | `viewer.unloaded` for the first, with a "host noted" line saying how many pages were seen |
 | Press "Send host.loadMarkup" | `viewer.markupLoaded` acknowledging what rendered, and what could not |
+| Draw, then press "Select / deselect the markup" | The stored row is highlighted while the reader has it selected, and the highlight clears on the second press — `viewer.selectionChanged` carries `null` when nothing is selected |
 
 Three of those lines are the lifecycle events (§6.3 of the protocol). None is
 required to make the embed work — a host can ignore every one and still open

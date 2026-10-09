@@ -87,7 +87,7 @@ module.exports = [
       { t: 'Translation between the viewer’s ShapeData and the protocol’s Markup — the only part of the session with no session state, so it tests against the two representations directly' }] }
   ]),
   caption('Table 3 — The embed implementation.'),
-  p('**Fourteen message types run viewer → host and six run host → viewer.** Four of the fourteen '
+  p('**Thirteen message types run viewer → host and six run host → viewer.** Four of the thirteen '
   + 'are lifecycle events — `viewer.opened`, `viewer.unloaded`, `viewer.markupLoaded` and '
   + '`viewer.pageRendered` — added after the first integrations asked how to record what a reader '
   + 'did. None is required: a host can ignore every one and still open documents and collect '
@@ -125,13 +125,48 @@ module.exports = [
      + 'sends an author and the test asserted an outcome rather than forging the field. The test '
      + 'that works posts a `viewer.markupCreated` carrying `author: "Someone Else"` and asserts '
      + 'the host stores the name from its own session instead.'),
-  p('Ten Playwright tests drive the demo in a real browser against a stub viewer on a third '
+  p('Eleven Playwright tests drive the demo in a real browser against a stub viewer on a third '
   + 'origin. They earn their keep: three defects no unit test could reach were found there — a '
   + 'captured `contentWindow` going stale across navigation, an author `display` rule beating the '
   + 'user agent’s `[hidden] { display: none }` so a placeholder swallowed every click, and the '
   + 'page and the server disagreeing about the viewer’s origin.'),
+  p('Four, now. The eleventh test exists because **the demo was missing a documented event, and '
+  + 'the demo is what an integrator reads instead of the specification.** '
+  + '`viewer.selectionChanged` is in the protocol\u2019s event table and is genuinely sent by '
+  + '`embed-session.service.ts`, and the demo neither handled it nor summarised it in its log '
+  + '\u2014 so a host built by copying the reference integration would have omitted it without '
+  + 'anything saying so. It now highlights the stored row whose markup the reader has selected, '
+  + 'and clears the highlight when the selection goes to `null` \u2014 the half most likely to '
+  + 'be got wrong, because a host that treats a clear as a selection leaves the last row '
+  + 'highlighted for ever.'),
 
-  h2('4.3  What the embed cannot open'),
+  h2('4.3  A documented event that nothing sent'),
+  note('Checking the demo against the protocol found the drift running the other way too, and '
+     + 'worse. **`viewer.resized` was declared in the `ViewerMessageType` union and documented '
+     + 'in `docs/viewer-embed-protocol.md` \u2014 the file `embed-protocol.ts` names as the '
+     + 'authority \u2014 with a payload shape of `{ contentHeightPx }` and guidance on when a '
+     + 'host should ignore it. No code path ever sent it.**'),
+  p('A host implementing the published protocol would wire a handler, size its frame to the '
+  + 'content, and wait for an event that never arrives. Nothing errors. The frame simply never '
+  + 'resizes, and the integrator looks for the bug in their own code, because the document they '
+  + 'are working from says the event exists.'),
+  p('No test could have caught it: the event nothing sends is also the event nothing asserts, so '
+  + 'the suite was green and the protocol was wrong. What catches it is a comparison between the '
+  + 'three places the protocol describes itself \u2014 the union, the `send` calls, and the '
+  + 'authority\u2019s event table \u2014 which is now the `check:embed-protocol` gate in '
+  + '\u00a712.2. It was verified by putting the defect back and watching it fail, and it names '
+  + 'the consequence rather than the discrepancy: *a host that handles it waits for an event that '
+  + 'never arrives.*'),
+  note('The event is removed rather than implemented, and that is a deliberate choice with an '
+     + 'open question behind it. The viewer paginates and scrolls internally, so \u201ccontent '
+     + 'height\u201d has no single meaning \u2014 one page, all pages, or the current fit '
+     + '\u2014 and the answer is entangled with whether the viewer should ever manage its own '
+     + 'scrolling, which changes the accessibility story around focus and scroll containers. '
+     + '**That decision is open; advertising the event before it is made is not a way of keeping '
+     + 'it open.** A host that wants the frame to follow the content measures it from its own '
+     + 'page.'),
+
+  h2('4.4  What the embed cannot open'),
   note('**Only PDF renders in an embedded frame today.** `embed-session.service.ts` treats '
      + '`application/pdf` as directly renderable and refuses everything else with a 415 '
      + '`conversion-required` problem naming the format. The conversion service in section 6 '
