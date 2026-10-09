@@ -42,17 +42,6 @@ module.exports = [
   p('On a Node that satisfies it, `ng test` and `ng build --configuration production` both run: '
   + '**2,185 specs pass, and the production build is clean.** TestBed specs are the majority of '
   + 'them.'),
-  note('**`test:demo` has a second trap of the same shape, and it reads as a missing install '
-     + 'rather than a mismatch.** Playwright resolves its browser by build number, so the pinned '
-     + '`@playwright/test` asks for a specific one — currently 1234 — and a container '
-     + 'that ships a different build (this one ships 1194) fails every test in the gate with '
-     + '*Executable doesn\u2019t exist*, followed by an invitation to run `playwright install`. '
-     + 'Running it is the wrong move here: `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` is set deliberately '
-     + 'and the download would not be permitted anyway. The browser that is present works — '
-     + 'all ten tests pass against build 1194 once it is reachable under the path the pin expects. '
-     + 'Nothing in the repository should encode that path, because it is a property of one '
-     + 'container and not of the project; it is written down here so the next person reads the '
-     + 'error as a version mismatch rather than as a broken gate.'),
   p('That correction is load-bearing in an unwelcome direction. Several components had never been '
   + 'type-checked against their own templates, because `ng test` does not type-check a component '
   + 'no spec imports and `tsc --noEmit` does not check Angular templates at all. Only '
@@ -62,6 +51,23 @@ module.exports = [
   p('What remains true: the demo’s end-to-end tests drive a stub viewer rather than the real one, '
   + 'so **the `/embed` route still has not been rendered by Angular inside a host frame on an '
   + 'installed deployment** (§13).'),
+  note('**`test:demo` has a second trap of the same shape, and it reads as a missing install '
+     + 'rather than a mismatch.** Playwright resolves its browser by build number, so the pinned '
+     + '`@playwright/test` asks for a specific one — currently 1234 — and a container '
+     + 'that ships a different build (this one ships 1194) fails every test in the gate with '
+     + '*Executable doesn\u2019t exist*, followed by an invitation to run `playwright install`. '
+     + 'Running it is the wrong move here: `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` is set deliberately '
+     + 'and the download would not be permitted anyway.'),
+  note('**The remedy is already in the repository, and the last issue of this document described '
+     + 'a workaround instead of it.** `demo/e2e/playwright.config.mjs` reads '
+     + '`PLAYWRIGHT_CHROMIUM_PATH` and passes it as `launchOptions.executablePath`, which '
+     + 'bypasses the build-number lookup entirely: pointing it at the installed browser passes '
+     + 'all ten against the one that is present. The previous note said the browser had to be '
+     + 'made “reachable under the path the pin expects”, which works and is the wrong '
+     + 'advice — it reconstructs by hand a mechanism the config already supports, and it '
+     + 'leaves behind container-specific directories that the next upgrade silently invalidates. '
+     + 'The pipeline stage uses the environment variable, and falls back to installing the pinned '
+     + 'build only when no path is given.'),
 
   h2('12.1  Coverage'),
   p('**§14’s figures are now the gate.** `angular.json` requires 90% line and 85% branch — the '
@@ -114,17 +120,31 @@ module.exports = [
       { t: 'The gate scripts themselves have tests, so a gate cannot pass by being broken' }] }
   ]),
   caption('Table 6 — The repository’s own gates.'),
-  p('**Four of these ten run in CI.** The last issue said five, and its own next sentence listed '
-  + 'four — the headline was a miscount of the prose beneath it. The CI Node is not the '
-  + 'container’s, so the version trap above does not reach the pipeline. The platform’s '
-  + '`Jenkinsfile` runs `npm ci`, `tsc --build --force --noEmit`, `check:no-remote-code`, '
-  + '`check:i18n`, `check:i18n-markup`, `test:scripts`, `ng build --configuration production` '
-  + 'and `ng test` against this repository. `check:attribution`, `check:icons`, `check:samples`, '
-  + '`check:served-assets`, `check:bundle-budget` and `test:demo` exist, pass locally, and guard '
-  + 'nothing until a pipeline stage calls them. A gate nothing runs is documentation.'),
+  p('**All ten now run in CI**, where four did when this document was last issued. The CI Node '
+  + 'is not the container\u2019s, so the version trap above does not reach the pipeline. The '
+  + 'platform\u2019s `Jenkinsfile` runs `npm ci`, `tsc --build --force --noEmit` and `ng test` '
+  + 'against this repository, and every gate in the table: `check:no-remote-code`, `check:i18n`, '
+  + '`check:i18n-markup`, `test:scripts`, `check:icons` and `check:samples` in the '
+  + 'static-analysis stage; `ng build --configuration production` then `check:served-assets` and '
+  + '`check:bundle-budget` in the build stage, because those two read the bundle and cannot run '
+  + 'before it exists; `check:attribution` beside the backend\u2019s own licence gate; and '
+  + '`test:demo` as its own stage under Tests.'),
+  note('The six that moved had existed and passed locally for some time, which is the state worth '
+     + 'naming rather than the fix: **a gate nothing runs is documentation.** Each was written '
+     + 'because the thing it checks is otherwise invisible in a diff, and then left where nothing '
+     + 'could fail on it.'),
   p('The count is ten rather than nine because `check:bundle-budget` was missing from the table '
   + 'above — it has existed and passed since the budgets were set, and a gate absent from the '
   + 'list of gates is one nobody will think to wire up.'),
+  p('Two of the placements are load-bearing rather than tidy. `check:served-assets` and '
+  + '`check:bundle-budget` sit after the production build in the same shell, so neither can be '
+  + 'reached without the artifact it reads \u2014 a check that passes itself over a missing '
+  + 'bundle reports success for every build that never produced one. And `check:attribution` is '
+  + 'both halves of the frontend\u2019s licence assurance, not just a file comparison: it '
+  + 'refuses a forbidden licence (\u00a72.1) or one on neither list, and refuses to write '
+  + '`THIRD-PARTY-NOTICES.txt` over a violation, so it cannot report a clean file for a tree that '
+  + 'is not clean. The pipeline\u2019s own list of gates it does not provide is one line shorter '
+  + 'as a result.'),
   note('One correction to the `tsc` line in the last issue: the pipeline passes `--build --force`, '
      + 'not a bare `--noEmit`. `tsconfig.json` carries `"files": []` and project references, so '
      + '`tsc --noEmit` type-checks nothing at all and exits 0 — proven by putting a type error in '
@@ -149,8 +169,10 @@ module.exports = [
      + 'build time. That distinction is the whole reason the gate counted them, and “the '
      + 'lockfile marks them production-reachable” described the symptom as though it were an '
      + 'accident of the lockfile rather than a true fact about the dependency. '
-     + '**§17.6’s release checklist is not blocked by this.** What it is still waiting on '
-     + 'is the six gates above that nothing in a pipeline calls.'),
+     + '**§17.6’s release checklist is not blocked by this, and no longer blocked by the '
+     + 'gates either** — the six that nothing called are now pipeline stages. What remains '
+     + 'outstanding against that checklist is in section 13, and none of it is a frontend licence '
+     + 'question.'),
 
   h1('13.  What this architecture does not yet have'),
   lead('Stated plainly, and shorter than it was. The gap between “the viewer works” and “a CDE can '
