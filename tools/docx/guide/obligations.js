@@ -70,13 +70,24 @@ module.exports = [
        + 'against their behaviour, this is one fewer finding than the last release would have '
        + 'given you.'),
   note('**And what we cannot.** No axe run, no Lighthouse budget, no screen-reader pass against '
-     + 'the supported matrix, and no CI gate producing any of them. One known functional gap: '
-     + '**markup shapes cannot yet be created or moved without a pointer**, which is an SC 2.5.7 '
-     + 'failure in the annotation layer specifically. If your customers annotate drawings and '
-     + 'your bid claims AA, raise this with us before you sign.'),
+     + 'the supported matrix, and no CI gate producing any of them.'),
+  p('The SC 2.5.7 failure in the annotation layer that the last issue of this guide reported is '
+  + '**fixed for drawing**: a shape can now be created entirely from the keyboard on both the PDF '
+  + 'page and the converted drawing. Focus the markup layer, then arrow keys move a crosshair, '
+  + 'Shift takes a larger step, Space presses, Enter finishes and Escape cancels \u2014 the arrow '
+  + 'keys between the press and the finish are the single-pointer alternative to the drag.'),
+  p('Two limits on that, stated plainly because a bid should not over-claim.'),
+  bullet('**A committed shape still cannot be moved or resized \u2014 by anyone.** The viewer has '
+       + 'no shape selection and no move, for any input device, so a misplaced annotation is '
+       + 'deleted and drawn again. The last issue filed this as half of the keyboard gap, which '
+       + 'hid it; it is a functional gap, not an accessibility one.'),
+  bullet('**A reader cannot yet enumerate existing markup** through assistive technology. '
+       + 'Creating is covered; reading back what is on the page is not.'),
+  note('If your customers annotate drawings and your bid claims AA, raise both with us before '
+     + 'you sign.'),
 
   p('**Localisation.** Everything a reader sees carries a stable message id and a translator '
-  + 'note, extracted to a committed catalogue — 585 messages — with two CI gates keeping it '
+  + 'note, extracted to a committed catalogue — 587 messages — with two CI gates keeping it '
   + 'honest: one fails if the catalogue drifts from source, the other if a template grows text a '
   + 'translator will never see.'),
   note('**The last issue of this guide said there were no hardcoded strings left. Nine were found '

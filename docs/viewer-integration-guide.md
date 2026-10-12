@@ -555,10 +555,26 @@ regresses:
   than the last release would have given you.
 
 **And what we cannot.** No axe run, no Lighthouse budget, no screen-reader pass
-against the supported matrix, and no CI gate producing any of them. One known
-functional gap: **markup shapes cannot yet be created or moved without a
-pointer**, which is an SC 2.5.7 failure in the annotation layer specifically.
-If your customers annotate drawings and your bid claims AA, raise this with us
+against the supported matrix, and no CI gate producing any of them.
+
+The SC 2.5.7 failure in the annotation layer that the last issue of this guide
+reported is **fixed for drawing**: a shape can now be created entirely from the
+keyboard on both the PDF page and the converted drawing. Focus the markup
+layer, then arrow keys move a crosshair, Shift takes a larger step, Space
+presses, Enter finishes and Escape cancels — the arrow keys between the press
+and the finish are the single-pointer alternative to the drag.
+
+Two limits on that, stated plainly because a bid should not over-claim:
+
+- **A committed shape still cannot be moved or resized — by anyone.** The
+  viewer has no shape selection and no move, for any input device, so a
+  misplaced annotation is deleted and drawn again. The last issue filed this as
+  half of the keyboard gap, which hid it; it is a functional gap, not an
+  accessibility one.
+- **A reader cannot yet enumerate existing markup** through assistive
+  technology. Creating is covered; reading back what is on the page is not.
+
+If your customers annotate drawings and your bid claims AA, raise both with us
 before you sign.
 
 **Localisation.** Everything a reader sees carries a stable message id and a

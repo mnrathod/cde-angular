@@ -40,7 +40,7 @@ module.exports = [
   + 'entire test suite, with an error message about npm engines nowhere in it, is exactly the kind '
   + 'of thing the next person loses an hour to.'),
   p('On a Node that satisfies it, `ng test` and `ng build --configuration production` both run: '
-  + '**2,185 specs pass, and the production build is clean.** TestBed specs are the majority of '
+  + '**2,199 specs pass, and the production build is clean.** TestBed specs are the majority of '
   + 'them.'),
   p('That correction is load-bearing in an unwelcome direction. Several components had never been '
   + 'type-checked against their own templates, because `ng test` does not type-check a component '
@@ -72,8 +72,8 @@ module.exports = [
   h2('12.1  Coverage'),
   p('**§14’s figures are now the gate.** `angular.json` requires 90% line and 85% branch — the '
   + 'standard itself — where it previously required 78/78, which was a figure the suite happened '
-  + 'to reach rather than one anybody had chosen. Measured: **90.28% line (5,583/6,184) and 85.64% '
-  + 'branch (2,786/3,253)**, with statements at 87.5% and functions at 74.9%, both also gated at '
+  + 'to reach rather than one anybody had chosen. Measured: **90.18% line (5,639/6,253) and 85.55% '
+  + 'branch (2,826/3,303)**, with statements at 87.4% and functions at 74.9%, both also gated at '
   + 'their measured values so neither can fall.'),
   note('**The denominator grew while the work was done** — from 5,375 lines to 6,175. The '
      + 'builder’s `coverageInclude` filters rather than forces inclusion, so v8 counts a file only '
@@ -246,6 +246,21 @@ module.exports = [
   + 'has been run. **What is missing is not the document; it is the evidence the document is '
   + 'supposed to cite.** There is still no axe run, no Lighthouse budget, and no gate in the '
   + 'pipeline to produce either.'),
+  note('**The axe gate is blocked rather than merely undone, and it is worth saying on what.** '
+     + '\u00a71A.5 names axe-core via Playwright, and `@axe-core/playwright` is not in this '
+     + 'repository\u2019s dependency tree. Adding it needs a version, and \u00a70.1 says to '
+     + 'resolve one through the Context7 MCP and \u2014 if Context7 is unavailable \u2014 to say '
+     + 'so and ask rather than guess. Context7 has been unavailable throughout this work. Pinning '
+     + 'a version from memory is exactly the thing that rule forbids, and an accessibility gate '
+     + 'introduced by guessing at a dependency would be a \u00a70.1 violation shipped in the name '
+     + 'of \u00a71A. **This needs the dependency approving under \u00a70.3 with a resolved '
+     + 'version; it is not an engineering problem.**'),
+  note('**Separately: a committed markup shape cannot be moved or resized by anyone.** There is '
+     + 'no shape selection in the viewer and no move \u2014 `removeShape` is the only operation '
+     + 'on a committed shape, so a misplaced annotation has to be deleted and drawn again. This '
+     + 'was previously recorded as half of an accessibility gap, which hid it: it is not a '
+     + 'keyboard gap, because no input device can do it. Keyboard creation does not address it '
+     + 'and was not meant to.'),
   p('What has changed is the ground underneath them. The defects in sections 9.2 and 9.3 were '
   + 'real conformance failures and they are fixed, with a keyboard-operable test pinning each '
   + 'one — so an ACR filled in today would read differently from one filled in at the last issue. '

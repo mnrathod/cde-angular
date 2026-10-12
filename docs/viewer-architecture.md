@@ -498,9 +498,62 @@ Two drag-only interactions have since been given a keyboard route:
 - **The comparison wipe** was a drag-only divider. It is a range input with the
   visual handle drawn over it, so it answers arrow keys, Home and End.
 
-**The remaining gap is the markup layer**, and it is the same one as last time:
-no shape can yet be created or moved without a pointer. This is the largest
-accessibility item outstanding and it is not a small one.
+**The markup layer was the remaining gap, and it is closed for creation.**
+Two issues of this document said no shape could be created or moved without a
+pointer and called it the largest accessibility item outstanding. A shape can
+now be drawn entirely from the keyboard, on both surfaces.
+
+The overlay takes focus when a drawing tool is active, and announces what the
+keys do — the only place they are written down for a reader who cannot see the
+crosshair. Arrow keys move that crosshair, Shift takes the coarse step, Space
+presses, Enter finishes and Escape cancels. Space-then-arrows-then-Enter is the
+single-pointer alternative SC 2.5.7 asks for, because the arrow keys between
+the press and the finish are doing what the drag did. The overlay claims a key
+only when it used it, so arrow keys still scroll a page nobody is drawing on
+and Tab still leaves.
+
+**The sentence that named the gap was conflating two different things, and only
+one of them was an accessibility defect.** Creating a shape was pointer-only —
+that was real, and is fixed. *Moving* a committed shape is not a keyboard gap
+at all: there is no shape selection and no move in the viewer, for any input
+device. `removeShape` is the only thing that acts on a committed shape. So the
+second half of that claim described a feature nobody has rather than a route
+some readers lack, which made the accessibility gap look larger than it was and
+hid a plain functional gap behind it. Both are now stated separately — the
+missing move is in section 13.
+
+Two things about how it is built, because both were choices and the obvious
+alternative to each is worse.
+
+**The keyboard drives the same state machine the pointer does.** The three
+pointer handlers now hold nothing but coordinate extraction and hand a point to
+`pressAt`, `moveTo` and `release`; the keyboard moves a point and calls the
+same three. A separate keyboard path would have passed its own tests and still
+come to disagree with the pointer about which tools work, what a shape's
+defaults are, or where a finished one goes — which is not a hypothetical. It is
+the drift this session was extracted to stop, and it had already happened once
+between the PDF page and the CAD drawing. One test asserts the keyboard and the
+pointer produce an identical shape from identical coordinates; that assertion
+is the design, not a detail of it.
+
+**The crosshair is a component, extracted on the second caller rather than the
+third.** §3.3 says to duplicate twice and abstract on the third, and this is
+the exception that rule's own wording allows: the two callers are the two
+surfaces that have drifted before, over exactly this question of what works
+where. Drawn twice it ends up two sizes, or present on one surface and absent
+on the other — and a reader who cannot see it has no way to tell which of those
+happened. It is a crosshair rather than a dot so it reads as an aiming point
+over dense line work, and it is stroked twice, a wide light line under a narrow
+dark one, so it keeps contrast against both a white sheet and a dark drawing
+without depending on either (§1A.2).
+
+**What this does not do.** It is a keyboard route to *create*; it is not a
+screen-reader account of what is already on the page. A reader still cannot
+enumerate existing markup, and cannot move or resize a committed shape, because
+nobody can. Neither is this a substitute for the testing §1A.5 requires: these
+are unit tests of a state machine, and the manual keyboard pass and the
+screen-reader matrix remain the real gates. The axe gate is still missing, for
+the reason section 13 now gives.
 
 The callout half of that sentence is fixed, and the sentence was wrong about
 why. It read: `updateShape` still has no `callout` case, so a callout box
@@ -565,7 +618,7 @@ quoting to a buyer who asks what our VPAT rests on.
 
 Every sentence a reader sees is an `i18n` attribute or a `$localize` call
 carrying a stable message id and a translator note, extracted to a committed
-catalogue at `src/locale/messages.json` — 585 messages at this issue, up from 552.
+catalogue at `src/locale/messages.json` — 587 messages at this issue, up from 585.
 
 **The last issue of this document said there were none left, and that was wrong
 by nine.** They were found by writing specs over two panels that had none, not by
@@ -763,7 +816,7 @@ suite, with an error message about npm engines nowhere in it, is exactly the kin
 of thing the next person loses an hour to.
 
 On a Node that satisfies it, `ng test` and `ng build --configuration production`
-both run: **2,185 specs pass, and the production build is clean.** TestBed specs
+both run: **2,199 specs pass, and the production build is clean.** TestBed specs
 are the majority of them.
 
 That correction is load-bearing in an unwelcome direction. Several components
@@ -805,7 +858,7 @@ and falls back to installing the pinned build only when no path is given.
 branch — the standard itself — where it previously required 78/78, which was a
 figure the suite happened to reach rather than one anybody had chosen.
 
-Measured: **90.28% line (5,583/6,184) and 85.64% branch (2,786/3,253)**, with
+Measured: **90.18% line (5,639/6,253) and 85.55% branch (2,826/3,303)**, with
 statements at 87.5% and functions at 74.9%, both also gated at their measured
 values so neither can fall.
 
@@ -1020,6 +1073,24 @@ criterion in the ACR reads Not Evaluated or Does Not Support, and no
 screen-reader pass has been run. **What is missing is not the document; it is
 the evidence the document is supposed to cite.** There is still no axe run, no
 Lighthouse budget, and no gate in the pipeline to produce either.
+
+**The axe gate is blocked rather than merely undone, and it is worth saying on
+what.** §1A.5 names axe-core via Playwright, and `@axe-core/playwright` is not
+in this repository's dependency tree. Adding it needs a version, and §0.1 says
+to resolve one through the Context7 MCP and — if Context7 is unavailable — to
+say so and ask rather than guess. Context7 has been unavailable throughout this
+work. Pinning a version from memory is exactly the thing that rule forbids, and
+an accessibility gate introduced by guessing at a dependency would be a §0.1
+violation shipped in the name of §1A. **This needs the dependency approving
+under §0.3 with a resolved version; it is not an engineering problem.**
+
+**Separately: a committed markup shape cannot be moved or resized by anyone.**
+There is no shape selection in the viewer and no move — `removeShape` is the
+only operation on a committed shape, so a misplaced annotation has to be
+deleted and drawn again. This was previously recorded as half of an
+accessibility gap, which hid it: it is not a keyboard gap, because no input
+device can do it. Keyboard creation (§9.2) does not address it and was not
+meant to.
 
 What has changed is the ground underneath them. The defects in §9.2 and §9.3
 were real conformance failures and they are fixed, with a keyboard-operable

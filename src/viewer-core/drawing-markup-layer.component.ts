@@ -15,6 +15,7 @@ import {
   HostListener, Input, ViewChild, computed, inject,
 } from "@angular/core";
 
+import { MarkupKeyboardCursorComponent } from "./markup-keyboard-cursor.component";
 import { MarkupShapesComponent } from "./markup-shapes.component";
 import {
   MarkupDrawingSession, MarkupSurface,
@@ -27,16 +28,20 @@ const DRAWING_PAGE = 1;
 @Component({
   selector: "app-drawing-markup-layer",
   standalone: true,
-  imports: [MarkupShapesComponent],
+  imports: [MarkupShapesComponent, MarkupKeyboardCursorComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [MarkupDrawingSession],
   styles: [`:host { display: contents; }`],
   template: `
     <svg #markupSvg
-      class="absolute top-0 left-0 w-full h-full"
+      class="absolute top-0 left-0 w-full h-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
       [attr.viewBox]="viewBox"
       [style.cursor]="cursorStyle()"
       [style.pointer-events]="acceptsDrawing ? 'auto' : 'none'"
+      [attr.tabindex]="acceptsDrawing ? 0 : null"
+      [attr.role]="acceptsDrawing ? 'application' : null"
+      [attr.aria-label]="acceptsDrawing ? keyboardHelp() : null"
+      (keydown)="onKey($event)"
       (mousedown)="session.pointerDown($event)"
       (mousemove)="session.pointerMove($event)"
       (mouseup)="session.pointerUp()"
@@ -44,6 +49,9 @@ const DRAWING_PAGE = 1;
       (touchstart)="session.pointerDown($event); $event.preventDefault()"
       (touchmove)="session.pointerMove($event); $event.preventDefault()"
       (touchend)="session.pointerUp()">
+
+      <!-- Where the keyboard is aiming -->
+      <g markupKeyboardCursor [at]="session.keyboardCursor()"></g>
 
       <!-- Saved and in-progress shapes -->
       <g markupShapes [shapes]="shapesOnDrawing()"></g>
@@ -113,13 +121,34 @@ export class DrawingMarkupLayerComponent implements AfterViewInit, MarkupSurface
     this.state.addShape(shape);
   }
 
+  /**
+   * What the overlay announces, and the only place the keys are written down
+   * for a reader who cannot see the cursor.
+   */
+  keyboardHelp(): string {
+    return $localize`:Announced when focus reaches the drawing's markup layer. Tells a keyboard user how to draw, because there is no visible hint and no pointer convention to fall back on@@markup.keyboardHelp:Drawing layer. Arrow keys move the crosshair, Shift for larger steps, Space places, Enter finishes the shape, Escape cancels.`;
+  }
+
+  onKey(event: KeyboardEvent): void {
+    // Only when the session used the key: otherwise arrow keys must still
+    // scroll, and Tab must still leave.
+    if (this.session.handleKey(event)) event.preventDefault();
+  }
+
+  /**
+   * Enter and Escape are also taken at the document, because a vertex shape
+   * outlives the gesture that started it: a reader who has clicked three
+   * corners and then moved focus to the toolbar still needs a way to finish
+   * or abandon it. The element's own handler covers the keyboard route; these
+   * cover a shape in progress whatever has focus.
+   */
   @HostListener("document:keydown.enter")
   finishFromKeyboard() {
     this.session.finishFromKeyboard();
   }
 
   @HostListener("document:keydown.escape")
-  cancelVertexShape() {
+  cancelShapeInProgress() {
     this.session.cancel();
   }
 }

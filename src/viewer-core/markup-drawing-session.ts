@@ -58,6 +58,15 @@ export class MarkupDrawingSession {
   /** The shape being drawn, or null between gestures. */
   readonly activeShape = signal<ShapeData | null>(null);
 
+  /**
+   * Where the keyboard's cursor is, or null when the keyboard is not drawing.
+   *
+   * <p>A signal because the surface draws it: a cursor the reader cannot see
+   * is a cursor they cannot aim, and §1A.2 wants the keyboard route to be
+   * usable rather than merely present.
+   */
+  readonly keyboardCursor = signal<PointerPoint | null>(null);
+
   private surface: MarkupSurface | null = null;
   private dragging = false;
   /** Where the pointer is between vertex clicks, for the rubber band. */
@@ -70,18 +79,43 @@ export class MarkupDrawingSession {
 
   pointerDown(event: MouseEvent | TouchEvent): void {
     const surface = this.surface;
+    if (!surface) return;
+    this.pressAt(this.markup.getSvgPoint(event, surface.overlay), {
+      clickDetail: (event as MouseEvent).detail ?? 1,
+    });
+  }
+
+  pointerMove(event: MouseEvent | TouchEvent): void {
+    const surface = this.surface;
+    if (!surface) return;
+    this.moveTo(this.markup.getSvgPoint(event, surface.overlay));
+  }
+
+  pointerUp(): void {
+    this.release();
+  }
+
+  // ── The gesture, in surface coordinates ─────────────────────────────
+  // The three methods below are the whole state machine, and they take a
+  // point rather than an event so the keyboard route can drive the same one.
+  // A second copy for the keyboard is how the two come to disagree about
+  // which tools work — the mistake this file's header describes, made once
+  // already between the PDF page and the CAD drawing.
+
+  /** A press — a pointer going down, or the keyboard placing at its cursor. */
+  pressAt(point: PointerPoint, options: { clickDetail?: number } = {}): void {
+    const surface = this.surface;
     if (!surface?.acceptsDrawing) return;
 
     const tool = this.state.activeTool();
-    const point = this.markup.getSvgPoint(event, surface.overlay);
 
     if (this.markup.isClickPlacedTextTool(tool)) {
       this.drawTextShape(point, tool, surface);
       return;
     }
     if (this.markup.isVertexTool(tool)) {
-      // Click-driven: never sets `dragging`, so pointerUp is a no-op.
-      this.addOrFinishVertex(point, tool, (event as MouseEvent).detail ?? 1);
+      // Click-driven: never sets `dragging`, so `release` is a no-op.
+      this.addOrFinishVertex(point, tool, options.clickDetail ?? 1);
       return;
     }
 
@@ -89,14 +123,13 @@ export class MarkupDrawingSession {
     this.activeShape.set(this.startShape(tool, point, surface));
   }
 
-  pointerMove(event: MouseEvent | TouchEvent): void {
+  /** The point moving, mid-gesture. */
+  moveTo(point: PointerPoint): void {
     const active = this.activeShape();
-    const surface = this.surface;
-    if (!active || !surface) return;
+    if (!active || !this.surface) return;
 
-    const point = this.markup.getSvgPoint(event, surface.overlay);
     if (this.markup.isVertexTool(active.tool)) {
-      // Rubber band only; vertices are committed by clicking.
+      // Rubber band only; vertices are committed by pressing.
       this.hover = point;
       return;
     }
@@ -104,7 +137,8 @@ export class MarkupDrawingSession {
     this.activeShape.set(this.markup.updateShape(active, point));
   }
 
-  pointerUp(): void {
+  /** The press ending, which is where a dragged shape is committed. */
+  release(): void {
     const shape = this.activeShape();
     if (!this.dragging || !shape) return;
 
@@ -125,6 +159,112 @@ export class MarkupDrawingSession {
     this.surface?.commit(shape);
   }
 
+  // ── The keyboard route ──────────────────────────────────────────────
+  // §1A.2 wants every interaction available from the keyboard, and SC 2.5.7
+  // wants a single-pointer alternative to every drag. Drawing had neither:
+  // no shape could be created at all without a pointer, which made the whole
+  // markup layer unusable for a reader who does not use one.
+  //
+  // These four methods are a cursor and a press. They do not re-implement the
+  // gesture — they move a point and hand it to `pressAt`, `moveTo` and
+  // `release`, so the keyboard and the pointer are the same state machine and
+  // cannot come to disagree about which tools work.
+
+  /**
+   * Show the keyboard cursor, so arrow keys have something to move.
+   *
+   * <p>Returns whether it was shown, so a surface can leave the key alone
+   * when drawing is not available — a tool like pan or select accepts no
+   * shapes, and swallowing the key there would break scrolling.
+   */
+  showKeyboardCursor(): boolean {
+    if (!this.surface?.acceptsDrawing) return false;
+    if (this.keyboardCursor() === null) {
+      this.keyboardCursor.set(this.markup.centreOf(this.surface.overlay));
+    }
+    return true;
+  }
+
+  /**
+   * Move the cursor by one step, and carry a half-drawn shape with it.
+   *
+   * <p>The second part is what makes this a drag alternative rather than just
+   * a way to place a point: while a shape is being sized, moving the cursor
+   * is the same event as moving the pointer.
+   */
+  moveKeyboardCursor(dx: number, dy: number, coarse = false): boolean {
+    if (!this.showKeyboardCursor()) return false;
+    const step = this.markup.keyboardStep(coarse);
+    const from = this.keyboardCursor()!;
+    const to = { x: from.x + dx * step, y: from.y + dy * step };
+    this.keyboardCursor.set(to);
+    this.moveTo(to);
+    return true;
+  }
+
+  /**
+   * Press at the cursor — the keyboard's equivalent of a pointer going down.
+   *
+   * <p>For a dragged tool this starts the shape; the next arrow keys size it
+   * and Enter commits it. For a click-placed tool it places it outright. For
+   * a vertex tool it drops a vertex, which is what a click does.
+   */
+  pressAtKeyboardCursor(): boolean {
+    if (!this.showKeyboardCursor()) return false;
+    this.pressAt(this.keyboardCursor()!);
+    return true;
+  }
+
+  /** Put the cursor away, without touching a shape in progress. */
+  hideKeyboardCursor(): void {
+    this.keyboardCursor.set(null);
+  }
+
+  /**
+   * Interpret a key pressed on a surface, and say whether it was used.
+   *
+   * <p>Lives here rather than in the two surfaces because it is the keyboard
+   * half of the gesture, and the two surfaces already drifted once over which
+   * gestures work. The caller suppresses the browser's own handling only when
+   * this returns true, so arrow keys still scroll a page nobody is drawing on.
+   *
+   * <p>Space presses and Enter confirms, which is the convention everywhere
+   * else: Space activates the thing under the cursor, Enter commits the thing
+   * in progress. Shift takes the coarse step.
+   */
+  handleKey(event: KeyboardEvent): boolean {
+    switch (event.key) {
+      case "ArrowLeft":
+        return this.moveKeyboardCursor(-1, 0, event.shiftKey);
+      case "ArrowRight":
+        return this.moveKeyboardCursor(1, 0, event.shiftKey);
+      case "ArrowUp":
+        return this.moveKeyboardCursor(0, -1, event.shiftKey);
+      case "ArrowDown":
+        return this.moveKeyboardCursor(0, 1, event.shiftKey);
+      case " ":
+        return this.pressAtKeyboardCursor();
+      case "Enter": {
+        if (!this.activeShape()) return false;
+        this.finishFromKeyboard();
+        return true;
+      }
+      case "Escape": {
+        if (this.activeShape()) {
+          this.cancel();
+          return true;
+        }
+        if (this.keyboardCursor() !== null) {
+          this.hideKeyboardCursor();
+          return true;
+        }
+        return false;
+      }
+      default:
+        return false;
+    }
+  }
+
   doubleClick(event: MouseEvent): void {
     const shape = this.activeShape();
     if (!shape || !this.markup.isVertexTool(shape.tool)) return;
@@ -140,14 +280,32 @@ export class MarkupDrawingSession {
    */
   finishFromKeyboard(): void {
     const shape = this.activeShape();
-    if (!this.markup.canFinish(shape)) return;
-    this.finish(shape!);
+    if (!shape) return;
+
+    // A vertex shape finishes once it holds enough vertices. A shape that was
+    // being sized finishes the way letting go of the pointer finishes it —
+    // including asking a text shape for its words — rather than through a
+    // second path that would have to be kept in step with the first.
+    if (this.markup.isVertexTool(shape.tool)) {
+      if (!this.markup.canFinish(shape)) return;
+      this.finish(shape);
+      return;
+    }
+    this.release();
   }
 
-  /** Abandon a half-drawn shape. Without this it could not be got rid of. */
+  /**
+   * Abandon a half-drawn shape. Without this it could not be got rid of.
+   *
+   * <p>Any half-drawn shape, not only a vertex one. A shape being sized by
+   * the keyboard persists between presses exactly as a vertex shape does, so
+   * refusing to cancel it would leave a reader with no pointer holding a
+   * shape they could neither finish nor discard. Escape during a pointer drag
+   * now abandons it too, which is the convention anyway (§1.3).
+   */
   cancel(): void {
-    const shape = this.activeShape();
-    if (!shape || !this.markup.isVertexTool(shape.tool)) return;
+    if (!this.activeShape()) return;
+    this.dragging = false;
     this.activeShape.set(null);
     this.hover = null;
   }

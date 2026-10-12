@@ -51,6 +51,38 @@ export class MarkupEngineService {
     };
   }
 
+  /**
+   * The middle of a surface, in the same coordinates {@link getSvgPoint}
+   * returns.
+   *
+   * <p>Where a keyboard-placed shape starts. The centre rather than the origin
+   * because a shape at the top-left corner is half outside the page on a
+   * drawing whose viewBox does not start at zero, and because the centre is
+   * the part of the sheet a reader is most likely to be looking at.
+   *
+   * <p>Falls back to the element's own box when there is no viewBox, exactly
+   * as `getSvgPoint` does, so the two agree about where the middle is.
+   */
+  centreOf(svgEl: SVGSVGElement): PointerPoint {
+    const box = svgEl.viewBox.baseVal;
+    if (box && (box.width || box.height)) {
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    }
+    const rect = svgEl.getBoundingClientRect();
+    return { x: rect.width / 2, y: rect.height / 2 };
+  }
+
+  /**
+   * How far one arrow-key press moves the keyboard cursor, in surface units.
+   *
+   * <p>Two steps rather than one: a single fine step makes crossing a sheet
+   * take hundreds of presses, and a single coarse step cannot place anything
+   * precisely. Shift is the conventional modifier for the larger of the two.
+   */
+  keyboardStep(coarse: boolean): number {
+    return coarse ? 20 : 2;
+  }
+
   // ── Build a partial ShapeData from a start point ─────────────
   startShape(
     tool:        MarkupTool,
