@@ -40,7 +40,7 @@ module.exports = [
   + 'entire test suite, with an error message about npm engines nowhere in it, is exactly the kind '
   + 'of thing the next person loses an hour to.'),
   p('On a Node that satisfies it, `ng test` and `ng build --configuration production` both run: '
-  + '**2,199 specs pass, and the production build is clean.** TestBed specs are the majority of '
+  + '**2,209 specs pass, and the production build is clean.** TestBed specs are the majority of '
   + 'them.'),
   p('That correction is load-bearing in an unwelcome direction. Several components had never been '
   + 'type-checked against their own templates, because `ng test` does not type-check a component '
@@ -72,8 +72,8 @@ module.exports = [
   h2('12.1  Coverage'),
   p('**§14’s figures are now the gate.** `angular.json` requires 90% line and 85% branch — the '
   + 'standard itself — where it previously required 78/78, which was a figure the suite happened '
-  + 'to reach rather than one anybody had chosen. Measured: **90.18% line (5,639/6,253) and 85.55% '
-  + 'branch (2,826/3,303)**, with statements at 87.4% and functions at 74.9%, both also gated at '
+  + 'to reach rather than one anybody had chosen. Measured: **90.39% line (5,685/6,289) and 85.57% '
+  + 'branch (2,836/3,314)**, with statements at 87.6% and functions at 74.7%, both also gated at '
   + 'their measured values so neither can fall.'),
   note('**The denominator grew while the work was done** — from 5,375 lines to 6,175. The '
      + 'builder’s `coverageInclude` filters rather than forces inclusion, so v8 counts a file only '

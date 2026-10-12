@@ -547,6 +547,14 @@ regresses:
   validation messages and their hints; required fields say so to assistive
   technology rather than only showing an asterisk.
 - Long operations and their results are announced through live regions.
+- **Every route now names itself with a top-level heading** (SC 2.4.6). Four did
+  not, including the document viewer itself, so a reader navigating by headings
+  reached the viewer and found nothing naming the open document. Where a visible
+  title already existed it carries the heading semantics now rather than gaining
+  a hidden duplicate; where none existed the heading is hidden, because a second
+  visible title on a sign-in card is chrome nobody asked for. The embedded frame
+  carries its own, since an iframe is a separate document and your `h1` is not
+  inside it — hidden, so nothing we inject appears in your page.
 - The embedded toolbar is marked as a group of named buttons rather than a
   toolbar. It used to claim `role="toolbar"`, which promises arrow-key navigation
   over a single tab stop that the row does not implement — so a screen-reader
@@ -555,7 +563,18 @@ regresses:
   than the last release would have given you.
 
 **And what we cannot.** No axe run, no Lighthouse budget, no screen-reader pass
-against the supported matrix, and no CI gate producing any of them.
+against the supported matrix, and no CI gate producing any of them. If your own
+audit runs axe, expect it to find things this document does not list: the
+headings defect above is exactly the kind a tool catches and we did not, and it
+sat in our own conformance report mis-described for a release.
+
+**Two heading limits remain, and an auditor will find both.** Levels skip from
+`h1` to `h3` in the viewer, compare and 3D routes, because the panels that own
+the `h3` each chose their level independently and the container between them
+contributes no heading. Fixing it is not a one-line change — the same panel
+appears at more than one depth, so no single level is right everywhere, and the
+route outlines need designing. And **labels have not been audited at all**: SC
+2.4.6 covers headings *and* labels, and only headings were inspected.
 
 The SC 2.5.7 failure in the annotation layer that the last issue of this guide
 reported is **fixed for drawing**: a shape can now be created entirely from the

@@ -614,11 +614,66 @@ None of these would have been caught by axe. **This is the argument for §1A.5's
 position that automated checks are a floor, not conformance** — and it is worth
 quoting to a buyer who asks what our VPAT rests on.
 
+**One defect was on the list, and the list was wrong about it.** The
+conformance report in `cde-platform/docs/accessibility/` recorded SC 2.4.6 as
+*Does Not Support: no `<h1>`; heading hierarchy is incomplete.* The first
+clause was false when it was written — three `<h1>` elements already existed —
+and the second was true. A row that is wrong in our favour on one clause is a
+row nobody re-reads, so the clause that was right sat there unactioned.
+
+What was actually wrong: **four of the seven routes had no heading of any
+level**, among them `/viewer/:id`, the main document viewer. A reader
+navigating by headings arrived at the viewer and found nothing naming the
+document that was open. `/login`, `/compare` and `/viewer3d/:id` were the same,
+and the embedded frame had an `<h1>` only in its *failed* state — so the state
+a reader actually spends time in had none.
+
+Where a visible title already existed, it now carries the semantics rather than
+gaining a hidden copy beside it: the document viewer's top bar and the 3D
+toolbar held the page's title in a `<span>`, and hold it in an `<h1>` now.
+Tailwind's preflight resets heading size and margin, so nothing moved on
+screen. A second, hidden heading would have been a copy that can drift from the
+one a sighted reader is looking at — which is the §1A.2 preference for semantic
+HTML doing real work rather than reading as a style note.
+
+Where no visible title existed the heading is hidden, because the alternative
+is worse. Sign-in shows a brand lockup, which names the product rather than the
+task; compare shows two file slots and a `VS` pill, none of which names the
+page. A second visible title on a sign-in card is chrome nobody asked for.
+
+**The embedded frame is its own document, so it needs its own heading** — the
+host's `<h1>` is not inside the iframe. Hidden, because a host sized that frame
+to show a document and a title we injected would be chrome in their page. One
+detail there is load-bearing: **its visually-hidden rule is declared in the
+component's own styles, not borrowed from the application's utility layer.**
+Every other class in that component is local by design, and a visually-hidden
+rule that silently stops applying does not fail quietly — it puts a heading we
+injected on screen inside a customer's page. It is the same declaration the
+demo host uses, so the two cannot drift into two ideas of hidden.
+
+**Heading levels still skip, and the report now says so rather than implying
+otherwise.** The viewer, compare and 3D routes go from `h1` straight to the
+`h3` their panels use: the sidebar holding those panels contributes no heading
+of its own, and each panel chose its level independently. This is not a number
+to change in one template. The same panel component appears at more than one
+depth, so no single hard-coded level is correct in both places — it needs the
+route outlines designing, which is a decision rather than an edit. Labels are
+untouched as well, and SC 2.4.6 covers headings *and* labels, so the row's
+evidence does not reach half of its own criterion.
+
+Unlike the defects above it, **this is the kind of thing an automated checker
+is good at** — a page with no top-level heading, and a jump from one level to
+another, are structural facts a tool can see without knowing what the page is
+for. That makes the missing axe gate (§13) a concrete cost rather than an
+outstanding task: the gate nobody has been able to add is the one that would
+have found this, and it stayed unfound long enough for the report describing it
+to go stale in both directions.
+
 ### 9.4 Localisation
 
 Every sentence a reader sees is an `i18n` attribute or a `$localize` call
 carrying a stable message id and a translator note, extracted to a committed
-catalogue at `src/locale/messages.json` — 587 messages at this issue, up from 585.
+catalogue at `src/locale/messages.json` — 589 messages at this issue, up from 587.
 
 **The last issue of this document said there were none left, and that was wrong
 by nine.** They were found by writing specs over two panels that had none, not by
@@ -816,7 +871,7 @@ suite, with an error message about npm engines nowhere in it, is exactly the kin
 of thing the next person loses an hour to.
 
 On a Node that satisfies it, `ng test` and `ng build --configuration production`
-both run: **2,199 specs pass, and the production build is clean.** TestBed specs
+both run: **2,209 specs pass, and the production build is clean.** TestBed specs
 are the majority of them.
 
 That correction is load-bearing in an unwelcome direction. Several components
@@ -858,7 +913,7 @@ and falls back to installing the pinned build only when no path is given.
 branch — the standard itself — where it previously required 78/78, which was a
 figure the suite happened to reach rather than one anybody had chosen.
 
-Measured: **90.18% line (5,639/6,253) and 85.55% branch (2,826/3,303)**, with
+Measured: **90.39% line (5,685/6,289) and 85.57% branch (2,836/3,314)**, with
 statements at 87.5% and functions at 74.9%, both also gated at their measured
 values so neither can fall.
 

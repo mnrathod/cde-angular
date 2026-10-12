@@ -117,11 +117,52 @@ module.exports = [
   note('None of these would have been caught by axe. **This is the argument for §1A.5’s position '
      + 'that automated checks are a floor, not conformance** — and it is worth quoting to a buyer '
      + 'who asks what our VPAT rests on.'),
+  note('**One defect was on the list, and the list was wrong about it.** The conformance report '
+     + 'in `cde-platform/docs/accessibility/` recorded SC 2.4.6 as *Does Not Support: no `<h1>`; '
+     + 'heading hierarchy is incomplete.* The first clause was false when it was written — '
+     + 'three `<h1>` elements already existed — and the second was true. A row that is wrong '
+     + 'in our favour on one clause is a row nobody re-reads, so the clause that was right sat '
+     + 'there unactioned.'),
+  p('What was actually wrong: **four of the seven routes had no heading of any level**, among them '
+  + '`/viewer/:id`, the main document viewer. A reader navigating by headings arrived at the '
+  + 'viewer and found nothing naming the document that was open. `/login`, `/compare` and '
+  + '`/viewer3d/:id` were the same, and the embedded frame had an `<h1>` only in its *failed* '
+  + 'state — so the state a reader actually spends time in had none.'),
+  p('Where a visible title already existed, it now carries the semantics rather than gaining a '
+  + 'hidden copy beside it: the document viewer’s top bar and the 3D toolbar held the '
+  + 'page’s title in a `<span>`, and hold it in an `<h1>` now. Tailwind’s preflight '
+  + 'resets heading size and margin, so nothing moved on screen. A second, hidden heading would '
+  + 'have been a copy that can drift from the one a sighted reader is looking at. Where no visible '
+  + 'title existed the heading is hidden, because the alternative is worse: sign-in shows a brand '
+  + 'lockup, which names the product rather than the task, and compare shows two file slots and a '
+  + '`VS` pill, none of which names the page.'),
+  note('**The embedded frame is its own document, so it needs its own heading** — the '
+     + 'host’s `<h1>` is not inside the iframe. Hidden, because a host sized that frame to '
+     + 'show a document and a title we injected would be chrome in their page. One detail there is '
+     + 'load-bearing: **its visually-hidden rule is declared in the component’s own styles, '
+     + 'not borrowed from the application’s utility layer.** Every other class in that '
+     + 'component is local by design, and a visually-hidden rule that silently stops applying does '
+     + 'not fail quietly — it puts a heading we injected on screen inside a customer’s '
+     + 'page.'),
+  p('**Heading levels still skip, and the report now says so rather than implying otherwise.** The '
+  + 'viewer, compare and 3D routes go from `h1` straight to the `h3` their panels use: the sidebar '
+  + 'holding those panels contributes no heading of its own, and each panel chose its level '
+  + 'independently. This is not a number to change in one template. The same panel component '
+  + 'appears at more than one depth, so no single hard-coded level is correct in both places '
+  + '— it needs the route outlines designing, which is a decision rather than an edit. '
+  + 'Labels are untouched as well, and SC 2.4.6 covers headings *and* labels, so the row’s '
+  + 'evidence does not reach half of its own criterion.'),
+  note('Unlike the defects above it, **this is the kind of thing an automated checker is good at** '
+     + '— a page with no top-level heading, and a jump from one level to another, are '
+     + 'structural facts a tool can see without knowing what the page is for. That makes the '
+     + 'missing axe gate a concrete cost rather than an outstanding task: the gate nobody has been '
+     + 'able to add is the one that would have found this, and it stayed unfound long enough for '
+     + 'the report describing it to go stale in both directions.'),
 
   h2('9.4  Localisation'),
   p('Every sentence a reader sees is an `i18n` attribute or a `$localize` call carrying a stable '
   + 'message id and a translator note, extracted to a committed catalogue at '
-  + '`src/locale/messages.json` — **587 messages at this issue,** up from 585.'),
+  + '`src/locale/messages.json` — **589 messages at this issue,** up from 587.'),
   note('**The last issue of this document said there were none left, and that was wrong by nine.** '
      + 'They were found by writing specs over two panels that had none, not by either gate. Three '
      + 'were in the version-history panel — one inside a `confirm()`, two set on an error signal — '
