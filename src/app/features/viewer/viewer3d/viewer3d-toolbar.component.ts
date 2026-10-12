@@ -38,7 +38,8 @@ export interface ModelFact {
         <ng-container i18n="Leaves the 3D model view and returns to the document list@@viewer3d.back">Back</ng-container>
       </button>
 
-      <span class="text-sm font-semibold flex-1 truncate">{{ title }}</span>
+      <!-- The page's title, and so its h1 — see the document viewer's top bar. -->
+      <h1 class="text-sm font-semibold flex-1 truncate">{{ title }}</h1>
 
       @if (facts.length) {
         <dl class="flex items-center gap-3 text-xs text-white/70">

@@ -30,7 +30,16 @@ import { ViewerStateService } from "../../../viewer-core/viewer-state.service";
       </button>
 
       <div class="flex items-center gap-2 flex-1 min-w-0">
-        <span class="font-semibold text-sm truncate">{{ state.viewerData()?.name || loadingLabel }}</span>
+        <!--
+          An h1, not a span. This is already the page's title, and the route
+          had no heading of any level — so a reader navigating by headings
+          landed on the document viewer and found nothing naming what was
+          open (SC 2.4.6). Promoting the element that already says it is
+          semantic HTML first (1A.2) rather than a second, hidden copy that
+          can drift from it. Tailwind's preflight resets heading size and
+          margin, so the classes carry the appearance unchanged.
+        -->
+        <h1 class="font-semibold text-sm truncate">{{ state.viewerData()?.name || loadingLabel }}</h1>
         @if (state.viewerData()?.revision) {
           <span i18n="The document's revision identifier, abbreviated to fit the title bar@@viewerShell.revision"
                 class="text-xs px-2 py-0.5 rounded bg-white/20">Rev {{ state.viewerData()?.revision }}</span>

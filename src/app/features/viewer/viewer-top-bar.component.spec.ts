@@ -97,6 +97,19 @@ describe("ViewerTopBarComponent", () => {
       expect(text()).toContain("Foundation plan");
     });
 
+    it("names it as the page's heading, not just as text", () => {
+      // The route had no heading of any level, so a reader navigating by
+      // headings reached the document viewer and found nothing naming what
+      // was open (SC 2.4.6). The element that already carries the title is
+      // the heading now, rather than a second hidden copy that could drift
+      // from it.
+      state.viewerData.set({ name: "Foundation plan" } as never);
+      fixture.detectChanges();
+
+      const heading = fixture.nativeElement.querySelector("h1");
+      expect(heading?.textContent).toContain("Foundation plan");
+    });
+
     it("says it is loading rather than showing an empty title bar", () => {
       // A blank where the title goes reads as a document with no name.
       state.viewerData.set(null);

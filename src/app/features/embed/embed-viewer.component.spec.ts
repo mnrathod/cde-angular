@@ -71,6 +71,29 @@ describe("EmbedViewerComponent", () => {
     fixture.detectChanges();
   }
 
+  describe("the frame's own heading", () => {
+    it("names the document once the frame is showing one", () => {
+      // An iframe is its own document, so the host's h1 is not in it. The
+      // failed phase already had a heading; the phase a reader spends time in
+      // had none, so navigating into the frame by headings found nothing.
+      ready();
+
+      const heading = fixture.nativeElement.querySelector("h1");
+      expect(heading?.textContent).toContain("Foundation plan");
+    });
+
+    it("keeps it out of sight, because a host sized this frame for a document", () => {
+      // A visible title we injected is chrome in someone else's page. The rule
+      // is declared in this component's own styles rather than borrowed from
+      // the application's utility layer — every other class here is local, and
+      // a visually-hidden rule that silently stops applying puts our heading
+      // on screen inside a customer's page.
+      ready();
+
+      expect(fixture.nativeElement.querySelector("h1")?.className).toContain("sr-only");
+    });
+  });
+
   describe("while it is waiting for the host", () => {
     it("says so, rather than showing an empty frame", () => {
       // An empty iframe is indistinguishable from one that crashed, and the

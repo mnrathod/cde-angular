@@ -164,6 +164,18 @@ describe("CompareComponent", () => {
     });
   });
 
+  describe("the page's heading", () => {
+    it("names the page, which the two file slots do not", () => {
+      // The slots name the documents and the pill between them says VS. None
+      // of that names the page, so a reader navigating by headings reached
+      // nothing (SC 2.4.6).
+      const heading = (fixture.nativeElement as HTMLElement).querySelector("h1");
+
+      expect(heading).not.toBeNull();
+      expect(heading?.textContent?.trim()).not.toBe("");
+    });
+  });
+
   describe("the visual comparison", () => {
     it("does nothing until both files are chosen", () => {
       const router = TestBed.inject(Router);

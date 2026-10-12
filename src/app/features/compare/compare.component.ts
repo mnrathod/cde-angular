@@ -42,6 +42,13 @@ import { DocumentPickerComponent } from "./document-picker.component";
         (compareRequested)="runCompare()"
       />
 
+      <!--
+        The route had no heading of any level. The two file slots name the
+        documents and the pill between them says VS, none of which names the
+        page — so a reader navigating by headings arrived at nothing.
+      -->
+      <h1 class="sr-only" i18n="Heading for the document comparison page. Not shown on screen — the two file slots below name the documents, but nothing named the page itself@@compare.pageHeading">Compare two documents</h1>
+
       <div class="flex items-center gap-3 px-4 py-2 bg-white border-b border-gray-200 flex-shrink-0">
         <app-compare-file-slot
           [heading]="originalHeading" [document]="doc1()" (chosen)="pickFile(1)" />

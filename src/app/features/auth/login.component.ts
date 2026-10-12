@@ -31,6 +31,16 @@ import { RegisterFormComponent } from "./register-form.component";
           <span i18n="@@login.brandName" class="font-bold text-lg text-gray-800">Platform</span>
         </div>
 
+        <!--
+          The route had no heading of any level, so a reader navigating by
+          headings found nothing naming the page (SC 2.4.6). Hidden rather
+          than visible because the brand lockup above is what a sighted
+          reader uses, and adding a second visible title to a sign-in card
+          would be chrome nobody asked for — but a brand name does not say
+          what the page is *for*, which is what a heading has to do.
+        -->
+        <h1 class="sr-only" i18n="Heading for the sign-in page. Not shown on screen — it names the page for a reader navigating by headings, because the visible brand mark names the product rather than the task@@login.pageHeading">Sign in or create an account</h1>
+
         <app-auth-tabs [selected]="tab()" (chosen)="showTab($event)" />
 
         @if (error()) {

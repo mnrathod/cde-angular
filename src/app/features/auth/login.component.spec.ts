@@ -125,6 +125,23 @@ describe("the sign-in card", () => {
     });
   });
 
+  describe("the page's heading", () => {
+    it("names what the page is for, not just the product", () => {
+      // The route had no heading of any level, so a reader navigating by
+      // headings arrived at nothing. Hidden rather than visible, because the
+      // brand lockup is what a sighted reader uses — but a brand name does
+      // not say what the page is for, which is a heading's job (SC 2.4.6).
+      const heading = host().querySelector("h1");
+
+      expect(heading).not.toBeNull();
+      expect(heading?.textContent?.trim()).not.toBe("");
+    });
+
+    it("keeps it out of sight, since the card already reads as a sign-in", () => {
+      expect(host().querySelector("h1")?.className).toContain("sr-only");
+    });
+  });
+
   describe("the two panels", () => {
     it("labels the visible panel with the tab that controls it", () => {
       const panel = host().querySelector('[role="tabpanel"]');

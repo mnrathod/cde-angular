@@ -75,6 +75,15 @@ import { ProblemDetail } from './embed-protocol';
           <p class="notice" role="status">{{ notice() }}</p>
         }
 
+        <!--
+          An iframe is its own document, so this frame needs its own heading
+          — the host's h1 is not in it. Hidden, because a host sizes this
+          frame to show a document and a visible title we injected would be
+          chrome they did not ask for. The failed state below already had an
+          h1; the state a reader actually spends time in had none.
+        -->
+        <h1 class="sr-only">{{ session.documentName() }}</h1>
+
         <div class="pages">
           @for (page of pageNumbers(); track page) {
             <app-embed-page [pageNumber]="page" [zoom]="state.zoom()"
@@ -119,6 +128,26 @@ import { ProblemDetail } from './embed-protocol';
     .state h1 { font-size: 18px; margin: 0; }
     .state p { margin: 0; max-width: 52ch; color: #4a5361; }
     .trace { font-family: ui-monospace, monospace; font-size: 12px; }
+
+    /*
+      Declared here, not borrowed from the application's utility layer. Every
+      other class in this component is local, deliberately: the embed is
+      served inside a host's frame and should not depend on the app's Tailwind
+      build being present or on a utility surviving a future upgrade. A
+      visually-hidden rule that silently stops applying does not fail quietly
+      — it puts a heading we injected on screen inside a customer's page.
+
+      Same declaration as the demo host's, so the two do not drift into two
+      different ideas of hidden.
+    */
+    .sr-only {
+      position: absolute;
+      width: 1px; height: 1px;
+      margin: -1px; padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
   `],
 })
 export class EmbedViewerComponent implements OnInit, OnDestroy {
