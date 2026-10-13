@@ -20,9 +20,16 @@ import { IfcPropertiesComponent } from './ifc-properties.component';
 
       <!-- Header -->
       <div class="p-3 border-b border-gray-200 flex-shrink-0">
-        <div id="model-tree-heading"
-             i18n="Heading of the accessible, navigable equivalent of the 3D model view@@ifcTree.heading"
-             class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Model Tree</div>
+        <!--
+          An h2, not a div. Its own translator note already called it a
+          heading, and the properties panel below uses h3 — so the 3D route
+          went from the toolbar's h1 straight to that h3 (SC 2.4.6). It keeps
+          its id and goes on naming the tree through aria-labelledby, which a
+          heading does just as well as a div.
+        -->
+        <h2 id="model-tree-heading"
+            i18n="Heading of the accessible, navigable equivalent of the 3D model view@@ifcTree.heading"
+            class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Model Tree</h2>
         <!-- Search -->
         <input [(ngModel)]="searchQuery" (ngModelChange)="filterTree($event)"
           i18n-placeholder="@@ifcTree.searchPlaceholder"

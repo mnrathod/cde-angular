@@ -651,15 +651,51 @@ rule that silently stops applying does not fail quietly — it puts a heading we
 injected on screen inside a customer's page. It is the same declaration the
 demo host uses, so the two cannot drift into two ideas of hidden.
 
-**Heading levels still skip, and the report now says so rather than implying
-otherwise.** The viewer, compare and 3D routes go from `h1` straight to the
-`h3` their panels use: the sidebar holding those panels contributes no heading
-of its own, and each panel chose its level independently. This is not a number
-to change in one template. The same panel component appears at more than one
-depth, so no single hard-coded level is correct in both places — it needs the
-route outlines designing, which is a decision rather than an edit. Labels are
-untouched as well, and SC 2.4.6 covers headings *and* labels, so the row's
-evidence does not reach half of its own criterion.
+**Heading levels no longer skip, and the last issue of this document was wrong
+about why they could not be fixed.** It said the skip was "not a number to
+change in one template" because "the same panel component appears at more than
+one depth, so no single hard-coded level is correct in both places", and
+concluded that the route outlines needed designing — a decision rather than an
+edit.
+
+That premise was false, and checking it took one grep. Each of the panels that
+owns an `h3` is used in exactly one place: the signature and version panels in
+the viewer sidebar, the summary in compare, the properties panel in the model
+tree. Nothing appeared at two depths. **A defect deferred on a premise nobody
+tested is worse than one left open with no reason given**, because the reason
+is what stops the next person looking.
+
+What was actually in the way was the opposite problem — a missing level, not an
+ambiguous one — and it came with a second defect attached. The viewer's sidebar
+is a tabbed region: `sidebarTab()` renders exactly one panel at a time. Seven
+of its ten panels carry no heading at all, and the region has no landmark role
+and no accessible name either, so a reader who chose Measure or Outline arrived
+at content with nothing saying which panel they were in. The two panels that
+*do* have a heading start at `h3`, directly under the top bar's `h1`.
+
+One `h2` in the sidebar fixes both: it names whichever panel is showing, and it
+puts a level between the `h1` and those `h3`s so they become correct rather
+than being renumbered to paper over a gap. Its text comes from the `tabs`
+table the strip is already built from, so there is no new string to translate
+and the heading cannot disagree with the tab that selected it. Hidden, because
+that tab already shows the same word.
+
+The other two routes were the same promotion made elsewhere in this section.
+Compare's "AI Summary" was a `<span>` whose own translator note called it the
+heading of the panel, and the model tree's "Model Tree" was a `<div>` whose
+note called it a heading while serving as the tree's `aria-labelledby` target.
+Both are headings now, both keep doing what they did, and the `h3`s beneath
+them are correct.
+
+`modal-dialog` keeps its `h3` deliberately. It is the dialog's accessible name
+through `aria-labelledby` inside `role="dialog"`, which is an isolated context
+announced as a dialog; renumbering it against whatever happens to be behind the
+dialog would be guesswork, and a level that depends on the caller is the
+genuine version of the problem the last issue imagined.
+
+**Labels remain untouched**, and SC 2.4.6 covers headings *and* labels, so the
+row's evidence still does not reach half of its own criterion. That half is
+open and this change does not speak to it.
 
 Unlike the defects above it, **this is the kind of thing an automated checker
 is good at** — a page with no top-level heading, and a jump from one level to
@@ -668,6 +704,11 @@ for. That makes the missing axe gate (§13) a concrete cost rather than an
 outstanding task: the gate nobody has been able to add is the one that would
 have found this, and it stayed unfound long enough for the report describing it
 to go stale in both directions.
+
+It is also what would have made the deferral above impossible. An axe run
+reporting a skipped level on three routes every night is harder to leave alone
+than a sentence in a document explaining why the skip is hard, and the sentence
+was wrong anyway.
 
 ### 9.4 Localisation
 
@@ -871,7 +912,7 @@ suite, with an error message about npm engines nowhere in it, is exactly the kin
 of thing the next person loses an hour to.
 
 On a Node that satisfies it, `ng test` and `ng build --configuration production`
-both run: **2,209 specs pass, and the production build is clean.** TestBed specs
+both run: **2,215 specs pass, and the production build is clean.** TestBed specs
 are the majority of them.
 
 That correction is load-bearing in an unwelcome direction. Several components
@@ -913,7 +954,7 @@ and falls back to installing the pinned build only when no path is given.
 branch — the standard itself — where it previously required 78/78, which was a
 figure the suite happened to reach rather than one anybody had chosen.
 
-Measured: **90.39% line (5,685/6,289) and 85.57% branch (2,836/3,314)**, with
+Measured: **90.40% line (5,688/6,292) and 85.55% branch (2,837/3,316)**, with
 statements at 87.5% and functions at 74.9%, both also gated at their measured
 values so neither can fall.
 

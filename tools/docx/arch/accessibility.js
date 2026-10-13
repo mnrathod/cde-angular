@@ -144,20 +144,51 @@ module.exports = [
      + 'component is local by design, and a visually-hidden rule that silently stops applying does '
      + 'not fail quietly — it puts a heading we injected on screen inside a customer’s '
      + 'page.'),
-  p('**Heading levels still skip, and the report now says so rather than implying otherwise.** The '
-  + 'viewer, compare and 3D routes go from `h1` straight to the `h3` their panels use: the sidebar '
-  + 'holding those panels contributes no heading of its own, and each panel chose its level '
-  + 'independently. This is not a number to change in one template. The same panel component '
-  + 'appears at more than one depth, so no single hard-coded level is correct in both places '
-  + '— it needs the route outlines designing, which is a decision rather than an edit. '
-  + 'Labels are untouched as well, and SC 2.4.6 covers headings *and* labels, so the row’s '
-  + 'evidence does not reach half of its own criterion.'),
+  note('**Heading levels no longer skip, and the last issue of this document was wrong about why '
+     + 'they could not be fixed.** It said the skip was \u201cnot a number to change in one '
+     + 'template\u201d because \u201cthe same panel component appears at more than one depth, so '
+     + 'no single hard-coded level is correct in both places\u201d, and concluded that the route '
+     + 'outlines needed designing \u2014 a decision rather than an edit.'),
+  p('That premise was false, and checking it took one grep. Each of the panels that owns an `h3` '
+  + 'is used in exactly one place: the signature and version panels in the viewer sidebar, the '
+  + 'summary in compare, the properties panel in the model tree. Nothing appeared at two depths. '
+  + '**A defect deferred on a premise nobody tested is worse than one left open with no reason '
+  + 'given**, because the reason is what stops the next person looking.'),
+  p('What was actually in the way was the opposite problem \u2014 a missing level, not an '
+  + 'ambiguous one \u2014 and it came with a second defect attached. The viewer\u2019s sidebar '
+  + 'is a tabbed region: `sidebarTab()` renders exactly one panel at a time. Seven of its ten '
+  + 'panels carry no heading at all, and the region has no landmark role and no accessible name '
+  + 'either, so a reader who chose Measure or Outline arrived at content with nothing saying '
+  + 'which panel they were in. The two panels that *do* have a heading start at `h3`, directly '
+  + 'under the top bar\u2019s `h1`.'),
+  p('One `h2` in the sidebar fixes both: it names whichever panel is showing, and it puts a level '
+  + 'between the `h1` and those `h3`s so they become correct rather than being renumbered to '
+  + 'paper over a gap. Its text comes from the `tabs` table the strip is already built from, so '
+  + 'there is no new string to translate and the heading cannot disagree with the tab that '
+  + 'selected it. Hidden, because that tab already shows the same word.'),
+  p('The other two routes were the same promotion made elsewhere in this section. '
+  + 'Compare\u2019s \u201cAI Summary\u201d was a `<span>` whose own translator note called it '
+  + 'the heading of the panel, and the model tree\u2019s \u201cModel Tree\u201d was a `<div>` '
+  + 'whose note called it a heading while serving as the tree\u2019s `aria-labelledby` target. '
+  + 'Both are headings now, both keep doing what they did, and the `h3`s beneath them are '
+  + 'correct.'),
+  note('`modal-dialog` keeps its `h3` deliberately. It is the dialog\u2019s accessible name '
+     + 'through `aria-labelledby` inside `role=\"dialog\"`, which is an isolated context '
+     + 'announced as a dialog; renumbering it against whatever happens to be behind the dialog '
+     + 'would be guesswork, and a level that depends on the caller is the genuine version of the '
+     + 'problem the last issue imagined.'),
+  note('**Labels remain untouched**, and SC 2.4.6 covers headings *and* labels, so the row\u2019s '
+     + 'evidence still does not reach half of its own criterion. That half is open and this change '
+     + 'does not speak to it.'),
   note('Unlike the defects above it, **this is the kind of thing an automated checker is good at** '
      + '— a page with no top-level heading, and a jump from one level to another, are '
      + 'structural facts a tool can see without knowing what the page is for. That makes the '
      + 'missing axe gate a concrete cost rather than an outstanding task: the gate nobody has been '
      + 'able to add is the one that would have found this, and it stayed unfound long enough for '
-     + 'the report describing it to go stale in both directions.'),
+     + 'the report describing it to go stale in both directions. It is also what would have made the '
+     + 'deferral above impossible: an axe run reporting a skipped level on three routes every '
+     + 'night is harder to leave alone than a sentence in a document explaining why the skip is '
+     + 'hard, and the sentence was wrong anyway.'),
 
   h2('9.4  Localisation'),
   p('Every sentence a reader sees is an `i18n` attribute or a `$localize` call carrying a stable '

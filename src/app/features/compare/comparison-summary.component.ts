@@ -32,8 +32,17 @@ import { parseComparisonReport } from "./comparison-report";
         class="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0"
       >
         <span aria-hidden="true">✨</span>
-        <span i18n="Heading of the panel holding a model-written review of the differences@@compare.aiHeading"
-              class="font-semibold text-sm flex-1">AI Summary</span>
+        <!--
+          An h2, not a span. Its own translator note already called it the
+          heading of the panel, and the report below it uses h3 for its
+          sections — so the compare route went from its h1 straight to those
+          h3s with nothing in between (SC 2.4.6). Promoting the element that
+          already says it is what fixes the skip; renumbering the report's
+          sections would have papered over it and lost a level of structure
+          the report genuinely has.
+        -->
+        <h2 i18n="Heading of the panel holding a model-written review of the differences@@compare.aiHeading"
+            class="font-semibold text-sm flex-1">AI Summary</h2>
         @if (aiLoading()) {
           <div
             class="w-4 h-4 border-2 border-blue-200 border-t-accent rounded-full animate-spin"

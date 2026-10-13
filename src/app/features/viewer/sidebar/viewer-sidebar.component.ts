@@ -1,4 +1,4 @@
-import { Component, inject, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, inject, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ViewerStateService, SidebarTab } from '../../../../viewer-core/viewer-state.service';
 import { IconComponent, IconName } from '../../../../viewer-core/icon.component';
@@ -51,6 +51,26 @@ import { Annotation } from '../../../core/models';
           </button>
         }
       </div>
+
+      <!--
+        Names the panel that is showing.
+
+        Two things were wrong without it. Seven of the ten panels carry no
+        heading of their own, and this region has no landmark role and no
+        accessible name either — so a reader who chose Measure or Outline
+        arrived at content with nothing saying which panel they were in. And
+        the two panels that do have a heading use h3, directly under the top
+        bar's h1, so the route skipped a level (SC 2.4.6).
+
+        One h2 fixes both, and fixes the skip the right way round: the panels
+        keep the level they chose, because with this above them h3 is now
+        correct rather than being renumbered to paper over a gap.
+
+        The label comes from the tabs table, so there is no new string to
+        translate and the heading cannot disagree with the tab that selected
+        it. Hidden, because that tab already shows the same word on screen.
+      -->
+      <h2 class="sr-only">{{ activePanelLabel() }}</h2>
 
       @if (state.sidebarTab() === 'annotations') {
         <app-annotations-panel (pageRequested)="goToPage($event)" />
@@ -143,6 +163,17 @@ export class ViewerSidebarComponent {
     { id: 'outline',     icon: 'outline',    label: $localize`:Sidebar tab — the document's bookmarks. Very short; truncates past about seven characters.@@sidebarTab.outline:Outline` },
     { id: 'versions',    icon: 'history',    label: $localize`:Sidebar tab — version history. Very short; truncates past about seven characters.@@sidebarTab.versions:History` },
   ];
+
+  /**
+   * The showing panel's label, for the heading above it.
+   *
+   * <p>Falls back to empty rather than to a guess: an `h2` with the wrong
+   * panel's name in it is worse than one with none, because a reader has no
+   * way to tell it is wrong.
+   */
+  readonly activePanelLabel = computed(
+    () => this.tabs.find((tab) => tab.id === this.state.sidebarTab())?.label ?? '',
+  );
 
   goToPage(page: number) {
     this.state.navigateTo(page);

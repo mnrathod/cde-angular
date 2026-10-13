@@ -49,6 +49,16 @@ describe("ComparisonSummaryComponent", () => {
     fixture.detectChanges();
   }
 
+  it("heads the panel at level two, so its report sections do not skip one", () => {
+    // The panel's title was a span whose own translator note called it the
+    // heading of the panel, while the report inside it used h3 for sections —
+    // so the compare route went from its h1 straight to those h3s (SC 2.4.6).
+    givenComparison();
+
+    const heading = (fixture.nativeElement as HTMLElement).querySelector("h2");
+    expect(heading?.textContent).toContain("AI Summary");
+  });
+
   it("has nothing to summarise before a comparison has run", () => {
     const report = vi.spyOn(service, "getComparisonReport");
 

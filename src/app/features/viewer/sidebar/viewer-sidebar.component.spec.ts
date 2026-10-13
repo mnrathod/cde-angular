@@ -124,6 +124,46 @@ describe("ViewerSidebarComponent", () => {
     });
   });
 
+  describe("naming the panel that is showing", () => {
+    it("heads every panel with its own name", () => {
+      // Seven of the ten panels carry no heading of their own, and this region
+      // has no landmark role and no accessible name either — so a reader who
+      // chose Measure or Outline arrived at content with nothing saying which
+      // panel they were in.
+      for (const tab of sidebar.tabs) {
+        state.sidebarTab.set(tab.id);
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector("h2")?.textContent?.trim()).toBe(tab.label);
+      }
+    });
+
+    it("takes the name from the tab table, so the two cannot disagree", () => {
+      // A second string for the heading would be a second thing to translate
+      // and a second thing to get out of step with the tab that selected it.
+      state.sidebarTab.set("measure");
+      fixture.detectChanges();
+
+      expect(sidebar.activePanelLabel()).toBe(
+        sidebar.tabs.find((tab) => tab.id === "measure")!.label,
+      );
+    });
+
+    it("sits at level two, so the panels' own h3 does not skip one", () => {
+      // The route's h1 is the document name in the top bar. Without this the
+      // two panels that do have a heading jumped straight to h3 (SC 2.4.6).
+      state.sidebarTab.set("versions");
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector("h1")).toBeNull();
+      expect(fixture.nativeElement.querySelector("h2")).not.toBeNull();
+    });
+
+    it("keeps it out of sight, because the tab already shows the word", () => {
+      expect(fixture.nativeElement.querySelector("h2")?.className).toContain("sr-only");
+    });
+  });
+
   describe("choosing a panel", () => {
     it("opens the one that was pressed", () => {
       tabFor("versions").click();

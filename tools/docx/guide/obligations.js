@@ -82,13 +82,16 @@ module.exports = [
      + 'expect it to find things this document does not list: the headings defect above is '
      + 'exactly the kind a tool catches and we did not, and it sat in our own conformance report '
      + 'mis-described for a release.'),
-  note('**Two heading limits remain, and an auditor will find both.** Levels skip from `h1` to '
-     + '`h3` in the viewer, compare and 3D routes, because the panels that own the `h3` each chose '
-     + 'their level independently and the container between them contributes no heading. Fixing '
-     + 'it is not a one-line change \u2014 the same panel appears at more than one depth, so no '
-     + 'single level is right everywhere, and the route outlines need designing. And **labels '
-     + 'have not been audited at all**: SC 2.4.6 covers headings *and* labels, and only headings '
-     + 'were inspected.'),
+  note('**The heading skip the last issue of this guide reported is fixed, and the reason it gave '
+     + 'for leaving it was wrong.** That issue said levels skipped from `h1` to `h3` in the '
+     + 'viewer, compare and 3D routes and that fixing it needed the route outlines designing, '
+     + 'because the panels owning the `h3` appeared at more than one depth. They do not \u2014 '
+     + 'each is used in exactly one place, which one check would have shown. The three routes now '
+     + 'run `h1` to `h2` to `h3` without a gap, and in the viewer the new `h2` also names the '
+     + 'sidebar panel you are in, which seven of the ten panels previously left unnamed.'),
+  note('**One heading limit does remain: labels have not been audited at all.** SC 2.4.6 covers '
+     + 'headings *and* labels, and only headings were inspected, so treat the headings work as '
+     + 'evidence for half of that criterion and nothing more.'),
   p('The SC 2.5.7 failure in the annotation layer that the last issue of this guide reported is '
   + '**fixed for drawing**: a shape can now be created entirely from the keyboard on both the PDF '
   + 'page and the converted drawing. Focus the markup layer, then arrow keys move a crosshair, '
