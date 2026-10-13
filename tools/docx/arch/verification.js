@@ -40,7 +40,7 @@ module.exports = [
   + 'entire test suite, with an error message about npm engines nowhere in it, is exactly the kind '
   + 'of thing the next person loses an hour to.'),
   p('On a Node that satisfies it, `ng test` and `ng build --configuration production` both run: '
-  + '**2,215 specs pass, and the production build is clean.** TestBed specs are the majority of '
+  + '**2,221 specs pass, and the production build is clean.** TestBed specs are the majority of '
   + 'them.'),
   p('That correction is load-bearing in an unwelcome direction. Several components had never been '
   + 'type-checked against their own templates, because `ng test` does not type-check a component '
@@ -72,8 +72,8 @@ module.exports = [
   h2('12.1  Coverage'),
   p('**§14’s figures are now the gate.** `angular.json` requires 90% line and 85% branch — the '
   + 'standard itself — where it previously required 78/78, which was a figure the suite happened '
-  + 'to reach rather than one anybody had chosen. Measured: **90.40% line (5,688/6,292) and 85.55% '
-  + 'branch (2,837/3,316)**, with statements at 87.6% and functions at 74.7%, both also gated at '
+  + 'to reach rather than one anybody had chosen. Measured: **90.87% line (5,727/6,302) and 85.64% '
+  + 'branch (2,840/3,316)**, with statements at 87.9% and functions at 74.8%, both also gated at '
   + 'their measured values so neither can fall.'),
   note('**The denominator grew while the work was done** — from 5,375 lines to 6,175. The '
      + 'builder’s `coverageInclude` filters rather than forces inclusion, so v8 counts a file only '
@@ -86,7 +86,7 @@ module.exports = [
   + 'assertions is worse than honest lower coverage. Every assertion written to reach it was '
   + 'checked by deliberately breaking the thing it guards and confirming it failed only the cases '
   + 'that name it — nineteen deliberate weakenings in all. That is also how the nine untranslated '
-  + 'strings in section 9.4 and the `role="toolbar"` defect in section 9.3 were found. Neither was '
+  + 'strings in section 9.5 and the `role="toolbar"` defect in section 9.3 were found. Neither was '
   + 'failing anything.'),
   p('Where the remaining 10% sits: the PDF markup layer’s pointer handling, the collaboration '
   + 'service’s socket lifecycle, the embed page’s stroke session, and `pdf-engine.service`’s '
@@ -118,15 +118,18 @@ module.exports = [
       { t: 'The initial bundle, three.js and pdf.js each stay inside their §7.1 budget — currently 122.8 kB / 250, 187.2 kB / 200 and 149.3 kB / 160' }] },
     { cells: [{ t: 'check:embed-protocol' },
       { t: 'The embed protocol’s three self-descriptions agree: every type in the ViewerMessageType union is sent by production code and has a row in the authority’s event table, and nothing is sent or documented from outside it' }] },
+    { cells: [{ t: 'check:labels' },
+      { t: 'Every focusable control has an accessible name. A placeholder is not a label, an aria-hidden icon contributes nothing, and title is the weakest source in the algorithm' }] },
     { cells: [{ t: 'test:scripts' },
       { t: 'The gate scripts themselves have tests, so a gate cannot pass by being broken' }] }
   ]),
   caption('Table 6 — The repository’s own gates.'),
-  p('**All eleven now run in CI**, where four did when this document was last issued. The CI Node '
+  p('**All twelve now run in CI**, where four did two issues ago. The CI Node '
   + 'is not the container\u2019s, so the version trap above does not reach the pipeline. The '
   + 'platform\u2019s `Jenkinsfile` runs `npm ci`, `tsc --build --force --noEmit` and `ng test` '
   + 'against this repository, and every gate in the table: `check:no-remote-code`, `check:i18n`, '
-  + '`check:i18n-markup`, `test:scripts`, `check:icons` and `check:samples` in the '
+  + '`check:i18n-markup`, `test:scripts`, `check:icons`, `check:samples`, '
+  + '`check:embed-protocol` and `check:labels` in the '
   + 'static-analysis stage; `ng build --configuration production` then `check:served-assets` and '
   + '`check:bundle-budget` in the build stage, because those two read the bundle and cannot run '
   + 'before it exists; `check:attribution` beside the backend\u2019s own licence gate; and '

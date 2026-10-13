@@ -98,7 +98,14 @@ import {
                 </div>
                 <div class="flex items-center justify-between mt-1.5 gap-1">
                   @if (roles.can(Permission.WriteDocument)) {
+                    <!--
+                      Named with the document, not just "Change status".
+                      There is one of these per card, so a shared name
+                      announces as a grid of identical choosers with no way
+                      to tell which document each belongs to.
+                    -->
                     <select
+                      [attr.aria-label]="statusLabelFor(doc)"
                       [value]="doc.status"
                       (click)="$event.stopPropagation()"
                       (change)="changeStatus(doc, $event)"
@@ -130,6 +137,12 @@ import {
   `,
 })
 export class DocumentGridComponent {
+  /** Names a card's status chooser by the document it belongs to. */
+  statusLabelFor(document: { name: string }): string {
+    const name = document.name;
+    return $localize`:Accessible name of the chooser that changes one document's review status, in a grid of many@@documentGrid.statusLabel:Status of ${name}:name:`;
+  }
+
   openRequested = output<Document>();
   deleteRequested = output<Document>();
 

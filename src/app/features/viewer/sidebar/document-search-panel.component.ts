@@ -23,7 +23,15 @@ import {
   <div class="flex flex-col h-full">
     <div class="p-3 border-b border-gray-200">
       <div class="flex gap-1">
+        <!--
+          A placeholder is not a label: it disappears the moment the reader
+          types, so anyone returning to the field hears nothing, and voice
+          control has no name to address it by. Hidden, because the
+          placeholder already says it on screen.
+        -->
+        <label class="sr-only" for="document-search-term">{{ searchFieldLabel }}</label>
         <input
+          id="document-search-term"
           [ngModel]="state.searchQuery()"
           (ngModelChange)="state.searchQuery.set($event)"
           (keydown.enter)="doSearch()"
@@ -77,6 +85,9 @@ import {
   `,
 })
 export class DocumentSearchPanelComponent {
+  /** Names the search box for assistive technology (its placeholder cannot). */
+  readonly searchFieldLabel = $localize`:Accessible name of the box for searching the open document's text@@sidebar.searchFieldLabel:Search this document`;
+
   /** Run the search. The shell owns the engine that answers it. */
   searchRequested = output<void>();
   /** Go to a page a match was found on. */

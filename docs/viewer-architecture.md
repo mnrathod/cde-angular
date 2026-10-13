@@ -13,7 +13,7 @@
   integrating it.
 - **Since the last issue**, the work has been conformance and structure rather
   than features: every hardcoded user-facing string is now a translatable
-  message behind two CI gates (§9.4); two drag-only interactions have a
+  message behind two CI gates (§9.5); two drag-only interactions have a
   keyboard route and a set of controls that announced themselves as glyphs now
   have names (§9.2, §9.3); and `viewer-core` is inside the §3.3 size limits
   throughout (§3.2). One claim in the last issue was wrong and is corrected in
@@ -693,9 +693,80 @@ announced as a dialog; renumbering it against whatever happens to be behind the
 dialog would be guesswork, and a level that depends on the caller is the
 genuine version of the problem the last issue imagined.
 
-**Labels remain untouched**, and SC 2.4.6 covers headings *and* labels, so the
-row's evidence still does not reach half of its own criterion. That half is
-open and this change does not speak to it.
+### 9.4 The labels half of SC 2.4.6
+
+The criterion is headings *and* labels. The headings half above had been worked
+through twice; the labels half had never been looked at, and the conformance
+report said so rather than implying otherwise. This is that audit, and it is a
+gate now — `check:labels` — because the answer only stays true if something
+keeps asking.
+
+**Eight controls had no accessible name.** Two kinds, and the second is the one
+that matters most:
+
+- **Five were labelled by a placeholder, or by nothing.** Both document
+  searches, and three of the controls for naming a form field drawn on a page.
+  A placeholder is not a label: it disappears the moment the reader types, so
+  anyone who comes back to the field hears nothing, and voice control has no
+  name to address it by.
+- **Three announced as nothing at all.** The sidebar toggle in the viewer's top
+  bar, whose only content is an `aria-hidden` icon — missed by the pass that
+  gave six other icon-only buttons a name, and relying on `title`, the weakest
+  source in the accessible-name algorithm. The per-document status chooser in
+  the grid, where one shared name would have announced as a grid of identical
+  choosers. And **every link annotation in every PDF**: those are empty
+  anchors laid over the words the document draws, so a page with fifty
+  cross-references put fifty nameless links in the tab order. The name was
+  already being computed for the tooltip; it simply never reached assistive
+  technology.
+
+Where a control repeats, each one is named so they can be told apart — the
+status chooser by its document, the form-field controls by position and page.
+A single shared name passes a naive check and still leaves a reader choosing
+between several identical controls.
+
+#### What the audit got wrong first, and why that is in this document
+
+The first run reported **fourteen** controls. Six were correctly labelled by
+means a single template cannot see, and finding that out took reading each one:
+
+- A thumbnail button named by the `alt` of the image inside it.
+- Four controls in one dialog wrapped in `app-labelled-field`, which renders
+  the `<label for>` around its content, so no `<label>` appears in the template
+  being read.
+- A file input hidden with `class="hidden"` — `display: none`, so not focusable
+  and not in the accessibility tree at all. That is the opposite of `sr-only`,
+  which hides visually and *does* still need a name.
+
+**Each of those is now an exclusion with the reason written beside it**, because
+an audit that cries wolf gets switched off, and then it catches nothing. The
+gate's own tests assert the exclusions directly, since they are the part most
+likely to be removed by someone tidying up.
+
+Then the reverse: fixing a traversal bug in the gate **revealed five defects it
+had been hiding.** It returned the first collection of children it found
+instead of accumulating them, so anything inside an `@empty` or a `@switch`
+went unread — and `@switch` keeps its cases in `groups`, not `cases`. A false
+negative in a gate is worse than a false positive: nobody is told, and the
+clean report is evidence of nothing.
+
+#### What this gate cannot do
+
+A label can point at `labelTarget()` while the control it names carries
+`[id]="controlId"` — two different expressions resolving to the same value.
+That is correct code, and no reader of the template alone can pair them up;
+five properly labelled controls in the form a reader actually fills in were
+reported on exactly that shape. So a template holding a bound `for` and a
+control holding a bound `id` is taken as associated.
+
+**That is a deliberate floor with a cost worth naming: a genuine mismatch
+between a bound `for` and a bound `id` passes this gate.** Catching it needs
+the rendered page. This is what §1A.5 means by automated checks being necessary
+and not sufficient, and it is the honest reason the manual keyboard pass and
+the screen-reader matrix are still the real gates rather than a formality.
+
+The gate checks that a name *exists*. Whether a name is *apt* is a judgement it
+does not make and should not claim to.
 
 Unlike the defects above it, **this is the kind of thing an automated checker
 is good at** — a page with no top-level heading, and a jump from one level to
@@ -710,11 +781,11 @@ reporting a skipped level on three routes every night is harder to leave alone
 than a sentence in a document explaining why the skip is hard, and the sentence
 was wrong anyway.
 
-### 9.4 Localisation
+### 9.5 Localisation
 
 Every sentence a reader sees is an `i18n` attribute or a `$localize` call
 carrying a stable message id and a translator note, extracted to a committed
-catalogue at `src/locale/messages.json` — 589 messages at this issue, up from 587.
+catalogue at `src/locale/messages.json` — 595 messages at this issue, up from 589.
 
 **The last issue of this document said there were none left, and that was wrong
 by nine.** They were found by writing specs over two panels that had none, not by
@@ -912,7 +983,7 @@ suite, with an error message about npm engines nowhere in it, is exactly the kin
 of thing the next person loses an hour to.
 
 On a Node that satisfies it, `ng test` and `ng build --configuration production`
-both run: **2,215 specs pass, and the production build is clean.** TestBed specs
+both run: **2,221 specs pass, and the production build is clean.** TestBed specs
 are the majority of them.
 
 That correction is load-bearing in an unwelcome direction. Several components
@@ -954,7 +1025,7 @@ and falls back to installing the pinned build only when no path is given.
 branch — the standard itself — where it previously required 78/78, which was a
 figure the suite happened to reach rather than one anybody had chosen.
 
-Measured: **90.40% line (5,688/6,292) and 85.55% branch (2,837/3,316)**, with
+Measured: **90.87% line (5,727/6,302) and 85.64% branch (2,840/3,316)**, with
 statements at 87.5% and functions at 74.9%, both also gated at their measured
 values so neither can fall.
 
@@ -976,7 +1047,7 @@ it failed only the cases that name it — nineteen deliberate weakenings in all,
 across the markup engine, the focus trap, the live-region directive, the tool
 rail, the redaction panel, the version-history panel, the form panels, the
 project shell, the visual comparison and the embed viewer. That is also how the
-nine untranslated strings in §9.4 and the `role="toolbar"` defect in §9.3 were
+nine untranslated strings in §9.5 and the `role="toolbar"` defect in §9.3 were
 found. Neither was failing anything.
 
 Where the remaining 10% sits: the PDF markup layer's pointer handling, the
@@ -1002,14 +1073,16 @@ thing it checks is otherwise invisible in a diff.
 | `check:served-assets` | Nothing in the built bundle is unreachable code |
 | `check:bundle-budget` | The initial bundle, three.js and pdf.js each stay inside their §7.1 budget — currently 122.8 kB / 250, 187.2 kB / 200 and 149.3 kB / 160 |
 | `check:embed-protocol` | The embed protocol's three self-descriptions agree: every type in the `ViewerMessageType` union is sent by production code and has a row in the authority's event table, and nothing is sent or documented from outside it |
+| `check:labels` | Every focusable control has an accessible name. A placeholder is not a label, an `aria-hidden` icon contributes nothing, and `title` is the weakest source in the algorithm |
 | `test:scripts` | The gate scripts themselves have tests, so a gate cannot pass by being broken |
 
-**All eleven now run in CI**, where four did when this document was last issued.
+**All twelve now run in CI**, where four did two issues ago.
 The CI Node is not the container's, so the version trap above does not reach
 the pipeline. The platform's `Jenkinsfile` runs `npm ci`,
 `tsc --build --force --noEmit` and `ng test` against this repository, and every
 gate in the table: `check:no-remote-code`, `check:i18n`, `check:i18n-markup`,
-`test:scripts`, `check:icons` and `check:samples` in the static-analysis stage;
+`test:scripts`, `check:icons`, `check:samples`, `check:embed-protocol` and
+`check:labels` in the static-analysis stage;
 `ng build --configuration production` then `check:served-assets` and
 `check:bundle-budget` in the build stage, because those two read the bundle and
 cannot run before it exists; `check:attribution` beside the backend's own
@@ -1024,7 +1097,7 @@ The count was ten rather than nine because `check:bundle-budget` was missing
 from the table above — it has existed and passed since the budgets were set,
 and a gate absent from the list of gates is one nobody will think to wire up,
 which is exactly what had happened to it. It is eleven now because
-`check:embed-protocol` is new; §4 says what it was written for.
+`check:embed-protocol` and `check:labels` are newer still; §4 and §9.4 say what each was written for.
 
 Two of the placements are load-bearing rather than tidy. `check:served-assets`
 and `check:bundle-budget` sit after the production build in the same shell, so

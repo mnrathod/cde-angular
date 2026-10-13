@@ -89,9 +89,21 @@ module.exports = [
      + 'each is used in exactly one place, which one check would have shown. The three routes now '
      + 'run `h1` to `h2` to `h3` without a gap, and in the viewer the new `h2` also names the '
      + 'sidebar panel you are in, which seven of the ten panels previously left unnamed.'),
-  note('**One heading limit does remain: labels have not been audited at all.** SC 2.4.6 covers '
-     + 'headings *and* labels, and only headings were inspected, so treat the headings work as '
-     + 'evidence for half of that criterion and nothing more.'),
+  note('**The labels half of SC 2.4.6 has now been audited too**, which the last issue of this '
+     + 'guide listed as outstanding. It found eight controls with no accessible name and all '
+     + 'eight are fixed: both document searches and three form-field controls had only a '
+     + 'placeholder, which disappears the moment a reader types; the viewer\u2019s panel toggle '
+     + 'announced as nothing; the per-document status chooser announced the same name on every '
+     + 'card; and **every link annotation in every PDF was an empty link** \u2014 a page with '
+     + 'fifty cross-references put fifty nameless links in the tab order. A CI gate now fails the '
+     + 'build on a control with no name.'),
+  p('Two limits on that, because it should not be read as more than it is.'),
+  bullet('**The gate checks that a name exists, not that it is apt.** Whether a label describes '
+       + 'its control well is a judgement no tool makes.'),
+  bullet('**It cannot verify a label whose `for` and a control whose `id` are both bound to '
+       + 'expressions** \u2014 correct code that no static reader can pair up. A genuine mismatch '
+       + 'of that shape passes. Catching it needs the rendered page, which is what the manual '
+       + 'pass and the screen-reader matrix are for, and why neither is a formality.'),
   p('The SC 2.5.7 failure in the annotation layer that the last issue of this guide reported is '
   + '**fixed for drawing**: a shape can now be created entirely from the keyboard on both the PDF '
   + 'page and the converted drawing. Focus the markup layer, then arrow keys move a crosshair, '
@@ -108,7 +120,7 @@ module.exports = [
      + 'you sign.'),
 
   p('**Localisation.** Everything a reader sees carries a stable message id and a translator '
-  + 'note, extracted to a committed catalogue — 589 messages — with two CI gates keeping it '
+  + 'note, extracted to a committed catalogue — 595 messages — with two CI gates keeping it '
   + 'honest: one fails if the catalogue drifts from source, the other if a template grows text a '
   + 'translator will never see.'),
   note('**The last issue of this guide said there were no hardcoded strings left. Nine were found '

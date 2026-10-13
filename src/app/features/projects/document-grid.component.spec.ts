@@ -8,11 +8,15 @@
  */
 import { provideHttpClient } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
+import { signal } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { of, throwError } from "rxjs";
 
 import { Document } from "../../core/models";
+import { AuthService } from "../../core/services/auth.service";
 import { DocumentService } from "../../core/services/document.service";
+import { ProjectService } from "../../core/services/project.service";
+import { Permission, RoleService } from "../../core/services/role.service";
 import { DocumentGridComponent } from "./document-grid.component";
 
 function document(overrides: Partial<Document> = {}): Document {
@@ -67,6 +71,70 @@ describe("DocumentGridComponent", () => {
     it("says nothing at all for a document with no revision", () => {
       // A bare " · " with nothing after it reads as a missing value.
       expect(grid.revisionSuffix(document({ revision: "" }))).toBe("");
+    });
+  });
+
+  describe("naming the status chooser", () => {
+    it("names it by the document, not just by what it does", () => {
+      // There is one of these per card. A shared name like "Change status"
+      // announces as a grid of identical choosers with nothing to say which
+      // document each belongs to (SC 2.4.6).
+      const label = grid.statusLabelFor({ name: "Foundation plan" });
+
+      expect(label).toContain("Foundation plan");
+    });
+
+    it("gives two documents two different names", () => {
+      expect(grid.statusLabelFor({ name: "Level 01" })).not.toBe(
+        grid.statusLabelFor({ name: "Level 02" }),
+      );
+    });
+
+    it("puts those names on the rendered choosers, not just in the method", () => {
+      // Asserting the method alone let a regression through: replacing the
+      // template binding with a literal "Change status" passed every test
+      // above while putting the defect straight back.
+      //
+      // The chooser only renders for someone who may change a status, so the
+      // permission has to be granted or this asserts over an empty grid — and
+      // an assertion over nothing passes whatever the template says.
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          RoleService,
+          {
+            provide: AuthService,
+            useValue: {
+              role: signal("ENGINEER"),
+              permissions: signal(new Set([Permission.WriteDocument])),
+              isLoggedIn: signal(true),
+              username: signal("sam.okonkwo"),
+            },
+          },
+        ],
+      });
+      documents = TestBed.inject(DocumentService);
+      // The grid shows an empty state until a project is chosen, so without
+      // this the assertions below run against no cards at all.
+      TestBed.inject(ProjectService).selected.set({ id: 1, name: "Tower" } as never);
+      fixture = TestBed.createComponent(DocumentGridComponent);
+      grid = fixture.componentInstance;
+
+      documents.documents.set([
+        document({ id: 1, name: "Level 01" }),
+        document({ id: 2, name: "Level 02" }),
+      ]);
+      fixture.detectChanges();
+
+      const names = Array.from(
+        fixture.nativeElement.querySelectorAll("select") as NodeListOf<HTMLElement>,
+      ).map((element) => element.getAttribute("aria-label"));
+
+      expect(names.length).toBeGreaterThan(0);
+      expect(names.some((name) => name?.includes("Level 01"))).toBe(true);
+      expect(new Set(names).size).toBe(names.length);
     });
   });
 

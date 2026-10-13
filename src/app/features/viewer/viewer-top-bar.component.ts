@@ -92,8 +92,16 @@ import { ViewerStateService } from "../../../viewer-core/viewer-state.service";
       }
 
       <!-- Toggle sidebar -->
+      <!--
+        aria-label as well as title. The pass that gave six icon-only buttons
+        an accessible name missed this one: its only content is an
+        aria-hidden icon, so the name fell back to the tooltip — the weakest
+        source in the algorithm, and the exact failure section 9.3 of the
+        architecture document describes.
+      -->
       <button type="button" (click)="state.sidebarOpen.update(v => !v)"
         [title]="state.sidebarOpen() ? hideSidebarHint : showSidebarHint"
+        [attr.aria-label]="state.sidebarOpen() ? hideSidebarHint : showSidebarHint"
         [attr.aria-pressed]="state.sidebarOpen()"
         class="w-7 h-7 inline-flex items-center justify-center rounded-md
                bg-white/10 hover:bg-white/20">

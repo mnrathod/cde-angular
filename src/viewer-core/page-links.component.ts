@@ -14,6 +14,13 @@ import { ViewerStateService } from './viewer-state.service';
  *
  * <p>Positions arrive in PDF coordinates with a bottom-left origin and are
  * flipped and scaled here, so a link stays over its text at any zoom.
+ *
+ * <p>Each anchor carries `aria-label` as well as `title`. These elements have
+ * no text of their own — they are boxes laid over the words the document
+ * already draws — so without a name they announce as empty links, once per
+ * cross-reference on the page. A document with fifty references put fifty
+ * nameless links in the tab order. The name was already being computed for
+ * the tooltip; it simply was not reaching assistive technology.
  */
 @Component({
   selector: 'app-page-links',
@@ -27,6 +34,7 @@ import { ViewerStateService } from './viewer-state.service';
            [attr.target]="link.url ? '_blank' : null"
            [attr.rel]="link.url ? 'noopener noreferrer' : null"
            [title]="titleFor(link)"
+           [attr.aria-label]="titleFor(link)"
            (click)="follow(link, $event)"
            class="absolute block rounded-sm cursor-pointer
                   hover:bg-blue-400/20 hover:outline hover:outline-1 hover:outline-blue-500/60"

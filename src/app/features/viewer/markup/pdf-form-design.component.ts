@@ -45,10 +45,18 @@ import { ViewerStateService } from "../../../../viewer-core/viewer-state.service
           the page, then name it here.
         </p>
 
-        @for (draft of state.formFieldDrafts(); track draft.id) {
+        @for (draft of state.formFieldDrafts(); track draft.id; let position = $index) {
           <div class="border border-gray-200 rounded p-1.5 mb-1.5">
             <div class="flex items-center gap-1 mb-1">
+              <!--
+                Named per draft, not generically. These three controls repeat
+                once per field drawn, so one shared name would announce as
+                several identical boxes — which for a reader choosing between
+                them is barely better than no name. The position and page are
+                what tell them apart.
+              -->
               <input type="text" [ngModel]="draft.name"
+                [attr.aria-label]="fieldNameLabel(position + 1, draft.page)"
                 (ngModelChange)="state.updateFormFieldDraft(draft.id, { name: $event })"
                 i18n-placeholder="@@pdfForm.fieldNamePlaceholder"
                 placeholder="field name"
@@ -61,6 +69,7 @@ import { ViewerStateService } from "../../../../viewer-core/viewer-state.service
             </div>
             <div class="flex items-center gap-1">
               <select [ngModel]="draft.kind"
+                [attr.aria-label]="fieldKindLabel(position + 1, draft.page)"
                 (ngModelChange)="state.updateFormFieldDraft(draft.id, { kind: $event })"
                 class="text-xs border border-gray-300 rounded px-1 py-0.5">
                 <option value="TEXT" i18n="Form field kind — a single line of text@@formFieldKind.text">Text</option>
@@ -78,6 +87,7 @@ import { ViewerStateService } from "../../../../viewer-core/viewer-state.service
             </div>
             @if (draft.kind === 'DROPDOWN') {
               <input type="text" [ngModel]="draft.options"
+                [attr.aria-label]="fieldOptionsLabel(position + 1, draft.page)"
                 (ngModelChange)="state.updateFormFieldDraft(draft.id, { options: $event })"
                 i18n-placeholder="The values a dropdown field offers@@pdfForm.optionsPlaceholder"
                 placeholder="options, comma separated"
@@ -121,6 +131,21 @@ export class PdfFormDesignComponent {
   readonly state = inject(ViewerStateService);
 
   pageShort = abbreviatedPageLabel;
+
+  /** Names the box for typing a drawn field's name. */
+  fieldNameLabel(position: number, page: number): string {
+    return $localize`:Accessible name of the box for naming one of several form fields drawn on a document. Position counts from 1 in the order they were drawn.@@pdfForm.fieldNameLabel:Name of form field ${position}:position: on page ${page}:page:`;
+  }
+
+  /** Names the chooser for what kind of field a drawn field is. */
+  fieldKindLabel(position: number, page: number): string {
+    return $localize`:Accessible name of the chooser for what kind of field one of several drawn form fields is@@pdfForm.fieldKindLabel:Kind of form field ${position}:position: on page ${page}:page:`;
+  }
+
+  /** Names the box listing a dropdown field's choices. */
+  fieldOptionsLabel(position: number, page: number): string {
+    return $localize`:Accessible name of the box listing the choices a drawn dropdown field offers@@pdfForm.fieldOptionsLabel:Options for form field ${position}:position: on page ${page}:page:`;
+  }
 
   readonly designing = signal(false);
   readonly designMessage = signal("");

@@ -177,23 +177,62 @@ module.exports = [
      + 'announced as a dialog; renumbering it against whatever happens to be behind the dialog '
      + 'would be guesswork, and a level that depends on the caller is the genuine version of the '
      + 'problem the last issue imagined.'),
-  note('**Labels remain untouched**, and SC 2.4.6 covers headings *and* labels, so the row\u2019s '
-     + 'evidence still does not reach half of its own criterion. That half is open and this change '
-     + 'does not speak to it.'),
-  note('Unlike the defects above it, **this is the kind of thing an automated checker is good at** '
-     + '— a page with no top-level heading, and a jump from one level to another, are '
-     + 'structural facts a tool can see without knowing what the page is for. That makes the '
-     + 'missing axe gate a concrete cost rather than an outstanding task: the gate nobody has been '
-     + 'able to add is the one that would have found this, and it stayed unfound long enough for '
-     + 'the report describing it to go stale in both directions. It is also what would have made the '
-     + 'deferral above impossible: an axe run reporting a skipped level on three routes every '
-     + 'night is harder to leave alone than a sentence in a document explaining why the skip is '
-     + 'hard, and the sentence was wrong anyway.'),
+  h2('9.4  The labels half of SC 2.4.6'),
+  p('The criterion is headings *and* labels. The headings half above had been worked through '
+  + 'twice; the labels half had never been looked at, and the conformance report said so rather '
+  + 'than implying otherwise. This is that audit, and it is a gate now \u2014 `check:labels` '
+  + '\u2014 because the answer only stays true if something keeps asking.'),
+  note('**Eight controls had no accessible name.** Five were labelled by a placeholder, or by '
+     + 'nothing: both document searches, and three of the controls for naming a form field drawn '
+     + 'on a page. A placeholder is not a label \u2014 it disappears the moment the reader types, '
+     + 'so anyone who comes back to the field hears nothing, and voice control has no name to '
+     + 'address it by.'),
+  p('Three announced as nothing at all. The sidebar toggle in the viewer\u2019s top bar, whose '
+  + 'only content is an `aria-hidden` icon \u2014 missed by the pass that gave six other '
+  + 'icon-only buttons a name, and relying on `title`, the weakest source in the '
+  + 'accessible-name algorithm. The per-document status chooser in the grid, where one shared '
+  + 'name would have announced as a grid of identical choosers. And **every link annotation in '
+  + 'every PDF**: those are empty anchors laid over the words the document draws, so a page with '
+  + 'fifty cross-references put fifty nameless links in the tab order. The name was already '
+  + 'being computed for the tooltip; it simply never reached assistive technology.'),
+  p('Where a control repeats, each one is named so they can be told apart \u2014 the status '
+  + 'chooser by its document, the form-field controls by position and page. A single shared name '
+  + 'passes a naive check and still leaves a reader choosing between several identical '
+  + 'controls.'),
+  h3('What the audit got wrong first, and why that is in this document'),
+  p('The first run reported **fourteen** controls. Six were correctly labelled by means a single '
+  + 'template cannot see, and finding that out took reading each one: a thumbnail button named by '
+  + 'the `alt` of the image inside it; four controls in one dialog wrapped in '
+  + '`app-labelled-field`, which renders the `<label for>` around its content; and a file input '
+  + 'hidden with `class=\"hidden\"` \u2014 `display: none`, so not focusable and not in the '
+  + 'accessibility tree at all, which is the opposite of `sr-only`, which hides visually and '
+  + '*does* still need a name.'),
+  note('**Each of those is now an exclusion with the reason written beside it**, because an audit '
+     + 'that cries wolf gets switched off, and then it catches nothing. The gate\u2019s own tests '
+     + 'assert the exclusions directly, since they are the part most likely to be removed by '
+     + 'someone tidying up.'),
+  note('Then the reverse: fixing a traversal bug in the gate **revealed five defects it had been '
+     + 'hiding.** It returned the first collection of children it found instead of accumulating '
+     + 'them, so anything inside an `@empty` or a `@switch` went unread \u2014 and `@switch` '
+     + 'keeps its cases in `groups`, not `cases`. **A false negative in a gate is worse than a '
+     + 'false positive:** nobody is told, and the clean report is evidence of nothing.'),
+  h3('What this gate cannot do'),
+  p('A label can point at `labelTarget()` while the control it names carries `[id]=\"controlId\"` '
+  + '\u2014 two different expressions resolving to the same value. That is correct code, and no '
+  + 'reader of the template alone can pair them up; five properly labelled controls in the form a '
+  + 'reader actually fills in were reported on exactly that shape. So a template holding a bound '
+  + '`for` and a control holding a bound `id` is taken as associated.'),
+  note('**That is a deliberate floor with a cost worth naming: a genuine mismatch between a bound '
+     + '`for` and a bound `id` passes this gate.** Catching it needs the rendered page. This is '
+     + 'what \u00a71A.5 means by automated checks being necessary and not sufficient, and it is '
+     + 'the honest reason the manual keyboard pass and the screen-reader matrix are still the real '
+     + 'gates rather than a formality. The gate checks that a name *exists*. Whether a name is '
+     + '*apt* is a judgement it does not make and should not claim to.'),
 
-  h2('9.4  Localisation'),
+  h2('9.5  Localisation'),
   p('Every sentence a reader sees is an `i18n` attribute or a `$localize` call carrying a stable '
   + 'message id and a translator note, extracted to a committed catalogue at '
-  + '`src/locale/messages.json` — **589 messages at this issue,** up from 587.'),
+  + '`src/locale/messages.json` — **595 messages at this issue,** up from 589.'),
   note('**The last issue of this document said there were none left, and that was wrong by nine.** '
      + 'They were found by writing specs over two panels that had none, not by either gate. Three '
      + 'were in the version-history panel — one inside a `confirm()`, two set on an error signal — '

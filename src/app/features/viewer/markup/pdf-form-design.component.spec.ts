@@ -172,6 +172,43 @@ describe("PdfFormDesignComponent", () => {
     });
   });
 
+  describe("naming the controls for each drawn field", () => {
+    it("names every control, since none of them has a label", () => {
+      // These three repeat once per drawn field and had only placeholders —
+      // and a placeholder disappears as soon as the reader types.
+      withDrafts(draft({ kind: "DROPDOWN" }));
+
+      const named = Array.from(
+        fixture.nativeElement.querySelectorAll(
+          "input[aria-label], select[aria-label]",
+        ) as NodeListOf<HTMLElement>,
+      );
+
+      expect(named.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("tells two drawn fields apart", () => {
+      // One shared name per control type would announce as several identical
+      // boxes, which for a reader choosing between them is barely better than
+      // no name at all.
+      withDrafts(draft({ id: "d1", page: 2 }), draft({ id: "d2", page: 7 }));
+
+      const names = Array.from(
+        fixture.nativeElement.querySelectorAll(
+          "input[aria-label]",
+        ) as NodeListOf<HTMLElement>,
+      ).map((element) => element.getAttribute("aria-label"));
+
+      expect(new Set(names).size).toBe(names.length);
+    });
+
+    it("says which page a field was drawn on", () => {
+      withDrafts(draft({ page: 9 }));
+
+      expect(fixture.nativeElement.innerHTML).toContain("9");
+    });
+  });
+
   describe("whether the drawn fields can be committed", () => {
     it("they cannot, with nothing drawn", () => {
       expect(panel.draftsReady()).toBe(false);

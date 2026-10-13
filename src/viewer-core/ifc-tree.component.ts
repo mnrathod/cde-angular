@@ -31,7 +31,10 @@ import { IfcPropertiesComponent } from './ifc-properties.component';
             i18n="Heading of the accessible, navigable equivalent of the 3D model view@@ifcTree.heading"
             class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Model Tree</h2>
         <!-- Search -->
-        <input [(ngModel)]="searchQuery" (ngModelChange)="filterTree($event)"
+        <!-- A placeholder is not a label; see the document search panel. -->
+        <label class="sr-only" for="model-tree-search">{{ searchFieldLabel }}</label>
+        <input id="model-tree-search"
+          [(ngModel)]="searchQuery" (ngModelChange)="filterTree($event)"
           i18n-placeholder="@@ifcTree.searchPlaceholder"
           placeholder="Search elements..."
           class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-accent" />
@@ -67,6 +70,9 @@ import { IfcPropertiesComponent } from './ifc-properties.component';
   `
 })
 export class IfcTreeComponent implements OnChanges {
+  /** Names the element search box for assistive technology. */
+  readonly searchFieldLabel = $localize`:Accessible name of the box for finding an element in the 3D model's hierarchy@@ifcTree.searchFieldLabel:Search model elements`;
+
   /**
    * The model hierarchy, supplied by the host.
    *
