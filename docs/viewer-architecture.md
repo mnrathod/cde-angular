@@ -203,9 +203,11 @@ two vertex tests, two topmost-shape tests — and nothing else.
 for a file, 200 for an Angular component — and a limit nothing measures holds
 only until somebody is in a hurry. Both were crossed by the accessibility work
 and the only thing that noticed was a later reading of this document against
-the code. `scripts/check-file-size.mjs` now measures them over 330 code files,
-runs as `npm run check:file-size`, and is wired into the pipeline's static
-analysis stage.
+the code. `scripts/check-file-size.mjs` now measures them over every code file
+under `src`, `scripts`, `tools` and `demo` — 332 of them at this issue, a figure
+that moves with the tree and is printed on every run rather than quoted from
+here. It runs as `npm run check:file-size` and is wired into the pipeline's
+static analysis stage.
 
 It ships with a baseline, because failing seventeen files on day one is how a
 gate gets switched off by the second day. Each is recorded at its measured

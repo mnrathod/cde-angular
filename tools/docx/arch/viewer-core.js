@@ -89,7 +89,9 @@ module.exports = [
      + 'component \u2014 and a limit nothing measures holds only until somebody is in a hurry. '
      + 'Both were crossed by the accessibility work and the only thing that noticed was a later '
      + 'reading of this document against the code. `scripts/check-file-size.mjs` now measures '
-     + 'them over 330 code files, runs as `npm run check:file-size`, and is wired into the '
+     + 'them over every code file under `src`, `scripts`, `tools` and `demo` \u2014 332 of them '
+     + 'at this issue, a figure that moves with the tree and is printed on every run rather than '
+     + 'quoted from here. It runs as `npm run check:file-size` and is wired into the '
      + 'pipeline’s static analysis stage.'),
   p('It ships with a baseline, because failing seventeen files on day one is how a gate gets '
   + 'switched off by the second day. Each is recorded at its measured length and **may only '
