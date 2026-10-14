@@ -73,8 +73,16 @@ module.exports = [
   p('**§14’s figures are now the gate.** `angular.json` requires 90% line and 85% branch — the '
   + 'standard itself — where it previously required 78/78, which was a figure the suite happened '
   + 'to reach rather than one anybody had chosen. Measured: **90.87% line (5,727/6,302) and 85.64% '
-  + 'branch (2,840/3,316)**, with statements at 87.9% and functions at 74.8%, both also gated at '
-  + 'their measured values so neither can fall.'),
+  + 'branch (2,840/3,316)**, with statements at 88.05% and functions at 74.75%.'),
+  note('**The gates are whole-number floors just under those figures \u2014 90, 85, 87 and 74 '
+     + '\u2014 not the measurements themselves.** The last issue of this document said all four '
+     + 'were \u201cgated at their measured values so neither can fall\u201d, and that was wrong '
+     + 'in a way worth correcting precisely rather than quietly: there is about a point of slack '
+     + 'in each, so coverage can drift down that far without failing a build. The slack is '
+     + 'deliberate. These are v8 figures and the denominator moves whenever an import changes, so '
+     + 'a gate pinned to the exact measurement fails on churn that tested nothing differently, '
+     + 'and a gate that fails for no reason is one somebody lowers. The floor only ever moves '
+     + 'up.'),
   note('**The denominator grew while the work was done** — from 5,375 lines to 6,175. The '
      + 'builder’s `coverageInclude` filters rather than forces inclusion, so v8 counts a file only '
      + 'once something imports it, and each new spec pulls in its component’s whole dependency '

@@ -20,17 +20,12 @@ import { IfcPropertiesComponent } from './ifc-properties.component';
 
       <!-- Header -->
       <div class="p-3 border-b border-gray-200 flex-shrink-0">
-        <!--
-          An h2, not a div. Its own translator note already called it a
-          heading, and the properties panel below uses h3 — so the 3D route
-          went from the toolbar's h1 straight to that h3 (SC 2.4.6). It keeps
-          its id and goes on naming the tree through aria-labelledby, which a
-          heading does just as well as a div.
-        -->
+        <!-- An h2, not a div: it was already the heading of this region in
+             everything but element name, and the properties panel below uses
+             h3. Keeps its id, which still names the tree. §9.4. -->
         <h2 id="model-tree-heading"
             i18n="Heading of the accessible, navigable equivalent of the 3D model view@@ifcTree.heading"
             class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Model Tree</h2>
-        <!-- Search -->
         <!-- A placeholder is not a label; see the document search panel. -->
         <label class="sr-only" for="model-tree-search">{{ searchFieldLabel }}</label>
         <input id="model-tree-search"

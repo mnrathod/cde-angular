@@ -15,9 +15,10 @@
   than features: every hardcoded user-facing string is now a translatable
   message behind two CI gates (§9.5); two drag-only interactions have a
   keyboard route and a set of controls that announced themselves as glyphs now
-  have names (§9.2, §9.3); and `viewer-core` is inside the §3.3 size limits
-  throughout (§3.2). One claim in the last issue was wrong and is corrected in
-  §12 — the environment note that qualified every statement about test results.
+  have names (§9.2, §9.3, §9.4). **`viewer-core` is no longer inside the §3.3
+  size limits, and the work in those sections is what pushed it out** — two
+  files are over the 400-line limit (§3.2). Several claims in earlier issues
+  were wrong and are corrected where they were made, in §9.3, §12 and §12.1.
 - §13 says exactly what is left; read it before quoting anything here to a
   customer.
 
@@ -49,7 +50,7 @@ from "the bytes belong to someone else".
   └───────────────────────┬──────────────────────────────────┘
                           │  cde.viewer.v1  (built — §4; framing blocked §10.1)
   ┌───────────────────────┴──────────────────────────────────┐
-  │  Embed surface            5 files · 996 lines            │
+  │  Embed surface            7 files · 1,338 lines          │
   │  postMessage boundary, session, /embed route             │
   └───────────────────────┬──────────────────────────────────┘
                           │
@@ -59,14 +60,16 @@ from "the bytes belong to someone else".
   └───────────────────────┬──────────────────────────────────┘
                           │  ordinary imports, one direction only
   ┌───────────────────────┴──────────────────────────────────┐
-  │  viewer-core              6 services · 6 components      │
+  │  viewer-core              6 services · 12 components     │
   │  renders, measures, searches, holds state                │
   │  knows no backend exists                                 │
   └──────────────────────────────────────────────────────────┘
 ```
 
-**`src/viewer-core/` is the product.** 3,220 lines of production TypeScript
-across 15 source files, with 8 spec files beside them. Nothing in it imports
+**`src/viewer-core/` is the product.** 5,571 lines of production TypeScript
+across 37 source files, with 30 spec files beside them — up from 3,220 across
+15 with 8 at the last issue, which is the growth the conformance work of the
+last three issues cost and worth seeing stated rather than discovering. Nothing in it imports
 anything from the application — not a service, not a model, not an environment
 constant. When the separate repository exists, this directory is **copied, not
 untangled**.
@@ -135,7 +138,7 @@ last issue of this document recorded `cad-viewer.component.ts` at 678 lines and
 called splitting it debt that wanted a runnable test suite first. The suite
 runs, and the split happened: `cad-viewer` is 118 lines, with the viewport
 transform, the image lifecycle, the layer panel and the markup overlay each in
-their own file. `ifc-tree` went the same way, 398 to 190, with a row component
+their own file. `ifc-tree` went the same way, 398 to 198, with a row component
 and a roving tab stop beside it.
 
 The decomposition was not cosmetic. Splitting a file forces every seam through
@@ -144,13 +147,42 @@ shift had never been asserted, a layer panel whose checkbox the spec bypassed
 by reaching into the component, an image viewer branch that could never have
 run, and model metadata computed, translated and never rendered.
 
-Two spec files remain over 400 lines — `ifc-tree.visibility.spec.ts` (458) and
-`markup-drawing-session.spec.ts` (408). Recorded rather than hidden; they are
-the next thing to split.
+**Four files are over the 400-line limit, and this passage was wrong about
+which, in both directions.** The last issue named two spec files as the next
+thing to split — `ifc-tree.visibility.spec.ts` at 458 and
+`markup-drawing-session.spec.ts` at 408. Both were split; they are 109 and 110
+lines now, and nothing recorded that the debt had been paid. A document that
+keeps claiming work is outstanding after it is done is as misleading as one
+that claims work is finished when it is not, and the second kind at least gets
+corrected when somebody looks.
+
+What is over the limit now:
+
+| File | Lines | |
+|---|---|---|
+| `markup-engine.service.spec.ts` | 691 | spec |
+| `markup-drawing-session.ts` | 460 | **production** |
+| `markup-engine.service.ts` | 434 | **production** |
+| `markup-engine.interaction.spec.ts` | 412 | spec |
+
+**The two production files are over because of the keyboard work in §9.2**, and
+that is the honest account of what the single-pointer alternative cost: the
+state machine and the engine each took a cursor, a key interpreter and the
+geometry behind them. The seam for splitting `markup-drawing-session` is
+visible in the file — the keyboard route is already a labelled section — but
+splitting a state machine is a change that wants its own verification rather
+than being folded into a documentation pass, so it is recorded here and not
+attempted.
+
+**Nothing gates file size**, which is why two production files could cross a
+hard limit in §3.3 without anything saying so, and why the paid-off debt above
+went unrecorded for two issues. That is the gap worth closing before the next
+one opens — a ratcheting baseline of the kind `check:i18n-markup` already uses
+would do it.
 
 ### 3.3 What is deliberately *not* here
 
-The 33 viewer components still in the application are not there by accident.
+The 38 viewer components still in the application are not there by accident.
 Eighteen import the platform's HTTP services directly; the rest are
 presentational children produced by the §3.3 decomposition, and those move as
 they are — a page card, a signature stamp, a form field row and a toolbar have
@@ -1026,8 +1058,17 @@ branch — the standard itself — where it previously required 78/78, which was
 figure the suite happened to reach rather than one anybody had chosen.
 
 Measured: **90.87% line (5,727/6,302) and 85.64% branch (2,840/3,316)**, with
-statements at 87.5% and functions at 74.9%, both also gated at their measured
-values so neither can fall.
+statements at 88.05% and functions at 74.75%.
+
+**The gates are whole-number floors just under those figures — 90, 85, 87 and
+74 — not the measurements themselves.** The last issue of this document said
+all four were "gated at their measured values so neither can fall", and that
+was wrong in a way worth correcting precisely rather than quietly: there is
+about a point of slack in each, so coverage can drift down that far without
+failing a build. The slack is deliberate. These are v8 figures and the
+denominator moves whenever an import changes, so a gate pinned to the exact
+measurement fails on churn that tested nothing differently, and a gate that
+fails for no reason is one somebody lowers. The floor only ever moves up.
 
 Two things about reading that number honestly.
 

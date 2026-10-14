@@ -26,11 +26,12 @@ module.exports = [
    + 'integrating it.',
      '**Since the last issue**, the work has been conformance and structure rather than '
    + 'features: every hardcoded user-facing string is now a translatable message behind two CI '
-   + 'gates (section 9.4); two drag-only interactions have a keyboard route, and a set of '
-   + 'controls that announced themselves as glyphs now have names (sections 9.2 and 9.3); and '
-   + '`viewer-core` is inside the section 3.3 size limits throughout (section 3.2). **One claim '
-   + 'in the last issue was wrong** and is corrected in section 12 — the environment note that '
-   + 'qualified every statement about test results.',
+   + 'gates (section 9.5); two drag-only interactions have a keyboard route, and a set of '
+   + 'controls that announced themselves as glyphs now have names (sections 9.2, 9.3 and 9.4). '
+   + '**`viewer-core` is no longer inside the section 3.3 size limits, and the work in those '
+   + 'sections is what pushed it out** — two files are over the 400-line limit (section 3.2). '
+   + 'Several claims in earlier issues were wrong and are corrected where they were made, in '
+   + 'sections 9.3, 12 and 12.1.',
      'Section 13 states exactly what is left — read it before quoting anything here to a '
    + 'customer.']),
 
@@ -58,8 +59,11 @@ module.exports = [
 
   h1('2.  Three layers, and the one that matters'),
   ...diagramBoundary(),
-  p('**`src/viewer-core/` is the product.** 3,220 lines of production TypeScript across 15 source '
-  + 'files, with 8 spec files beside them. Nothing in it imports anything from the application — '
+  p('**`src/viewer-core/` is the product.** 5,571 lines of production TypeScript across 37 source '
+  + 'files, with 30 spec files beside them \u2014 up from 3,220 across 15 with 8 at the last '
+  + 'issue, which is the growth the conformance work of the last three issues cost and worth '
+  + 'seeing stated rather than discovering. Nothing in it imports anything from the application '
+  + '\u2014 '
   + 'not a service, not a model, not an environment constant. When the separate repository exists, '
   + 'this directory is **copied, not untangled**.'),
   p('It is now shaped as a library rather than a directory: `package.json`, `ng-package.json`, '

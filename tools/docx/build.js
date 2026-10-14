@@ -180,7 +180,7 @@ function diagramBoundary() {
         { t: ['Their identity provider', 'Entra / Okta / own'], fill: TEAL_BG },
         { t: ['2.  identify the user  →', '✓  BUILT', 'host.init.identity — 3 untrusted fields'],
           fill: TEAL_BG, color: TEAL, align: AlignmentType.CENTER, bold: true },
-        { t: ['viewer-core', '15 files · 6 services · 6 components'] } ] },
+        { t: ['viewer-core', '37 files · 6 services · 12 components'] } ] },
 
       { cells: [
         { t: ['Their document store', 'SharePoint / S3 / Blob'], fill: TEAL_BG },

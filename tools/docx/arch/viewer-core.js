@@ -37,19 +37,42 @@ module.exports = [
   + '`cad-viewer.component.ts` at 678 lines and called splitting it debt that wanted a runnable '
   + 'test suite first. The suite runs (§12), and the split happened: `cad-viewer` is 118 lines, '
   + 'with the viewport transform, the image lifecycle, the layer panel and the markup overlay '
-  + 'each in their own file. `ifc-tree` went the same way, 398 to 190, with a row component and '
+  + 'each in their own file. `ifc-tree` went the same way, 398 to 198, with a row component and '
   + 'a roving tab stop beside it.'),
   p('The decomposition was not cosmetic. Splitting a file forces every seam through a test, and '
   + 'four defects came out of these two alone: a drawing whose rotation shift had never been '
   + 'asserted, a layer panel whose checkbox the spec bypassed by reaching into the component, an '
   + 'image-viewer branch that could never have run, and model metadata computed, translated and '
   + 'never rendered.'),
-  note('Two spec files remain over the 400-line file limit — `ifc-tree.visibility.spec.ts` (458) '
-     + 'and `markup-drawing-session.spec.ts` (408). Recorded rather than hidden; they are the '
-     + 'next thing to split.'),
+  note('**Four files are over the 400-line limit, and this passage was wrong about which, in '
+     + 'both directions.** The last issue named two spec files as the next thing to split '
+     + '\u2014 `ifc-tree.visibility.spec.ts` at 458 and `markup-drawing-session.spec.ts` at 408. '
+     + 'Both were split; they are 109 and 110 lines now, and nothing recorded that the debt had '
+     + 'been paid. A document that keeps claiming work is outstanding after it is done is as '
+     + 'misleading as one that claims work is finished when it is not, and the second kind at '
+     + 'least gets corrected when somebody looks.'),
+  table([5200, 1600, 2946], [
+    { header: true, cells: [{ t: 'File' }, { t: 'Lines' }, { t: '' }] },
+    { cells: [{ t: 'markup-engine.service.spec.ts' }, { t: '691' }, { t: 'spec' }] },
+    { cells: [{ t: 'markup-drawing-session.ts' }, { t: '460' }, { t: 'production' }] },
+    { cells: [{ t: 'markup-engine.service.ts' }, { t: '434' }, { t: 'production' }] },
+    { cells: [{ t: 'markup-engine.interaction.spec.ts' }, { t: '412' }, { t: 'spec' }] },
+  ]),
+  caption('Table 2a \u2014 Files over the section 3.3 limit.'),
+  p('**The two production files are over because of the keyboard work in section 9.2**, and that '
+  + 'is the honest account of what the single-pointer alternative cost: the state machine and the '
+  + 'engine each took a cursor, a key interpreter and the geometry behind them. The seam for '
+  + 'splitting `markup-drawing-session` is visible in the file \u2014 the keyboard route is '
+  + 'already a labelled section \u2014 but splitting a state machine is a change that wants its '
+  + 'own verification rather than being folded into a documentation pass, so it is recorded here '
+  + 'and not attempted.'),
+  note('**Nothing gates file size**, which is why two production files could cross a hard limit '
+     + 'in section 3.3 without anything saying so, and why the paid-off debt above went '
+     + 'unrecorded for two issues. That is the gap worth closing before the next one opens '
+     + '\u2014 a ratcheting baseline of the kind `check:i18n-markup` already uses would do it.'),
 
   h2('3.3  What is deliberately not here'),
-  p('The 33 viewer components still in the application are not there by accident. Eighteen '
+  p('The 38 viewer components still in the application are not there by accident. Eighteen '
   + 'import the platform’s HTTP services directly; the rest are presentational children produced '
   + 'by the §3.3 decomposition, and those move as they are — a page card, a signature stamp, a '
   + 'form-field row and a toolbar have no opinion about where their data came from.'),
