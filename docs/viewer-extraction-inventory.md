@@ -63,39 +63,65 @@ call the platform directly.
 
 ## 2. What it needs from a host — the integration contract
 
-**35 endpoints across 15 files** — 11 services and 4 components. Method: walk
-imports transitively from every viewer component, viewer service and
-`viewer-core` file; count distinct `/api/...` literals in everything reached.
+**45 endpoints over 48 call sites, in 13 files — 11 services and 2 loaders, no
+components.** Method: walk imports transitively from every viewer component,
+every embed component and every `viewer-core` file; collapse each `/api/...`
+path's interpolations so one route counts once.
 
-> **Corrected 2026-09-09.** This said "26 across 9", which was itself a
-> correction of an earlier "seven". Both were undercounts, for two different
-> reasons — the first from grepping directories instead of following imports,
-> the second from a resolver that turned `role.service` into `role.ts` by
-> replacing the extension rather than appending one, so every `*.service.ts`
-> import silently failed to resolve. ADR 14, "A note on the count", has the
-> detail. The
-> real surface is nearly four times larger, and it is the difference between a
-> weekend and a project.
+> **Corrected 2026-10-14, and no longer by hand.** This said "35 across 15 —
+> 11 services and 4 components", which was itself a correction of "26 across 9",
+> which corrected "seven". **All three were undercounts**, which is the
+> expensive direction: this figure exists to size the ingress an external CDE
+> has to build. The first came from grepping directories instead of following
+> imports; the second from a resolver that turned `role.service` into `role.ts`
+> by replacing the extension rather than appending one, so every `*.service.ts`
+> import silently failed to resolve; the third was a hand count never re-run,
+> wrong on three of its four numbers — there are no components in the list at
+> all, and the two files that are not services are the PDF and comparison
+> loaders.
+>
+> **`scripts/count-viewer-endpoints.mjs` now produces it** (`npm run
+> count:endpoints`), and it refuses to print rather than printing a smaller
+> number: an import that does not resolve stops the count, and so does a call
+> whose URL is not a literal. The table below is its output, not a transcription
+> of it.
 
-| Service | Endpoints | Notes |
+The groups the design turns on: **five are content** (the document record, its
+PDF bytes, and the three 3D model routes), exactly what a host's ingress
+replaces; **twenty are document operations**, which ADR 14 assigned to the host;
+the remaining twenty are the viewer's own — markup, identity, flattening.
+
+| File | Call sites | What it reaches |
 |---|---|---|
-| `viewer.service` | `/api/viewer/{id}`, `/api/viewer/{id}/pdf`, `/api/viewer/{id}/flatten`, `/api/viewer3d/{id}`, `/api/viewer3d/{id}/tree` | 5 — the core read path |
-| `annotation.service` | `/api/annotations` and six more under it, including replies and `resolve` | 7 — markup, read and write |
-| `signature.service` | `/api/signatures/{id}`, `/api/signatures/{id}/verify`, `/api/signatures/document/{id}`, `/api/signatures/document/{id}/sign` | 4 |
-| `page.service` | `/api/documents/{id}/pages` + `/arrange`, `/extract`, `/insert` | 4 |
-| `document.service` | `/api/documents/{id}`, `/status`, `/project/{id}`, `/upload` | 4 |
-| `redaction.service` | `/find-text`, `/redact`, `/redact-matching` | 3 |
-| `document-version.service` | `/versions`, `/versions/{v}/file`, `/versions/{v}/restore` | 3 |
-| `pdf-form.service` | `/form-fields`, `/form-fill` | 2 |
-| `auth.service` | `/api/auth/login`, `/api/auth/register` | 2 — see §3 |
-| `ocr.service` | `/api/documents/{id}/ocr` | 1 |
+| `annotation.service` | 11 | markup read and write, replies, `resolve`, and XFDF both ways |
+| `document.service` | 6 | the document record, `project/{id}`, `upload`, `status`, `pages`, delete |
+| `auth.service` | 4 | `login`, `logout`, `register`, `session` |
+| `page.service` | 4 | `pages` plus `arrange`, `extract`, `insert` |
+| `pdf-form.service` | 4 | `form-fields` read, write and delete, plus `form-fill` |
+| `signature.service` | 4 | sign, verify, list by document, delete |
+| `document-version.service` | 3 | `versions`, `versions/{v}/file`, `versions/{v}/restore` |
+| `redaction.service` | 3 | `find-text`, `redact`, `redact-matching` |
+| `viewer.service` | 3 | the 3D model record, its tree and its geometry |
+| `ocr.service` | 1 | `ocr` |
+| `flatten.service` | 1 | `viewer/{id}/flatten` |
+| `compare-documents-loader` | 2 | the document record and its PDF bytes, for each side |
+| `viewer-document-loader` | 2 | the document record and its PDF bytes |
 
-Four components reach the API directly rather than through a service:
-`viewer-shell`, `annotation-thread`, `visual-compare`, and — the one that
-matters — `viewer-core/ifc-tree.component.ts`, which calls
-`/api/viewer3d/{id}/tree`. That last one is inside the package the boundary
-test protects; the test forbids *imports* across the boundary and a string
-literal is not an import, which is a gap worth closing.
+**No component reaches the API directly any more, and the claim that four did
+was stale.** This paragraph named `viewer-shell`, `annotation-thread`,
+`visual-compare` and — as the one that mattered — `viewer-core/ifc-tree.component.ts`,
+said to call `/api/viewer3d/{id}/tree` from inside the package the boundary test
+protects. **None of them does.** There is no `/api` literal in any component in
+the repository: every one of those calls had already moved behind a service, and
+nothing recorded it. A document that reports a boundary breach which does not
+exist costs somebody an afternoon looking for it, which is why this is corrected
+in place rather than deleted.
+
+The observation underneath it still holds and is still unclosed: the boundary
+test forbids *imports* across the `viewer-core` line, and a URL in a string
+literal is not an import, so nothing would stop a component inside the package
+calling the platform directly. That is a gap in the test, not a defect in the
+code — but it is the reason the claim above was believable for three issues.
 
 These fall into four groups, and the grouping is the design:
 
@@ -230,7 +256,7 @@ logo, which §17.4 does not permit and which blocks release.
 | Viewer components | 23 | files under `features/viewer/`, excluding specs |
 | Viewer services | 8 | files under `core/services/viewer/`, excluding specs |
 | Implementation lines | 7,996 | `wc -l` over both, excluding specs |
-| Files containing them | 15 | 11 services, 4 components |
-| Endpoints reached | 35 | distinct `/api/...` literals across everything the walk reaches |
+| Files containing them | 13 | 11 services, 2 loaders, no components |
+| Endpoints reached | 45 | distinct method + path across everything the walk reaches, over 48 call sites |
 | Services needing no network | 6 of 8 | absence of `HttpClient` |
 | Auth call sites | 3 | `auth.username()` |

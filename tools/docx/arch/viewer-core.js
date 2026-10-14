@@ -13,10 +13,10 @@ module.exports = [
   h2('3.1  Services'),
   table([2600, 900, 6246], [
     { header: true, cells: [{ t: 'Service' }, { t: 'Lines' }, { t: 'Responsibility' }] },
-    { cells: [{ t: 'viewer-state.service' }, { t: '375', align: AlignmentType.CENTER },
+    { cells: [{ t: 'viewer-state.service' }, { t: '390', align: AlignmentType.CENTER },
       { t: 'The single source of truth. Signals for document, page, zoom, rotation, active tool, selection, sidebar tab, and the version-commit token that makes panels reload after a server-side operation' }] },
-    { cells: [{ t: 'markup-engine.service' }, { t: '372', align: AlignmentType.CENTER },
-      { t: 'Shape creation, geometry updates and hit testing. Pointer handling and the in-progress shape moved out to markup-drawing-session when the second surface needed them' }] },
+    { cells: [{ t: 'markup-engine.service' }, { t: '323', align: AlignmentType.CENTER },
+      { t: 'Shape creation and geometry updates. Pointer handling and the in-progress shape moved out to markup-drawing-session when the second surface needed them; what a tool is and where a shape lies moved out to markup-tool-kinds and markup-hit-test when the file went over the section 3.3 limit' }] },
     { cells: [{ t: 'pdf-engine.service' }, { t: '238', align: AlignmentType.CENTER },
       { t: 'pdfjs-dist wrapper — document loading, page rendering to canvas, text-layer extraction' }] },
     { cells: [{ t: 'measurement.service' }, { t: '165', align: AlignmentType.CENTER },
@@ -26,14 +26,21 @@ module.exports = [
     { cells: [{ t: 'drawing-search.service' }, { t: '129', align: AlignmentType.CENTER },
       { t: 'Text search across a converted drawing’s labels' }] }
   ]),
-  caption('Table 2 — The six server-independent services.'),
+  caption('Table 2 — The six server-independent singletons.'),
+  p('Six files carry the `.service` suffix; nine in `viewer-core` are `@Injectable`. '
+  + '`drawing-image`, `drawing-viewport` and `markup-drawing-session` are the three that do not, '
+  + 'and that is deliberate rather than an oversight \u2014 each is provided per component rather '
+  + 'than once for the application, because each holds state for one surface and two surfaces '
+  + 'sharing one would see each other’s. Table 2 lists the six singletons.'),
+  p('`viewer-state.service` at 390 lines is the closest thing here to the section 3.3 limit, with '
+  + 'ten to spare. It is the one to watch, and as of this issue something is watching it.'),
 
   h2('3.2  Components'),
   p('`cad-viewer` (the DXF/DWG canvas), `ifc-tree` (the model hierarchy), `outline-panel`, '
   + '`page-links`, `tool-rail`, and `icon` — the last being the product’s whole icon set as '
   + 'stroke-only 24×24 path data, so one definition sits on a light rail, a dark header and an '
   + 'accent-filled button without variants.'),
-  p('**Every component in `viewer-core` is now inside the §3.3 limits.** The last issue recorded '
+  p('**Every component in `viewer-core` is inside the §3.3 limits.** An earlier issue recorded '
   + '`cad-viewer.component.ts` at 678 lines and called splitting it debt that wanted a runnable '
   + 'test suite first. The suite runs (§12), and the split happened: `cad-viewer` is 118 lines, '
   + 'with the viewport transform, the image lifecycle, the layer panel and the markup overlay '
@@ -44,32 +51,82 @@ module.exports = [
   + 'asserted, a layer panel whose checkbox the spec bypassed by reaching into the component, an '
   + 'image-viewer branch that could never have run, and model metadata computed, translated and '
   + 'never rendered.'),
-  note('**Four files are over the 400-line limit, and this passage was wrong about which, in '
-     + 'both directions.** The last issue named two spec files as the next thing to split '
-     + '\u2014 `ifc-tree.visibility.spec.ts` at 458 and `markup-drawing-session.spec.ts` at 408. '
-     + 'Both were split; they are 109 and 110 lines now, and nothing recorded that the debt had '
-     + 'been paid. A document that keeps claiming work is outstanding after it is done is as '
-     + 'misleading as one that claims work is finished when it is not, and the second kind at '
-     + 'least gets corrected when somebody looks.'),
-  table([5200, 1600, 2946], [
-    { header: true, cells: [{ t: 'File' }, { t: 'Lines' }, { t: '' }] },
-    { cells: [{ t: 'markup-engine.service.spec.ts' }, { t: '691' }, { t: 'spec' }] },
-    { cells: [{ t: 'markup-drawing-session.ts' }, { t: '460' }, { t: 'production' }] },
-    { cells: [{ t: 'markup-engine.service.ts' }, { t: '434' }, { t: 'production' }] },
-    { cells: [{ t: 'markup-engine.interaction.spec.ts' }, { t: '412' }, { t: 'spec' }] },
+  p('**The two production files that were over the 400-line limit are now under it, and a gate '
+  + 'measures the limit for the first time.** The last issue recorded '
+  + '`markup-drawing-session.ts` at 460 lines and `markup-engine.service.ts` at 434, both over '
+  + 'because of the keyboard work in section 9.2 \u2014 the honest cost of the single-pointer '
+  + 'alternative, which gave the state machine and the engine each a cursor, a key interpreter '
+  + 'and the geometry behind them. It said splitting a state machine wanted its own verification '
+  + 'rather than being folded into a documentation pass. That verification is this issue’s work.'),
+  table([3400, 1300, 5046], [
+    { header: true, cells: [{ t: 'Was' }, { t: 'Now' }, { t: 'Extracted to' }] },
+    { cells: [{ t: 'markup-drawing-session.ts  460' }, { t: '381' },
+      { t: 'markup-keyboard-drawing.ts (147)' }] },
+    { cells: [{ t: 'markup-engine.service.ts  434' }, { t: '323' },
+      { t: 'markup-tool-kinds.ts (156), markup-hit-test.ts (83)' }] },
   ]),
-  caption('Table 2a \u2014 Files over the section 3.3 limit.'),
-  p('**The two production files are over because of the keyboard work in section 9.2**, and that '
-  + 'is the honest account of what the single-pointer alternative cost: the state machine and the '
-  + 'engine each took a cursor, a key interpreter and the geometry behind them. The seam for '
-  + 'splitting `markup-drawing-session` is visible in the file \u2014 the keyboard route is '
-  + 'already a labelled section \u2014 but splitting a state machine is a change that wants its '
-  + 'own verification rather than being folded into a documentation pass, so it is recorded here '
-  + 'and not attempted.'),
-  note('**Nothing gates file size**, which is why two production files could cross a hard limit '
-     + 'in section 3.3 without anything saying so, and why the paid-off debt above went '
-     + 'unrecorded for two issues. That is the gap worth closing before the next one opens '
-     + '\u2014 a ratcheting baseline of the kind `check:i18n-markup` already uses would do it.'),
+  caption('Table 2a \u2014 The two files split to come back inside the section 3.3 limit.'),
+  p('Each split followed a seam the files already had. The engine delegated its rendering to '
+  + '`svg-primitives.ts` and `markup-svg.ts` and said in a comment that it did so to stay near '
+  + 'the limit; the tool predicates and the hit test went the same way, so every one of them is '
+  + 'still a method on the service and no caller changed. The drawing session’s keyboard route '
+  + 'was already a labelled section: it became a class holding one thing \u2014 where the cursor '
+  + 'is \u2014 that hands every action to the same press/move/release state machine the pointer '
+  + 'drives. **It does not re-implement the gesture**, which is the whole reason that file '
+  + 'exists; the dependency runs one way, from the session to the keys.'),
+  p('Three defects came out of it, all of the kind that only surfaces when somebody moves code: '
+  + 'the doc comment for `finishesShape` had come adrift and was sitting above '
+  + '`toleranceInUserUnits`’s own comment, so the longest explanation in the file documented '
+  + 'nothing; the comment describing `withPreviewPoint` sat above `isVertexTool`; and the hit '
+  + 'test’s default arm silently reports “not hit” for every shape it does not know, which is a '
+  + 'real gap rather than a safe default and is now written down where the code is.'),
+  p('The splits were verified by breaking them. The coarse keyboard step, the polygon vertex '
+  + 'minimum and the hit test’s search direction were each inverted in turn, and each failed '
+  + 'exactly the tests that name it \u2014 five keyboard tests, two vertex tests, two '
+  + 'topmost-shape tests \u2014 and nothing else.'),
+  note('**Nothing had been measuring the limit, and that is the defect behind the defect.** '
+     + 'Section 3.3 sets two hard limits \u2014 400 lines for a file, 200 for an Angular '
+     + 'component \u2014 and a limit nothing measures holds only until somebody is in a hurry. '
+     + 'Both were crossed by the accessibility work and the only thing that noticed was a later '
+     + 'reading of this document against the code. `scripts/check-file-size.mjs` now measures '
+     + 'them over 330 code files, runs as `npm run check:file-size`, and is wired into the '
+     + 'pipeline’s static analysis stage.'),
+  p('It ships with a baseline, because failing seventeen files on day one is how a gate gets '
+  + 'switched off by the second day. Each is recorded at its measured length and **may only '
+  + 'shrink**: a file on the baseline that grows fails, and one that comes back inside the limit '
+  + 'fails until its entry is deleted. The same ratcheting floor as `check-i18n-markup.mjs`. Its '
+  + 'own spec breaks the ratchet two ways \u2014 stopping the growth check, and an off-by-one '
+  + 'that fails a compliant file \u2014 and each failed exactly the test naming it.'),
+  p('**This passage has also been wrong in the other direction, and that is worth keeping.** Two '
+  + 'issues ago it named two spec files as the next thing to split \u2014 '
+  + '`ifc-tree.visibility.spec.ts` at 458 and `markup-drawing-session.spec.ts` at 408. Both were '
+  + 'split; they are 109 and 110 lines, and nothing recorded that the debt had been paid. A '
+  + 'document that keeps claiming work is outstanding after it is done misleads as much as one '
+  + 'claiming work is finished when it is not, and the second kind at least gets corrected when '
+  + 'somebody looks.'),
+  p('And the sentence this passage used to open with \u2014 “four files are over the 400-line '
+  + 'limit” \u2014 was true only of `viewer-core`, which is not what it said. The gate counts '
+  + 'every root, and the real figures are these.'),
+  table([5200, 1200, 3346], [
+    { header: true, cells: [{ t: 'What is over' }, { t: 'Count' }, { t: '' }] },
+    { cells: [{ t: 'Spec files over 400' }, { t: '12' },
+      { t: 'largest markup-engine.service.spec.ts at 691' }] },
+    { cells: [{ t: 'demo/public/host.js over 400' }, { t: '1' }, { t: '401, the demo host page' }] },
+    { cells: [{ t: 'Components over 200' }, { t: '4' },
+      { t: 'embed-viewer 245, pdf-markup-layer 218, pdf-form-design 213, login 201' }] },
+  ]),
+  caption('Table 2b \u2014 Everything on the file-size baseline.'),
+  p('**Every component in `viewer-core` is inside the 200-line limit** \u2014 the largest is '
+  + '`ifc-tree` at 198. The four that are over are all in `src/app`, and the earlier claim that '
+  + '“every component is inside again” was true of `viewer-core` and false of the application. '
+  + 'They are the next real debt, and they are production code, unlike most of the baseline.'),
+  note('**Twelve of the seventeen baseline entries are spec files, and whether section 3.3’s '
+     + 'limit is meant to bind a spec file is an open question for the team, not one this '
+     + 'document should answer** (section 0.7 \u2014 flag the conflict rather than quietly '
+     + 'picking). The limit as written says “files”, so that is what the gate measures. If the '
+     + 'team decides a 500-line spec of independent cases is not the hazard a 500-line service '
+     + 'is, the exclusion belongs in section 3.3 and then in the gate \u2014 not as a silent '
+     + 'condition inside a script.'),
 
   h2('3.3  What is deliberately not here'),
   p('The 38 viewer components still in the application are not there by accident. Eighteen '
@@ -90,10 +147,15 @@ module.exports = [
   h1('4.  The embed surface'),
   lead('New since the last issue of this document, and the reason its status line changed. The '
      + 'contract ADR 14 settled is now code on both sides.'),
-  p('`src/app/features/embed/` — 1,128 lines of production TypeScript across six files, with 811 '
+  p('`src/app/features/embed/` — 1,338 lines of production TypeScript across seven files, with 2,216 '
   + 'lines of spec beside them. It is deliberately **not** in `viewer-core`: the protocol is how a '
   + 'host talks to a deployment of the viewer, so it belongs to the application that is deployed, '
   + 'while `viewer-core` stays the part that knows no backend exists.'),
+  note('The figures in the paragraph above read “1,128 across six, with 811 of spec” until this '
+     + 'issue, while the diagram in section 2 already said seven files and 1,338 lines. **The '
+     + 'document contradicted itself two hundred lines apart**, because the last pass corrected '
+     + 'the diagram and never reached the prose. Worth stating rather than quietly fixing: a '
+     + 'figure is only as good as the last place it appears.'),
   table([2900, 6846], [
     { header: true, cells: [{ t: 'File' }, { t: 'What it does' }] },
     { cells: [{ t: 'embed-protocol.ts' },
@@ -107,7 +169,9 @@ module.exports = [
     { cells: [{ t: 'embed-viewer.component.ts' },
       { t: 'The /embed route component. No auth guard, deliberately — the viewer authenticates nobody' }] },
     { cells: [{ t: 'markup-wire-format.ts' },
-      { t: 'Translation between the viewer’s ShapeData and the protocol’s Markup — the only part of the session with no session state, so it tests against the two representations directly' }] }
+      { t: 'Translation between the viewer’s ShapeData and the protocol’s Markup — the only part of the session with no session state, so it tests against the two representations directly' }] },
+    { cells: [{ t: 'embed-stroke-session.ts' },
+      { t: 'A stroke in progress on the embed surface, kept out of embed-page.component so the component stays inside the section 3.3 limit of 200 lines. It was missing from this table, which is how the file count came to be wrong' }] }
   ]),
   caption('Table 3 — The embed implementation.'),
   p('**Thirteen message types run viewer → host and six run host → viewer.** Four of the thirteen '

@@ -72,8 +72,8 @@ module.exports = [
   h2('12.1  Coverage'),
   p('**§14’s figures are now the gate.** `angular.json` requires 90% line and 85% branch — the '
   + 'standard itself — where it previously required 78/78, which was a figure the suite happened '
-  + 'to reach rather than one anybody had chosen. Measured: **90.87% line (5,727/6,302) and 85.64% '
-  + 'branch (2,840/3,316)**, with statements at 88.05% and functions at 74.75%.'),
+  + 'to reach rather than one anybody had chosen. Measured: **90.88% line (5,754/6,331) and 85.66% '
+  + 'branch (2,844/3,320)**, with statements at 88.07% and functions at 74.94%.'),
   note('**The gates are whole-number floors just under those figures \u2014 90, 85, 87 and 74 '
      + '\u2014 not the measurements themselves.** The last issue of this document said all four '
      + 'were \u201cgated at their measured values so neither can fall\u201d, and that was wrong '
@@ -128,16 +128,18 @@ module.exports = [
       { t: 'The embed protocol’s three self-descriptions agree: every type in the ViewerMessageType union is sent by production code and has a row in the authority’s event table, and nothing is sent or documented from outside it' }] },
     { cells: [{ t: 'check:labels' },
       { t: 'Every focusable control has an accessible name. A placeholder is not a label, an aria-hidden icon contributes nothing, and title is the weakest source in the algorithm' }] },
+    { cells: [{ t: 'check:file-size' },
+      { t: 'No file is over the section 3.3 limit of 400 lines and no Angular component over 200, against a baseline of seventeen that is only allowed to shrink' }] },
     { cells: [{ t: 'test:scripts' },
       { t: 'The gate scripts themselves have tests, so a gate cannot pass by being broken' }] }
   ]),
   caption('Table 6 — The repository’s own gates.'),
-  p('**All twelve now run in CI**, where four did two issues ago. The CI Node '
+  p('**All thirteen now run in CI**, where four did three issues ago. The CI Node '
   + 'is not the container\u2019s, so the version trap above does not reach the pipeline. The '
   + 'platform\u2019s `Jenkinsfile` runs `npm ci`, `tsc --build --force --noEmit` and `ng test` '
   + 'against this repository, and every gate in the table: `check:no-remote-code`, `check:i18n`, '
   + '`check:i18n-markup`, `test:scripts`, `check:icons`, `check:samples`, '
-  + '`check:embed-protocol` and `check:labels` in the '
+  + '`check:embed-protocol`, `check:labels` and `check:file-size` in the '
   + 'static-analysis stage; `ng build --configuration production` then `check:served-assets` and '
   + '`check:bundle-budget` in the build stage, because those two read the bundle and cannot run '
   + 'before it exists; `check:attribution` beside the backend\u2019s own licence gate; and '
@@ -211,25 +213,43 @@ module.exports = [
   + 'end to end, so an embedding host never needs one — but the platform’s own `Document` entity '
   + 'still has no such column, so anything integrating through `/api/documents` keeps a map '
   + 'between its id and our numeric one.'),
-  p('**35 endpoints across 15 files** — 11 services and 4 components — derived by walking imports '
-  + 'transitively from every viewer component, viewer service and `viewer-core` file. Two groups '
-  + 'drive the design: **five are content**, and are exactly what the ingress replaces, and '
-  + '**seventeen are document operations**, which ADR 14 assigned to the host. The remainder is '
-  + 'markup, identity and collaboration.'),
-  note('That total has been wrong twice, in the same direction. It was “seven”, then “26 across '
-     + '9”, and both were undercounts — the first from grepping directories instead of following '
-     + 'imports, the second from a resolver that turned `role.service` into `role.ts` by replacing '
-     + 'the extension rather than appending one, so every `*.service.ts` import silently failed to '
-     + 'resolve and its endpoints were never counted. **A count that resolves imports must fail '
-     + 'loudly when one does not resolve**, or it reports the surface it could see as the surface '
-     + 'that exists.'),
-  note('**And it is not settled yet.** `viewer-extraction-inventory.md` §2 gives a total of 35 '
-     + 'across 11 services and 4 components, but its own table lists ten services, and its group '
-     + 'sizes — content 5, document operations 17, markup 7, identity 2 — sum to 31. Two of those '
-     + 'three figures must be wrong. The groups quoted above are the ones the inventory states '
-     + 'unambiguously and that a design decision actually turns on; **the partition needs '
-     + 're-deriving before it goes in front of a customer**, and no number here should be quoted '
-     + 'as a complete breakdown until it does.'),
+  p('**45 endpoints over 48 call sites, in 13 files \u2014 11 services and 2 loaders, no '
+  + 'components** \u2014 found by walking imports transitively from every viewer component, '
+  + 'every embed component and every `viewer-core` file. Two groups drive the design: **five are '
+  + 'content**, exactly what the ingress replaces, and **twenty are document operations**, which '
+  + 'ADR 14 assigned to the host. The remaining twenty are the viewer\u2019s own \u2014 markup, '
+  + 'identity, flattening.'),
+  note('**That total has now been wrong three times, every time an undercount**, which is the '
+     + 'expensive direction: the figure exists to size the ingress an external CDE has to build. '
+     + '\u201CSeven\u201D came from grepping directories instead of following imports. \u201C26 '
+     + 'across 9\u201D came from a resolver that turned `role.service` into `role.ts` by '
+     + 'replacing the extension rather than appending one, so every `*.service.ts` import '
+     + 'silently failed to resolve and its endpoints were never counted. \u201C35 across 15, 11 '
+     + 'services and 4 components\u201D \u2014 the figure this passage carried until now '
+     + '\u2014 was a hand count that was never re-run, and was wrong on three of its four '
+     + 'numbers: there are no components in the list at all, the two files that are not services '
+     + 'are the PDF and comparison loaders, and the document-operations group was out by three.'),
+  p('**So it is no longer a hand count.** `scripts/count-viewer-endpoints.mjs` produces it, '
+  + '`npm run count:endpoints` prints it, and the two rules that caused the earlier mistakes are '
+  + 'now assertions rather than intentions. **An import that does not resolve stops the count**, '
+  + 'because a resolver that shrugs reports the surface it could see as the surface that exists; '
+  + 'its spec asserts the extension-appending case in both directions, that `./role.service` '
+  + 'finds `role.service.ts` and that it does not find a `role.ts` sitting beside it. **A call '
+  + 'whose URL is not a literal stops the count** \u2014 one of ours builds its URL a line above '
+  + 'the call, so it is declared explicitly, and the declaration itself fails the run once it '
+  + 'stops matching a call. Widening the search until some nearby literal matched would have '
+  + 'answered confidently and wrongly.'),
+  p('The `http.request(\u2018delete\u2019, url)` form was a third, smaller version of the same '
+  + 'problem: taking the first literal as the path invented an endpoint named `delete` and lost '
+  + 'the real one, two errors from one call site.'),
+  note('**The inventory that carried the old figure is corrected too.** '
+     + '`viewer-extraction-inventory.md` section 2 gave \u201C35 across 11 services and 4 '
+     + 'components\u201D while its own table listed ten services and its group sizes summed to '
+     + '31 \u2014 two of those three figures had to be wrong, and this document said so without '
+     + 'being able to say which. All three are now replaced by the script\u2019s output. The '
+     + 'same pass found that the inventory\u2019s claim that four components call the API '
+     + 'directly \u2014 including one inside `viewer-core`, reported as a boundary breach '
+     + '\u2014 is false: there is no `/api` literal in any component in the repository.'),
   p('**A library in shape, never built as one — and now with a known reason.** `viewer-core` has '
   + 'its manifest, its ng-packagr configuration and its own `angular.json` project, so '
   + '`ng build viewer-core` is a real target. The last two issues gave two different wrong '

@@ -59,10 +59,11 @@ module.exports = [
 
   h1('2.  Three layers, and the one that matters'),
   ...diagramBoundary(),
-  p('**`src/viewer-core/` is the product.** 5,571 lines of production TypeScript across 37 source '
-  + 'files, with 30 spec files beside them \u2014 up from 3,220 across 15 with 8 at the last '
-  + 'issue, which is the growth the conformance work of the last three issues cost and worth '
-  + 'seeing stated rather than discovering. Nothing in it imports anything from the application '
+  p('**`src/viewer-core/` is the product.** 5,769 lines of production TypeScript across 40 source '
+  + 'files, with 30 spec files beside them \u2014 up from 3,220 across 15 with 8 three issues '
+  + 'ago, which is the growth the conformance work of those issues cost and worth '
+  + 'seeing stated rather than discovering. Three of those files are new this issue, from '
+  + 'splitting the two that had gone over the section 3.3 limit of 400 lines. Nothing in it imports anything from the application '
   + '\u2014 '
   + 'not a service, not a model, not an environment constant. When the separate repository exists, '
   + 'this directory is **copied, not untangled**.'),

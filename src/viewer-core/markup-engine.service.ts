@@ -2,6 +2,11 @@ import { Injectable } from '@angular/core';
 import { ShapeData, MarkupTool } from './viewer-state.service';
 import { SvgPrimitive, shapeToPrimitives } from './svg-primitives';
 import { shapeToSvg, shapesToSvgContent } from './markup-svg';
+import { hitTest } from './markup-hit-test';
+import {
+  canFinish, completionHint, finishesShape, isClickPlacedTextTool, isTextTool,
+  isVertexTool, minimumVertices, requiredVertices,
+} from './markup-tool-kinds';
 import {
   PointerPoint, MEASURE_COLOUR, MEASURE_COLOUR_DIM, MEASURE_FILL, CALIBRATION_COLOUR,
 } from './markup-palette';
@@ -12,10 +17,18 @@ export type { PointerPoint };
 export type { SvgPrimitive } from './svg-primitives';
 
 /**
- * MarkupEngineService
- * Handles all drawing logic: pointer events (mouse + touch),
- * shape creation, SVG rendering, hit testing.
- * Components call this service — no direct DOM manipulation in components.
+ * The drawing surface's one way in: a pointer position becomes a shape, a
+ * shape becomes SVG, and a click finds what is under it.
+ *
+ * <p>Components call this service — no direct DOM measurement or geometry in a
+ * component.
+ *
+ * <p>Much of it is implemented in the small modules beside this file —
+ * `svg-primitives.ts` and `markup-svg.ts` for rendering, `markup-tool-kinds.ts`
+ * for what a tool is and when a click-built shape is done, `markup-hit-test.ts`
+ * for picking — and reached through the methods here so no caller has to know
+ * which. That split is what keeps this file inside §3.3's 400-line limit, which
+ * it had quietly gone over.
  */
 @Injectable({ providedIn: 'root' })
 export class MarkupEngineService {
@@ -81,6 +94,26 @@ export class MarkupEngineService {
    */
   keyboardStep(coarse: boolean): number {
     return coarse ? 20 : 2;
+  }
+
+  /**
+   * The radius, in an SVG's own user units, that covers `screenPixels` on
+   * screen.
+   *
+   * Needed because "within ten pixels of that vertex" is a statement about
+   * what the eye and hand can do, while shape coordinates are in whatever
+   * space the SVG declares. A CAD drawing's viewBox is its own model units —
+   * often tens of thousands across — so a fixed ten there is a small fraction
+   * of a pixel and a click can never land inside it. Reading the element's own
+   * screen transform covers viewBox scale, zoom and any enclosing transform in
+   * one step.
+   */
+  toleranceInUserUnits(svg: SVGSVGElement, screenPixels = 10): number {
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return screenPixels;
+
+    const scale = Math.hypot(ctm.a, ctm.b);
+    return scale > 0 ? screenPixels / scale : screenPixels;
   }
 
   // ── Build a partial ShapeData from a start point ─────────────
@@ -170,182 +203,66 @@ export class MarkupEngineService {
     return { ...shape, points: (shape.points || []).slice(0, -1) };
   }
 
-  // Preview-only: appends a non-committed cursor point so the in-progress
-  // polygon/polyline rubber-bands to the pointer between clicks.
+  /**
+   * Preview-only: appends a non-committed cursor point so the in-progress
+   * polygon or polyline rubber-bands to the pointer between clicks.
+   *
+   * <p>This comment sat above {@link isVertexTool} for several commits, which
+   * is the ordinary fate of a comment that is not next to what it describes.
+   */
+  withPreviewPoint(shape: ShapeData, pt: PointerPoint | null): ShapeData {
+    if (!pt || !isVertexTool(shape.tool)) return shape;
+    return { ...shape, points: [...(shape.points || []), pt] };
+  }
+
+  // ── What kind of tool this is — see `markup-tool-kinds.ts` ────
   /** Tools built by clicking vertices rather than dragging. */
-  private static readonly VERTEX_TOOLS: MarkupTool[] =
-    ['polygon', 'polyline', 'dimension', 'area', 'radius', 'calibrate'];
-
   isVertexTool(tool: MarkupTool): boolean {
-    return MarkupEngineService.VERTEX_TOOLS.includes(tool);
+    return isVertexTool(tool);
   }
 
-  /**
-   * Tools whose shape carries a `text` field, and which therefore have to ask
-   * the user for that text before the shape is worth adding.
-   *
-   * <p>This lives here rather than in the viewers because both of them need
-   * the same answer, and when the list was written out in each of them they
-   * disagreed: `callout` was in {@link startShape} and in {@link shapeToSvg}
-   * but in neither viewer's copy, so placing one produced an empty box that
-   * could not be typed into and could not be removed except by undo. A tool
-   * added to one list and not the other fails exactly that way — silently,
-   * and only when someone reaches for it.
-   */
-  private static readonly TEXT_TOOLS: MarkupTool[] =
-    ['text', 'stamp', 'note', 'callout'];
-
+  /** Tools whose shape carries words, which have to be asked for. */
   isTextTool(tool: MarkupTool): boolean {
-    return MarkupEngineService.TEXT_TOOLS.includes(tool);
+    return isTextTool(tool);
   }
 
-  /**
-   * Text tools placed by a single click, which is all of them except `callout`.
-   *
-   * <p>{@link isTextTool} answers "does this shape carry words", which is what
-   * asking for them needs. Placing them needs a different question — "is this
-   * put down by a click or by a drag" — and `isTextTool` was standing in for
-   * it. That put `callout` on the click path, where {@link updateShape} is
-   * never reached, so every callout's label stayed at {@link startShape}'s
-   * fixed offset of eighty right and forty up. On a crowded drawing that is
-   * usually on top of the detail being annotated, near a page edge it is off
-   * the page, and no gesture moved it.
-   *
-   * <p>Two predicates rather than one because the two answers genuinely differ
-   * for one tool, and a single list cannot hold both without lying about one of
-   * them.
-   */
-  private static readonly CLICK_PLACED_TEXT_TOOLS: MarkupTool[] =
-    ['text', 'stamp', 'note'];
-
+  /** Text tools placed by one click — every one except `callout`. */
   isClickPlacedTextTool(tool: MarkupTool): boolean {
-    return MarkupEngineService.CLICK_PLACED_TEXT_TOOLS.includes(tool);
+    return isClickPlacedTextTool(tool);
   }
 
   /** Vertex tools that end on a fixed click count rather than a double-click. */
   requiredVertices(tool: MarkupTool): number | null {
-    return tool === 'radius' ? 2 : tool === 'calibrate' ? 2 : null;
+    return requiredVertices(tool);
   }
 
-  /**
-   * How a tool is completed, for the toolbar to show.
-   *
-   * Lives here rather than in the toolbar because it is a property of how the
-   * tool is drawn, not of how it is presented. The toolbar previously carried
-   * its own list naming only polygon and polyline, which left Area, Length and
-   * Radius with no indication that a shape has to be closed at all — and an
-   * unfinished shape simply never produces a reading, so the tool looks broken
-   * rather than unfinished.
-   *
-   * @returns an empty string for tools that are drawn by dragging.
-   */
-  completionHint(tool: MarkupTool): string {
-    if (!this.isVertexTool(tool)) return '';
-
-    // Returned as a finished sentence rather than a fragment the caller
-    // capitalises. Upper-casing the first character in the caller works in
-    // English and is wrong wherever casing rules differ, and it leaves the
-    // translator a fragment with no way to know how it will be presented.
-    const fixed = this.requiredVertices(tool);
-    return fixed
-      ? $localize`:Tells the user how to finish a shape that ends after a set number of clicks@@markupHint.fixedVertices:Click ${fixed}:count: points`
-      : $localize`:Tells the user how to finish a shape with any number of points. Enter is the keyboard key.@@markupHint.anyVertices:Click each point — press Enter, or click the first point again, to finish`;
-  }
-
-  /**
-   * The fewest vertices a shape needs before it can be closed. Below this the
-   * shape has no area or no length, so finishing it would commit nothing.
-   */
+  /** The fewest vertices a shape needs before it can be closed. */
   minimumVertices(tool: MarkupTool): number {
-    return tool === 'area' || tool === 'polygon' ? 3 : 2;
+    return minimumVertices(tool);
   }
 
-  /**
-   * Whether a click ends the shape rather than adding another vertex to it.
-   *
-   * Double-click alone was the only way to finish, and it is not a gesture
-   * software can rely on. The browser reports one only when two presses fall
-   * inside its own window of roughly half a second and a few pixels; outside
-   * that they arrive as two ordinary clicks with nothing marking them as a
-   * pair. Someone placing a point deliberately — the normal way to work on a
-   * drawing — falls outside it constantly, so the shape gained vertices
-   * instead of closing and could not be finished however many times it was
-   * tried.
-   *
-   * A click therefore ends the shape when any of these hold, none of which
-   * depend on that window:
-   *
-   *  - the browser did recognise a double-click (`clickDetail >= 2`);
-   *  - the click lands on the first vertex, the standard gesture for closing
-   *    an outline;
-   *  - the click lands on the vertex just placed, which is what a slow
-   *    double-click amounts to — and a repeated vertex in the same spot was
-   *    never worth anything anyway.
-   *
-   * Tools with a fixed click count complete themselves and are left alone.
-   *
-   * @param tolerance radius in the shape's own coordinate space, so the target
-   *                  stays the same apparent size at any zoom level.
-   * @param clickDetail `MouseEvent.detail` — 1 for a single press, 2 or more
-   *                    for the later presses of a rapid sequence.
-   */
-  /**
-   * The radius, in an SVG's own user units, that covers `screenPixels` on
-   * screen.
-   *
-   * Needed because "within ten pixels of that vertex" is a statement about
-   * what the eye and hand can do, while shape coordinates are in whatever
-   * space the SVG declares. A CAD drawing's viewBox is its own model units —
-   * often tens of thousands across — so a fixed ten there is a small fraction
-   * of a pixel and a click can never land inside it. Reading the element's own
-   * screen transform covers viewBox scale, zoom and any enclosing transform in
-   * one step.
-   */
-  toleranceInUserUnits(svg: SVGSVGElement, screenPixels = 10): number {
-    const ctm = svg.getScreenCTM();
-    if (!ctm) return screenPixels;
-
-    const scale = Math.hypot(ctm.a, ctm.b);
-    return scale > 0 ? screenPixels / scale : screenPixels;
+  /** How a tool is completed, for the toolbar to show. */
+  completionHint(tool: MarkupTool): string {
+    return completionHint(tool);
   }
 
+  /** Whether a click ends the shape rather than adding another vertex. */
   finishesShape(
     shape: ShapeData | null,
     pt: PointerPoint,
     tolerance: number,
     clickDetail = 1
   ): boolean {
-    if (!this.canFinish(shape)) return false;
-    if (this.requiredVertices(shape!.tool) !== null) return false;
-
-    const points = shape!.points ?? [];
-    const near = (v: PointerPoint | undefined) =>
-      v !== undefined && Math.hypot(pt.x - v.x, pt.y - v.y) <= tolerance;
-
-    // A shape with no vertices is not near anything, which `near` now says
-    // rather than throwing.
-    return clickDetail >= 2 || near(points[0]) || near(points[points.length - 1]);
+    return finishesShape(shape, pt, tolerance, clickDetail);
   }
 
   /** True when a click-built shape holds enough vertices to be committed. */
   canFinish(shape: ShapeData | null): boolean {
-    if (!shape || !this.isVertexTool(shape.tool)) return false;
-    return (shape.points?.length ?? 0) >= this.minimumVertices(shape.tool);
-  }
-
-
-  withPreviewPoint(shape: ShapeData, pt: PointerPoint | null): ShapeData {
-    if (!pt || !this.isVertexTool(shape.tool)) return shape;
-    return { ...shape, points: [...(shape.points || []), pt] };
+    return canFinish(shape);
   }
 
   // ── Render a ShapeData to SVG element string ─────────────────
-  /**
-   * A shape as drawable SVG primitives — see `svg-primitives.ts`.
-   *
-   * Delegated rather than implemented here so this file stays near §3.3's
-   * 400-line limit, which it is already over.
-   */
+  /** A shape as drawable SVG primitives — see `svg-primitives.ts`. */
   shapeToPrimitives(shape: ShapeData): SvgPrimitive[] {
     return shapeToPrimitives(shape);
   }
@@ -384,37 +301,9 @@ export class MarkupEngineService {
     }
   }
 
-  // ── Hit test: find shape at pointer position ─────────────────
+  /** The topmost committed shape under a point — see `markup-hit-test.ts`. */
   hitTest(shapes: ShapeData[], pt: PointerPoint, tolerance = 8): ShapeData | null {
-    for (let i = shapes.length - 1; i >= 0; i--) {
-      // Bound once rather than indexed twice: it removes the second access the
-      // compiler cannot prove safe, and it reads better.
-      const shape = shapes[i];
-      if (shape && this.shapeContains(shape, pt, tolerance)) return shape;
-    }
-    return null;
-  }
-
-  private shapeContains(s: ShapeData, pt: PointerPoint, tol: number): boolean {
-    switch (s.tool) {
-      case 'rect': case 'highlight': case 'formfield': case 'ellipse':
-      case 'underline': case 'strikeout': case 'squiggly':
-        return pt.x >= (s.x||0)-tol && pt.x <= (s.x||0)+(s.width||0)+tol &&
-               pt.y >= (s.y||0)-tol && pt.y <= (s.y||0)+(s.height||0)+tol;
-      case 'circle':
-        return Math.hypot(pt.x-(s.cx||0), pt.y-(s.cy||0)) <= (s.r||0)+tol;
-      case 'line': case 'arrow':
-        return this.distToSegment(pt, {x:s.x1||0,y:s.y1||0}, {x:s.x2||0,y:s.y2||0}) <= tol;
-      default: return false;
-    }
-  }
-
-  private distToSegment(p: PointerPoint, a: PointerPoint, b: PointerPoint): number {
-    const dx = b.x-a.x, dy = b.y-a.y;
-    const len2 = dx*dx+dy*dy;
-    if (len2 === 0) return Math.hypot(p.x-a.x, p.y-a.y);
-    const t = Math.max(0, Math.min(1, ((p.x-a.x)*dx+(p.y-a.y)*dy)/len2));
-    return Math.hypot(p.x-(a.x+t*dx), p.y-(a.y+t*dy));
+    return hitTest(shapes, pt, tolerance);
   }
 
   // ── Serialise shapes to XFDF-compatible JSON ─────────────────

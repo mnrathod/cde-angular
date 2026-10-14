@@ -22,6 +22,8 @@
     "check:i18n-markup": "node scripts/check-i18n-markup.mjs",
     "check:embed-protocol": "node scripts/check-embed-protocol.mjs",
     "check:labels": "node scripts/check-labels.mjs",
+    "check:file-size": "node scripts/check-file-size.mjs",
+    "count:endpoints": "node scripts/count-viewer-endpoints.mjs",
     "test:scripts": "vitest run --config vitest.scripts.config.mjs",
     "check:bundle-budget": "node scripts/check-bundle-budget.mjs"
   },

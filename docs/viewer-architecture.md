@@ -66,10 +66,12 @@ from "the bytes belong to someone else".
   └──────────────────────────────────────────────────────────┘
 ```
 
-**`src/viewer-core/` is the product.** 5,571 lines of production TypeScript
-across 37 source files, with 30 spec files beside them — up from 3,220 across
-15 with 8 at the last issue, which is the growth the conformance work of the
-last three issues cost and worth seeing stated rather than discovering. Nothing in it imports
+**`src/viewer-core/` is the product.** 5,769 lines of production TypeScript
+across 40 source files, with 30 spec files beside them — up from 3,220 across
+15 with 8 three issues ago, which is the growth the conformance work of those
+issues cost and worth seeing stated rather than discovering. Three of those
+files are new this issue, from splitting the two that had gone over §3.3's
+400-line limit (§3.2). Nothing in it imports
 anything from the application — not a service, not a model, not an environment
 constant. When the separate repository exists, this directory is **copied, not
 untangled**.
@@ -119,12 +121,23 @@ the glob and trip the rule it escaped.
 
 | Service | Lines | Responsibility |
 |---|---|---|
-| `viewer-state.service` | 375 | The single source of truth. Signals for document, page, zoom, rotation, active tool, selection, sidebar tab, and the version-commit token that makes panels reload after a server-side operation |
-| `markup-engine.service` | 372 | Shape creation, geometry updates and hit testing. Pointer handling and the in-progress shape moved out to `markup-drawing-session` when the second surface needed them |
+| `viewer-state.service` | 390 | The single source of truth. Signals for document, page, zoom, rotation, active tool, selection, sidebar tab, and the version-commit token that makes panels reload after a server-side operation |
+| `markup-engine.service` | 323 | Shape creation and geometry updates. Pointer handling and the in-progress shape moved out to `markup-drawing-session` when the second surface needed them; what a tool *is* and where a shape *lies* moved out to `markup-tool-kinds` and `markup-hit-test` when the file went over §3.3's limit |
 | `pdf-engine.service` | 238 | `pdfjs-dist` wrapper — document loading, page rendering to canvas, text-layer extraction |
 | `measurement.service` | 165 | Scale calibration and the geometry behind length, area and radius. `unitsPerPixel === 1` with unit `px` means uncalibrated |
 | `outline.service` | 147 | A PDF's bookmarks and its link annotations |
 | `drawing-search.service` | 129 | Text search across a converted drawing's labels |
+
+Six files carry the `.service` suffix; nine in `viewer-core` are `@Injectable`.
+`drawing-image`, `drawing-viewport` and `markup-drawing-session` are the three
+that do not, and that is deliberate rather than an oversight — each is provided
+per component rather than once for the application, because each holds state for
+one surface and two surfaces sharing one would see each other's. The table lists
+the six singletons.
+
+`viewer-state.service` at 390 lines is the closest thing here to §3.3's limit,
+with ten to spare. It is the one to watch, and as of this issue something is
+watching it (§3.2).
 
 ### 3.2 Components
 
@@ -133,9 +146,9 @@ the glob and trip the rule it escaped.
 product's whole icon set as stroke-only 24×24 path data, so one definition sits
 on a light rail, a dark header and an accent-filled button without variants.
 
-**Every component in `viewer-core` is now inside the §3.3 limits**, where the
-last issue of this document recorded `cad-viewer.component.ts` at 678 lines and
-called splitting it debt that wanted a runnable test suite first. The suite
+**Every component in `viewer-core` is inside the §3.3 limits**, where an
+earlier issue of this document recorded `cad-viewer.component.ts` at 678 lines
+and called splitting it debt that wanted a runnable test suite first. The suite
 runs, and the split happened: `cad-viewer` is 118 lines, with the viewport
 transform, the image lifecycle, the layer panel and the markup overlay each in
 their own file. `ifc-tree` went the same way, 398 to 198, with a row component
@@ -147,38 +160,96 @@ shift had never been asserted, a layer panel whose checkbox the spec bypassed
 by reaching into the component, an image viewer branch that could never have
 run, and model metadata computed, translated and never rendered.
 
-**Four files are over the 400-line limit, and this passage was wrong about
-which, in both directions.** The last issue named two spec files as the next
-thing to split — `ifc-tree.visibility.spec.ts` at 458 and
-`markup-drawing-session.spec.ts` at 408. Both were split; they are 109 and 110
-lines now, and nothing recorded that the debt had been paid. A document that
-keeps claiming work is outstanding after it is done is as misleading as one
-that claims work is finished when it is not, and the second kind at least gets
-corrected when somebody looks.
+**The two production files that were over the 400-line limit are now under
+it, and a gate measures the limit for the first time.** The last issue recorded
+`markup-drawing-session.ts` at 460 lines and `markup-engine.service.ts` at 434,
+both over because of the keyboard work in §9.2 — the honest cost of the
+single-pointer alternative, which gave the state machine and the engine each a
+cursor, a key interpreter and the geometry behind them. It said splitting a
+state machine wanted its own verification rather than being folded into a
+documentation pass. That verification is this issue's work:
 
-What is over the limit now:
-
-| File | Lines | |
+| Was | Now | Extracted to |
 |---|---|---|
-| `markup-engine.service.spec.ts` | 691 | spec |
-| `markup-drawing-session.ts` | 460 | **production** |
-| `markup-engine.service.ts` | 434 | **production** |
-| `markup-engine.interaction.spec.ts` | 412 | spec |
+| `markup-drawing-session.ts` 460 | **381** | `markup-keyboard-drawing.ts` (147) |
+| `markup-engine.service.ts` 434 | **323** | `markup-tool-kinds.ts` (156), `markup-hit-test.ts` (83) |
 
-**The two production files are over because of the keyboard work in §9.2**, and
-that is the honest account of what the single-pointer alternative cost: the
-state machine and the engine each took a cursor, a key interpreter and the
-geometry behind them. The seam for splitting `markup-drawing-session` is
-visible in the file — the keyboard route is already a labelled section — but
-splitting a state machine is a change that wants its own verification rather
-than being folded into a documentation pass, so it is recorded here and not
-attempted.
+Each split followed a seam the files already had. The engine delegated its
+rendering to `svg-primitives.ts` and `markup-svg.ts` and said in a comment that
+it did so to stay near the limit; the tool predicates and the hit test went the
+same way, so every one of them is still a method on the service and no caller
+changed. The drawing session's keyboard route was already a labelled section:
+it became a class holding one thing — where the cursor is — that hands every
+action to the same press/move/release state machine the pointer drives. **It
+does not re-implement the gesture**, which is the whole reason that file exists;
+the dependency runs one way, from the session to the keys.
 
-**Nothing gates file size**, which is why two production files could cross a
-hard limit in §3.3 without anything saying so, and why the paid-off debt above
-went unrecorded for two issues. That is the gap worth closing before the next
-one opens — a ratcheting baseline of the kind `check:i18n-markup` already uses
-would do it.
+Three defects came out of it, all of the kind that only surfaces when somebody
+moves code: the doc comment for `finishesShape` had come adrift and was sitting
+above `toleranceInUserUnits`'s own comment, so the longest explanation in the
+file documented nothing; the comment describing `withPreviewPoint` sat above
+`isVertexTool`; and the hit test's `default` arm silently reports "not hit" for
+every shape it does not know, which is a real gap rather than a safe default
+and is now written down where the code is.
+
+The splits were verified by breaking them. The coarse keyboard step, the
+polygon vertex minimum and the hit test's search direction were each inverted
+in turn, and each failed exactly the tests that name it — five keyboard tests,
+two vertex tests, two topmost-shape tests — and nothing else.
+
+#### Nothing had been measuring the limit
+
+**That is the defect behind the defect.** §3.3 sets two hard limits — 400 lines
+for a file, 200 for an Angular component — and a limit nothing measures holds
+only until somebody is in a hurry. Both were crossed by the accessibility work
+and the only thing that noticed was a later reading of this document against
+the code. `scripts/check-file-size.mjs` now measures them over 330 code files,
+runs as `npm run check:file-size`, and is wired into the pipeline's static
+analysis stage.
+
+It ships with a baseline, because failing seventeen files on day one is how a
+gate gets switched off by the second day. Each is recorded at its measured
+length and **may only shrink**: a file on the baseline that grows fails, and one
+that comes back inside the limit fails until its entry is deleted. The same
+ratcheting floor as `check-i18n-markup.mjs`. Its own spec breaks the ratchet
+two ways — stopping the growth check, and an off-by-one that fails a compliant
+file — and each failed exactly the test naming it.
+
+**This passage has also been wrong in the other direction, and that is worth
+keeping.** Two issues ago it named two spec files as the next thing to split —
+`ifc-tree.visibility.spec.ts` at 458 and `markup-drawing-session.spec.ts` at
+408. Both were split; they are 109 and 110 lines, and nothing recorded that the
+debt had been paid. A document that keeps claiming work is outstanding after it
+is done misleads as much as one claiming work is finished when it is not, and
+the second kind at least gets corrected when somebody looks.
+
+And the sentence this passage used to open with — "four files are over the
+400-line limit" — was true only of `viewer-core`, which is not what it said.
+The gate counts every root, and the real figures are:
+
+| What is over | Count | |
+|---|---|---|
+| Spec files over 400 | 12 | largest `markup-engine.service.spec.ts` at 691 |
+| `demo/public/host.js` over 400 | 1 | 401, the demo host page |
+| Components over 200 | 4 | `embed-viewer` 245, `pdf-markup-layer` 218, `pdf-form-design` 213, `login` 201 |
+
+**Every component in `viewer-core` is inside the 200-line limit** — the largest
+is `ifc-tree` at 198. The four that are over are all in `src/app`, and the
+earlier claim that "every component is inside again" was true of `viewer-core`
+and false of the application. They are the next real debt, and they are
+production code, unlike most of the baseline.
+
+**Twelve of the seventeen baseline entries are spec files, and whether §3.3's
+limit is meant to bind a spec file is an open question for the team, not one
+this document should answer** (§0.7 — flag the conflict rather than quietly
+picking). The limit as written says "files", so that is what the gate measures.
+If the team decides a 500-line spec of independent cases is not the hazard a
+500-line service is, the exclusion belongs in §3.3 and then in the gate — not
+as a silent condition inside a script.
+
+The last issue of this document named this as the gap worth closing before
+the next one opened, and proposed exactly the ratcheting baseline
+`check-file-size.mjs` now uses. It is closed.
 
 ### 3.3 What is deliberately *not* here
 
@@ -208,11 +279,17 @@ components, not the question of where they go.
 New since the last issue of this document, and the reason its status line
 changed. The contract ADR 14 settled is now code on both sides.
 
-`src/app/features/embed/` — 1,128 lines of production TypeScript across six
-files, with 811 lines of spec beside them. It is deliberately **not** in
+`src/app/features/embed/` — 1,338 lines of production TypeScript across seven
+files, with 2,216 lines of spec beside them. It is deliberately **not** in
 `viewer-core`: the protocol is how a host talks to a deployment of the viewer,
 so it belongs to the application that is deployed, while `viewer-core` stays
 the part that knows no backend exists.
+
+> The figures in this paragraph read "1,128 across six, with 811 of spec" until
+> this issue, while the diagram in §2 already said seven files and 1,338 lines.
+> **The document contradicted itself two hundred lines apart**, because the last
+> pass corrected the diagram and never reached the prose. Worth stating rather
+> than quietly fixing: a figure is only as good as the last place it appears.
 
 | File | What it does |
 |---|---|
@@ -222,6 +299,7 @@ the part that knows no backend exists.
 | `embed-page.component.ts` | The rendering surface and the markup overlay |
 | `embed-viewer.component.ts` | The `/embed` route component. No auth guard, deliberately — the viewer authenticates nobody |
 | `markup-wire-format.ts` | Translation between the viewer's `ShapeData` and the protocol's `Markup` — the only part of the session with no session state, so it tests against the two representations directly |
+| `embed-stroke-session.ts` | A stroke in progress on the embed surface, kept out of `embed-page.component` so the component stays inside §3.3's 200 lines. It was missing from this table, which is how the file count came to be wrong |
 
 **Thirteen message types run viewer → host and six run host → viewer.** Four of
 the thirteen are lifecycle events — `viewer.opened`, `viewer.unloaded`,
@@ -1057,8 +1135,8 @@ and falls back to installing the pinned build only when no path is given.
 branch — the standard itself — where it previously required 78/78, which was a
 figure the suite happened to reach rather than one anybody had chosen.
 
-Measured: **90.87% line (5,727/6,302) and 85.64% branch (2,840/3,316)**, with
-statements at 88.05% and functions at 74.75%.
+Measured: **90.88% line (5,754/6,331) and 85.66% branch (2,844/3,320)**, with
+statements at 88.07% and functions at 74.94%.
 
 **The gates are whole-number floors just under those figures — 90, 85, 87 and
 74 — not the measurements themselves.** The last issue of this document said
@@ -1115,15 +1193,16 @@ thing it checks is otherwise invisible in a diff.
 | `check:bundle-budget` | The initial bundle, three.js and pdf.js each stay inside their §7.1 budget — currently 122.8 kB / 250, 187.2 kB / 200 and 149.3 kB / 160 |
 | `check:embed-protocol` | The embed protocol's three self-descriptions agree: every type in the `ViewerMessageType` union is sent by production code and has a row in the authority's event table, and nothing is sent or documented from outside it |
 | `check:labels` | Every focusable control has an accessible name. A placeholder is not a label, an `aria-hidden` icon contributes nothing, and `title` is the weakest source in the algorithm |
+| `check:file-size` | No file is over §3.3's 400 lines and no Angular component over 200, against a baseline of seventeen that is only allowed to shrink |
 | `test:scripts` | The gate scripts themselves have tests, so a gate cannot pass by being broken |
 
-**All twelve now run in CI**, where four did two issues ago.
+**All thirteen now run in CI**, where four did three issues ago.
 The CI Node is not the container's, so the version trap above does not reach
 the pipeline. The platform's `Jenkinsfile` runs `npm ci`,
 `tsc --build --force --noEmit` and `ng test` against this repository, and every
 gate in the table: `check:no-remote-code`, `check:i18n`, `check:i18n-markup`,
-`test:scripts`, `check:icons`, `check:samples`, `check:embed-protocol` and
-`check:labels` in the static-analysis stage;
+`test:scripts`, `check:icons`, `check:samples`, `check:embed-protocol`,
+`check:labels` and `check:file-size` in the static-analysis stage;
 `ng build --configuration production` then `check:served-assets` and
 `check:bundle-budget` in the build stage, because those two read the bundle and
 cannot run before it exists; `check:attribution` beside the backend's own
@@ -1137,8 +1216,15 @@ invisible in a diff, and then left where nothing could fail on it.
 The count was ten rather than nine because `check:bundle-budget` was missing
 from the table above — it has existed and passed since the budgets were set,
 and a gate absent from the list of gates is one nobody will think to wire up,
-which is exactly what had happened to it. It is eleven now because
-`check:embed-protocol` and `check:labels` are newer still; §4 and §9.4 say what each was written for.
+which is exactly what had happened to it. It is thirteen now:
+`check:embed-protocol`, `check:labels` and `check:file-size` are newer still.
+§3.2, §4 and §9.4 say what each was written for.
+
+`npm run count:endpoints` sits beside them without being one of them. It prints
+the platform surface the viewer reaches (§13.3) and exits zero whatever it
+finds, because that count is a fact about the design rather than a limit on it —
+but it refuses to print at all when it cannot resolve an import or read a URL,
+which is the behaviour the three wrong counts bought.
 
 Two of the placements are load-bearing rather than tidy. `check:served-assets`
 and `check:bundle-budget` sit after the production build in the same shell, so
@@ -1210,6 +1296,14 @@ likely to surface something nobody predicted.
 **The embed opens PDF and nothing else.** §4.4. The conversion service exists;
 the embed path does not call it.
 
+**Four application components are over §3.3's 200-line limit** — `embed-viewer`
+245, `pdf-markup-layer` 218, `pdf-form-design` 213, `login` 201. They are on
+`check:file-size`'s baseline, so they cannot grow, and they are the only
+production code on it apart from the demo host page. This became visible rather
+than appearing this issue: nothing had ever measured the limit, and the earlier
+claim that every component was inside it was true of `viewer-core` and false of
+the application (§3.2).
+
 **Collaboration has no identity in an embed.** Live cursors and presence ride a
 STOMP socket authenticated by the page session, and an embedded viewer has no
 session. ADR 14 accepted this as the loose end that "no identity" leaves; it is
@@ -1222,20 +1316,43 @@ integrating through `/api/documents` keeps a map between its id and our numeric
 one. `Annotation.author` likewise remains a `@ManyToOne User`, which is correct
 for this platform's own users and is the reason the embed path never touches it.
 
-**35 endpoints across 15 files** — 11 services and 4 components — derived by
-walking imports transitively from every viewer component, viewer service and
-`viewer-core` file. Two groups drive the design: **five are content**, exactly
-what the ingress replaces, and **seventeen are document operations**, which
-ADR 14 assigned to the host. The remainder is markup, identity and
-collaboration.
+**45 endpoints over 48 call sites, in 13 files — 11 services and 2 loaders,
+no components** — found by walking imports transitively from every viewer
+component, every embed component and every `viewer-core` file. Two groups drive
+the design: **five are content**, exactly what the ingress replaces, and
+**twenty are document operations**, which ADR 14 assigned to the host. The
+remaining twenty are the viewer's own — markup, identity, flattening.
 
-That total has been wrong twice, in the same direction — "seven", then "26
-across 9", both undercounts. The first came from grepping directories instead
-of following imports; the second from a resolver that turned `role.service`
-into `role.ts` by replacing the extension rather than appending one, so every
+**That total has now been wrong three times, every time an undercount**, which
+is the expensive direction: the figure exists to size the ingress an external
+CDE has to build. "Seven" came from grepping directories instead of following
+imports. "26 across 9" came from a resolver that turned `role.service` into
+`role.ts` by replacing the extension rather than appending one, so every
 `*.service.ts` import silently failed to resolve and its endpoints were never
-counted. **A count that resolves imports must fail loudly when one does not
-resolve**, or it reports the surface it could see as the surface that exists.
+counted. "35 across 15, 11 services and 4 components" — the figure this
+paragraph carried until now — was a hand count that was never re-run, and was
+wrong on three of its four numbers: there are no components in the list at all,
+the two files that are not services are the PDF and comparison loaders, and
+the document-operations group was out by three.
+
+**So it is no longer a hand count.** `scripts/count-viewer-endpoints.mjs`
+produces it, `npm run count:endpoints` prints it, and the two rules that caused
+the earlier mistakes are now assertions rather than intentions:
+
+- **An import that does not resolve stops the count**, because a resolver that
+  shrugs reports the surface it could see as the surface that exists. Its spec
+  asserts the extension-appending case in both directions — that
+  `./role.service` finds `role.service.ts`, and that it does *not* find a
+  `role.ts` sitting beside it.
+- **A call whose URL is not a literal stops the count.** One of ours reads
+  `data.pdfUrl || /api/viewer/{id}/pdf` and assigns it a line above the call,
+  so no literal is in reach; it is declared explicitly, and the declaration
+  itself fails the run once it stops matching a call. Widening the search until
+  some nearby literal matched would have answered confidently and wrongly.
+
+The `http.request('delete', url)` form was a third, smaller version of the same
+problem: taking the first literal as the path invented an endpoint named
+`delete` and lost the real one, two errors from one call site.
 
 **And the partition is not settled.** `viewer-extraction-inventory.md` §2 gives
 a total of 35 across 11 services and 4 components, but its own table lists ten
