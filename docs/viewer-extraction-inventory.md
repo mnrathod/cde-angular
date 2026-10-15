@@ -117,11 +117,24 @@ nothing recorded it. A document that reports a boundary breach which does not
 exist costs somebody an afternoon looking for it, which is why this is corrected
 in place rather than deleted.
 
-The observation underneath it still holds and is still unclosed: the boundary
-test forbids *imports* across the `viewer-core` line, and a URL in a string
-literal is not an import, so nothing would stop a component inside the package
-calling the platform directly. That is a gap in the test, not a defect in the
-code — but it is the reason the claim above was believable for three issues.
+**And the gap it described is closed, which the correction above should have
+said and did not.** The reasoning kept here for one revision — that the
+boundary test forbids *imports* and a URL in a string literal is not an import,
+so nothing would stop a component inside the package calling the platform —
+was true once and is not true now. `viewer-core.boundary.spec.ts` asserts the
+absence of `HttpClient`, `@angular/common/http`, `fetch(`, `XMLHttpRequest`,
+`sendBeacon`, `new WebSocket`/`EventSource` **and a quoted `/api/` path**
+across every file in the package. Its own comment records why: that is exactly
+how `ifc-tree.component.ts` came to sit here injecting the HTTP client and
+fetching a model tree while every import assertion passed. Verified by planting
+`'/api/viewer3d/1/tree'` in a `viewer-core` file — the run fails on "no an
+`/api` path anywhere in the package" and nothing else.
+
+Worth stating plainly, because it is the same mistake twice in two days: the
+revision above correctly deleted a claim that four components call the API, then
+kept the premise underneath it without checking that premise either. **A
+deferral is only as good as the last time somebody tested its reason**, and the
+reason here had been false for longer than the claim it was supporting.
 
 These fall into four groups, and the grouping is the design:
 
